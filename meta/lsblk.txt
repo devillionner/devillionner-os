@@ -1,0 +1,16 @@
+NAME          SIZE FSTYPE FSVER MOUNTPOINTS PARTLABEL                    PARTUUID
+zram0        30,7G swap   1     [SWAP]                                   
+nvme0n1     953,9G                                                       
+├─nvme0n1p1   300M vfat   FAT32             EFI system partition         3f683fc2-b075-4554-9c56-28139fcbb65b
+├─nvme0n1p2    16M                          Microsoft reserved partition 759ce890-2b4f-431e-8738-7b2a57259c79
+├─nvme0n1p3 752,6G ntfs                     Basic data partition         5f0d6f6b-4e1b-4e5f-a8c9-f6b52d893c54
+├─nvme0n1p4  1000M ntfs                     Basic data partition         106b647c-49ed-4c6f-9faa-bfbd7e616889
+├─nvme0n1p5     4G vfat   FAT32 /boot                                    74d250ea-b08d-4c5f-b1ff-9668e0ca97dd
+├─nvme0n1p6   146G btrfs        /var/tmp                                 dd1a5d46-e370-454d-8278-2335f9eb1262
+│                               /var/log                                 
+│                               /var/cache                               
+│                               /srv                                     
+│                               /home                                    
+│                               /root                                    
+│                               /                                        
+└─nvme0n1p7    50G btrfs                    cachy-os-work                1c08b2fd-b4c8-4933-920b-80746d466558

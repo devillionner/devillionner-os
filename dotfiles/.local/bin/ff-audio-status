@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+cache="$HOME/.cache/ff-audio-preset"
+
+if pgrep -x easyeffects >/dev/null 2>&1; then
+    preset="$(timeout 1 easyeffects -s output 2>/dev/null | sed -n "s/^output:[[:space:]]*//p" | tail -n 1)"
+
+    case "$preset" in
+        "Laptop")
+            label="Zenbook / Laptop"
+            ;;
+        "Sony AutoEq Harman")
+            label="Sony / Harman"
+            ;;
+        "Dolby Atmos")
+            label="Dolby Atmos"
+            ;;
+        "")
+            label=""
+            ;;
+        *)
+            label="$preset"
+            ;;
+    esac
+
+    if [[ -n "$label" ]]; then
+        printf "%s\n" "$label" > "$cache"
+        printf "%s\n" "$label"
+        exit 0
+    fi
+fi
+
+if [[ -r "$cache" ]]; then
+    cat "$cache"
+else
+    printf "EasyEffects off\n"
+fi

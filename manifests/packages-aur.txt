@@ -1,0 +1,7 @@
+caelestia-cli
+caelestia-firefox-theme
+caelestia-shell
+darkly-bin
+hyprmod
+papirus-folders
+qtengine

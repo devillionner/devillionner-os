@@ -1,0 +1,7 @@
+snapshot=2026-08-17T05:35:43+03:00
+user=devillionner-gaming
+hostname=cachyos-asus-gaming
+shell=/bin/fish
+kernel=7.1.8-1-cachyos
+bios=UX3405CA.315
+model=ASUS Zenbook 14 UX3405CA_UX3405CA

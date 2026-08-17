@@ -1,0 +1,30 @@
+{
+    "appearance": {
+        "transparency": {
+            "enabled": true
+        }
+    },
+    "dashboard": {
+        "enabled": true,
+        "showDashboard": true,
+        "showOnHover": true
+    },
+    "general": {
+        "apps": {
+            "playback": [
+                "clapper"
+            ],
+            "terminal": [
+                "kitty"
+            ]
+        }
+    },
+    "services": {
+        "defaultPlayer": "YouTube Music for Desktop"
+    },
+    "utilities": {
+        "toasts": {
+            "nowPlaying": false
+        }
+    }
+}
