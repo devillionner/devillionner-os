@@ -6,6 +6,7 @@ MAN="$REPO/manifests"
 
 MAIN_PARTUUID="dd1a5d46-e370-454d-8278-2335f9eb1262"
 TEST_PARTUUID="1c08b2fd-b4c8-4933-920b-80746d466558"
+MODE="${1:-}"
 
 info() { printf "\n==> %s\n" "$*"; }
 ok()   { printf "    [OK] %s\n" "$*"; }
@@ -23,27 +24,39 @@ grep -Eq "^ID=\"?cachyos\"?$" /etc/os-release 2>/dev/null \
 [[ $EUID -ne 0 ]] \
     || die "Run this as your normal user, NOT as root."
 
-# ── Safety: root partition ─────────────────────────────────
+# ── Safety: restore target ─────────────────────────────────
 ROOT_SRC="$(findmnt -no SOURCE /)"
 ROOT_DEV="${ROOT_SRC%%[*}"
 ROOT_DEV="$(readlink -f "$ROOT_DEV")"
 ROOT_PARTUUID="$(lsblk -no PARTUUID "$ROOT_DEV" 2>/dev/null | head -n1 | xargs)"
+VIRT="$(systemd-detect-virt 2>/dev/null || true)"
 
 printf "Root device:   %s\n" "$ROOT_DEV"
 printf "Root PARTUUID: %s\n" "${ROOT_PARTUUID:-unknown}"
+printf "Virtualization: %s\n" "${VIRT:-none}"
 
+# The real main CachyOS is always blocked, even if other checks change later.
 if [[ "$ROOT_PARTUUID" == "$MAIN_PARTUUID" ]]; then
     die "You are on the MAIN CachyOS. Restore is blocked."
 fi
 
-if [[ "$ROOT_PARTUUID" != "$TEST_PARTUUID" ]]; then
-    die "This is not the expected CachyOS Work partition. Do not force it; inspect the disk first."
+if [[ "$MODE" == "--vm" ]]; then
+    case "$VIRT" in
+        kvm|qemu)
+            ok "KVM/QEMU test VM confirmed"
+            ;;
+        *)
+            die "--vm was requested, but this system is not a KVM/QEMU guest."
+            ;;
+    esac
+elif [[ "$ROOT_PARTUUID" == "$TEST_PARTUUID" ]]; then
+    ok "CachyOS Work partition confirmed"
+else
+    die "Unknown restore target. Use --vm only inside the Blueprint KVM test VM."
 fi
 
-ok "CachyOS Work partition confirmed"
-
 printf "\nThis will install packages and restore dotfiles/services.\n"
-printf "It will NOT touch Windows or repartition disks.\n\n"
+printf "It will NOT repartition disks or modify Windows partitions.\n\n"
 read -r -p "Type RESTORE to continue: " ANSWER
 [[ "$ANSWER" == "RESTORE" ]] || die "Cancelled."
 
