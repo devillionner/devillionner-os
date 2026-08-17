@@ -78,7 +78,7 @@ mapfile -t REPO_PKGS < <(sed "/^[[:space:]]*$/d" "$MAN/packages-repo.txt")
 if grep -qx "pipewire-jack" "$MAN/packages-repo.txt" \
     && pacman -Qq jack2 >/dev/null 2>&1; then
     info "Switching JACK implementation: jack2 -> pipewire-jack"
-    yes | sudo pacman -S --needed pipewire-jack
+    printf 'y\ny\n' | sudo pacman -S --needed pipewire-jack
 fi
 
 if (( ${#REPO_PKGS[@]} > 0 )); then
