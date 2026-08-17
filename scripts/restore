@@ -72,6 +72,15 @@ sudo pacman -Syu --needed --noconfirm base-devel git rsync
 info "Installing repository packages"
 mapfile -t REPO_PKGS < <(sed "/^[[:space:]]*$/d" "$MAN/packages-repo.txt")
 
+# A fresh CachyOS install may ship JACK2, while this Blueprint explicitly
+# uses PipeWire's JACK compatibility layer. Replace it first so the large
+# non-interactive pacman transaction cannot stop on the jack2 conflict.
+if grep -qx "pipewire-jack" "$MAN/packages-repo.txt" \
+    && pacman -Qq jack2 >/dev/null 2>&1; then
+    info "Switching JACK implementation: jack2 -> pipewire-jack"
+    yes | sudo pacman -S --needed pipewire-jack
+fi
+
 if (( ${#REPO_PKGS[@]} > 0 )); then
     sudo pacman -S --needed --noconfirm "${REPO_PKGS[@]}"
 fi
