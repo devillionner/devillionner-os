@@ -35,19 +35,14 @@ printf "Root device:   %s\n" "$ROOT_DEV"
 printf "Root PARTUUID: %s\n" "${ROOT_PARTUUID:-unknown}"
 printf "Virtualization: %s\n" "${VIRT:-none}"
 
-# The real main CachyOS is always blocked, even if other checks change later.
 if [[ "$ROOT_PARTUUID" == "$MAIN_PARTUUID" ]]; then
     die "You are on the MAIN CachyOS. Restore is blocked."
 fi
 
 if [[ "$MODE" == "--vm" ]]; then
     case "$VIRT" in
-        kvm|qemu)
-            ok "KVM/QEMU test VM confirmed"
-            ;;
-        *)
-            die "--vm was requested, but this system is not a KVM/QEMU guest."
-            ;;
+        kvm|qemu) ok "KVM/QEMU test VM confirmed" ;;
+        *) die "--vm was requested, but this system is not a KVM/QEMU guest." ;;
     esac
 elif [[ "$ROOT_PARTUUID" == "$TEST_PARTUUID" ]]; then
     ok "CachyOS Work partition confirmed"
@@ -60,21 +55,15 @@ printf "It will NOT repartition disks or modify Windows partitions.\n\n"
 read -r -p "Type RESTORE to continue: " ANSWER
 [[ "$ANSWER" == "RESTORE" ]] || die "Cancelled."
 
-# ── Sudo ───────────────────────────────────────────────────
 info "Authorizing sudo"
 sudo -v
 
-# ── Bootstrap ──────────────────────────────────────────────
 info "Installing restore prerequisites"
 sudo pacman -Syu --needed --noconfirm base-devel git rsync
 
-# ── Repository packages ────────────────────────────────────
 info "Installing repository packages"
 mapfile -t REPO_PKGS < <(sed "/^[[:space:]]*$/d" "$MAN/packages-repo.txt")
 
-# A fresh CachyOS install may ship JACK2, while this Blueprint explicitly
-# uses PipeWire's JACK compatibility layer. Replace it first so the large
-# non-interactive pacman transaction cannot stop on the jack2 conflict.
 if grep -qx "pipewire-jack" "$MAN/packages-repo.txt" \
     && pacman -Qq jack2 >/dev/null 2>&1; then
     info "Switching JACK implementation: jack2 -> pipewire-jack"
@@ -85,62 +74,75 @@ if (( ${#REPO_PKGS[@]} > 0 )); then
     sudo pacman -S --needed --noconfirm "${REPO_PKGS[@]}"
 fi
 
-# ── AUR / foreign packages ─────────────────────────────────
 info "Installing AUR / foreign packages"
 mapfile -t AUR_PKGS < <(sed "/^[[:space:]]*$/d" "$MAN/packages-aur.txt")
 
-if (( ${#AUR_PKGS[@]} > 0 )); then
+# caelestia-firefox-theme is an upstream-local Arch package, not an AUR package.
+SPECIAL_CAEL_FIREFOX=false
+FILTERED_AUR_PKGS=()
+for PKG in "${AUR_PKGS[@]}"; do
+    if [[ "$PKG" == "caelestia-firefox-theme" ]]; then
+        SPECIAL_CAEL_FIREFOX=true
+    else
+        FILTERED_AUR_PKGS+=("$PKG")
+    fi
+done
+
+if (( ${#FILTERED_AUR_PKGS[@]} > 0 )); then
     if ! command -v paru >/dev/null 2>&1; then
         sudo pacman -S --needed --noconfirm paru
     fi
-
-    paru -S --needed --noconfirm "${AUR_PKGS[@]}"
+    paru -S --needed --noconfirm "${FILTERED_AUR_PKGS[@]}"
 fi
 
-# ── Flatpak ────────────────────────────────────────────────
+if [[ "$SPECIAL_CAEL_FIREFOX" == true ]] \
+    && ! pacman -Qq caelestia-firefox-theme >/dev/null 2>&1; then
+    info "Installing caelestia-firefox-theme from upstream Caelestia source"
+    sudo pacman -S --needed --noconfirm inotify-tools
+    TMP_CAEL="$(mktemp -d)"
+    trap 'rm -rf "$TMP_CAEL"' EXIT
+    git clone --depth 1 https://github.com/caelestia-dots/caelestia.git "$TMP_CAEL/caelestia"
+    (
+        cd "$TMP_CAEL/caelestia/packages/caelestia-firefox-theme"
+        makepkg -si --needed --noconfirm
+    )
+    rm -rf "$TMP_CAEL"
+    trap - EXIT
+fi
+
 if [[ -s "$MAN/flatpak-apps.txt" ]]; then
     info "Installing Flatpak applications"
     sudo pacman -S --needed --noconfirm flatpak
-
     if ! flatpak remotes --columns=name 2>/dev/null | grep -qx flathub; then
         flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
     fi
-
     mapfile -t FLATPAKS < <(sed "/^[[:space:]]*$/d" "$MAN/flatpak-apps.txt")
     (( ${#FLATPAKS[@]} == 0 )) || flatpak install -y flathub "${FLATPAKS[@]}"
 fi
 
-# ── Dotfiles ───────────────────────────────────────────────
 info "Restoring dotfiles"
 mkdir -p "$HOME/.config" "$HOME/.local"
-
 rsync -a "$REPO/dotfiles/.config/" "$HOME/.config/"
 rsync -a "$REPO/dotfiles/.local/"  "$HOME/.local/"
-
 find "$HOME/.local/bin" -maxdepth 1 -type f -exec chmod +x {} + 2>/dev/null || true
 
-# Runtime cache intentionally is not stored in Git
 mkdir -p "$HOME/.cache"
 if [[ ! -e "$HOME/.cache/ff-audio-preset" ]]; then
     printf "%s\n" "Zenbook / Laptop" > "$HOME/.cache/ff-audio-preset"
 fi
 
-# ── Fish login shell ───────────────────────────────────────
 info "Configuring Fish"
 FISH_BIN="$(command -v fish)"
 CURRENT_LOGIN_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
-
 if [[ "$CURRENT_LOGIN_SHELL" != "$FISH_BIN" ]]; then
     chsh -s "$FISH_BIN" "$USER"
 else
     ok "Fish already configured as login shell"
 fi
 
-# ── System services ────────────────────────────────────────
 info "Enabling recorded system services"
 while IFS= read -r UNIT; do
     [[ -z "$UNIT" ]] && continue
-
     if systemctl cat "$UNIT" >/dev/null 2>&1; then
         if ! sudo systemctl enable "$UNIT" >/dev/null 2>&1; then
             warn "Could not enable $UNIT"
@@ -150,13 +152,10 @@ while IFS= read -r UNIT; do
     fi
 done < "$MAN/services-system.txt"
 
-# ── User services ──────────────────────────────────────────
 info "Enabling recorded user services"
 systemctl --user daemon-reload
-
 while IFS= read -r UNIT; do
     [[ -z "$UNIT" ]] && continue
-
     if systemctl --user cat "$UNIT" >/dev/null 2>&1; then
         if ! systemctl --user enable "$UNIT" >/dev/null 2>&1; then
             warn "Could not enable user unit $UNIT"
@@ -166,14 +165,11 @@ while IFS= read -r UNIT; do
     fi
 done < "$MAN/services-user.txt"
 
-# Critical audio services
 systemctl --user enable wireplumber.service >/dev/null 2>&1 || true
 systemctl --user enable pipewire.socket >/dev/null 2>&1 || true
 systemctl --user enable pipewire-pulse.socket >/dev/null 2>&1 || true
 
-# ── Validation ─────────────────────────────────────────────
 info "Running Blueprint validation"
-
 if "$REPO/scripts/check"; then
     printf "\n========================================\n"
     printf "RESTORE COMPLETED\n"
