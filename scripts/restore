@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MAN="$REPO/manifests"
+
+MAIN_PARTUUID="dd1a5d46-e370-454d-8278-2335f9eb1262"
+TEST_PARTUUID="1c08b2fd-b4c8-4933-920b-80746d466558"
+
+info() { printf "\n==> %s\n" "$*"; }
+ok()   { printf "    [OK] %s\n" "$*"; }
+warn() { printf "    [WARN] %s\n" "$*" >&2; }
+die()  { printf "\n    [SAFETY STOP] %s\n" "$*" >&2; exit 1; }
+
+printf "========================================\n"
+printf "       devillionner-os restore\n"
+printf "========================================\n"
+
+# ── Safety: OS ─────────────────────────────────────────────
+grep -Eq "^ID=\"?cachyos\"?$" /etc/os-release 2>/dev/null \
+    || die "This restore is intended for CachyOS."
+
+[[ $EUID -ne 0 ]] \
+    || die "Run this as your normal user, NOT as root."
+
+# ── Safety: root partition ─────────────────────────────────
+ROOT_SRC="$(findmnt -no SOURCE /)"
+ROOT_DEV="${ROOT_SRC%%[*}"
+ROOT_DEV="$(readlink -f "$ROOT_DEV")"
+ROOT_PARTUUID="$(lsblk -no PARTUUID "$ROOT_DEV" 2>/dev/null | head -n1 | xargs)"
+
+printf "Root device:   %s\n" "$ROOT_DEV"
+printf "Root PARTUUID: %s\n" "${ROOT_PARTUUID:-unknown}"
+
+if [[ "$ROOT_PARTUUID" == "$MAIN_PARTUUID" ]]; then
+    die "You are on the MAIN CachyOS. Restore is blocked."
+fi
+
+if [[ "$ROOT_PARTUUID" != "$TEST_PARTUUID" ]]; then
+    die "This is not the expected CachyOS Work partition. Do not force it; inspect the disk first."
+fi
+
+ok "CachyOS Work partition confirmed"
+
+printf "\nThis will install packages and restore dotfiles/services.\n"
+printf "It will NOT touch Windows or repartition disks.\n\n"
+read -r -p "Type RESTORE to continue: " ANSWER
+[[ "$ANSWER" == "RESTORE" ]] || die "Cancelled."
+
+# ── Sudo ───────────────────────────────────────────────────
+info "Authorizing sudo"
+sudo -v
+
+# ── Bootstrap ──────────────────────────────────────────────
+info "Installing restore prerequisites"
+sudo pacman -Syu --needed --noconfirm base-devel git rsync
+
+# ── Repository packages ────────────────────────────────────
+info "Installing repository packages"
+mapfile -t REPO_PKGS < <(sed "/^[[:space:]]*$/d" "$MAN/packages-repo.txt")
+
+if (( ${#REPO_PKGS[@]} > 0 )); then
+    sudo pacman -S --needed --noconfirm "${REPO_PKGS[@]}"
+fi
+
+# ── AUR / foreign packages ─────────────────────────────────
+info "Installing AUR / foreign packages"
+mapfile -t AUR_PKGS < <(sed "/^[[:space:]]*$/d" "$MAN/packages-aur.txt")
+
+if (( ${#AUR_PKGS[@]} > 0 )); then
+    if ! command -v paru >/dev/null 2>&1; then
+        sudo pacman -S --needed --noconfirm paru
+    fi
+
+    paru -S --needed --noconfirm "${AUR_PKGS[@]}"
+fi
+
+# ── Flatpak ────────────────────────────────────────────────
+if [[ -s "$MAN/flatpak-apps.txt" ]]; then
+    info "Installing Flatpak applications"
+    sudo pacman -S --needed --noconfirm flatpak
+
+    if ! flatpak remotes --columns=name 2>/dev/null | grep -qx flathub; then
+        flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    fi
+
+    mapfile -t FLATPAKS < <(sed "/^[[:space:]]*$/d" "$MAN/flatpak-apps.txt")
+    (( ${#FLATPAKS[@]} == 0 )) || flatpak install -y flathub "${FLATPAKS[@]}"
+fi
+
+# ── Dotfiles ───────────────────────────────────────────────
+info "Restoring dotfiles"
+mkdir -p "$HOME/.config" "$HOME/.local"
+
+rsync -a "$REPO/dotfiles/.config/" "$HOME/.config/"
+rsync -a "$REPO/dotfiles/.local/"  "$HOME/.local/"
+
+find "$HOME/.local/bin" -maxdepth 1 -type f -exec chmod +x {} + 2>/dev/null || true
+
+# Runtime cache intentionally is not stored in Git
+mkdir -p "$HOME/.cache"
+if [[ ! -e "$HOME/.cache/ff-audio-preset" ]]; then
+    printf "%s\n" "Zenbook / Laptop" > "$HOME/.cache/ff-audio-preset"
+fi
+
+# ── Fish login shell ───────────────────────────────────────
+info "Configuring Fish"
+FISH_BIN="$(command -v fish)"
+CURRENT_LOGIN_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
+
+if [[ "$CURRENT_LOGIN_SHELL" != "$FISH_BIN" ]]; then
+    chsh -s "$FISH_BIN" "$USER"
+else
+    ok "Fish already configured as login shell"
+fi
+
+# ── System services ────────────────────────────────────────
+info "Enabling recorded system services"
+while IFS= read -r UNIT; do
+    [[ -z "$UNIT" ]] && continue
+
+    if systemctl cat "$UNIT" >/dev/null 2>&1; then
+        if ! sudo systemctl enable "$UNIT" >/dev/null 2>&1; then
+            warn "Could not enable $UNIT"
+        fi
+    else
+        warn "Unit not available: $UNIT"
+    fi
+done < "$MAN/services-system.txt"
+
+# ── User services ──────────────────────────────────────────
+info "Enabling recorded user services"
+systemctl --user daemon-reload
+
+while IFS= read -r UNIT; do
+    [[ -z "$UNIT" ]] && continue
+
+    if systemctl --user cat "$UNIT" >/dev/null 2>&1; then
+        if ! systemctl --user enable "$UNIT" >/dev/null 2>&1; then
+            warn "Could not enable user unit $UNIT"
+        fi
+    else
+        warn "User unit not available: $UNIT"
+    fi
+done < "$MAN/services-user.txt"
+
+# Critical audio services
+systemctl --user enable wireplumber.service >/dev/null 2>&1 || true
+systemctl --user enable pipewire.socket >/dev/null 2>&1 || true
+systemctl --user enable pipewire-pulse.socket >/dev/null 2>&1 || true
+
+# ── Validation ─────────────────────────────────────────────
+info "Running Blueprint validation"
+
+if "$REPO/scripts/check"; then
+    printf "\n========================================\n"
+    printf "RESTORE COMPLETED\n"
+    printf "Validation: PASS\n"
+    printf "========================================\n"
+else
+    printf "\n========================================\n"
+    printf "RESTORE COMPLETED WITH DIFFERENCES\n"
+    printf "Review validation output above.\n"
+    printf "========================================\n"
+fi
+
+printf "\nA reboot is recommended before final validation.\n"

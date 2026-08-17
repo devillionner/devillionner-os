@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+set -u
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MAN="$REPO/manifests"
+
+OK=0
+WARN=0
+FAIL=0
+
+ok() {
+    printf "  [OK]   %s\n" "$*"
+    OK=$((OK + 1))
+}
+
+warn() {
+    printf "  [WARN] %s\n" "$*"
+    WARN=$((WARN + 1))
+}
+
+fail() {
+    printf "  [FAIL] %s\n" "$*"
+    FAIL=$((FAIL + 1))
+}
+
+section() {
+    printf "\n%s\n" "$1"
+}
+
+printf "========================================\n"
+printf "       devillionner-os validation\n"
+printf "========================================\n"
+
+section "SYSTEM"
+
+if grep -Eq "^ID=\"?cachyos\"?$" /etc/os-release 2>/dev/null; then
+    ok "CachyOS"
+else
+    fail "Not running CachyOS"
+fi
+
+MODEL="$(cat /sys/class/dmi/id/product_name 2>/dev/null || true)"
+if [[ "$MODEL" == *"UX3405CA"* ]]; then
+    ok "ASUS UX3405CA"
+else
+    warn "Different hardware: ${MODEL:-unknown}"
+fi
+
+section "CORE"
+
+for CMD in fish fastfetch Hyprland easyeffects kitty git rsync wpctl; do
+    if command -v "$CMD" >/dev/null 2>&1; then
+        ok "$CMD"
+    else
+        fail "$CMD missing"
+    fi
+done
+
+section "SHELL"
+
+LOGIN_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
+if [[ "$LOGIN_SHELL" == */fish ]]; then
+    ok "fish is login shell"
+else
+    fail "login shell is $LOGIN_SHELL"
+fi
+
+for FILE in c disk eq-laptop eq-sony eq-dolby fish_greeting; do
+    if [[ -f "$HOME/.config/fish/functions/$FILE.fish" ]]; then
+        ok "fish function: $FILE"
+    else
+        fail "fish function missing: $FILE"
+    fi
+done
+
+for FILE in ff-audio-status ff-disk-status; do
+    if [[ -x "$HOME/.local/bin/$FILE" ]]; then
+        ok "~/.local/bin/$FILE"
+    else
+        fail "~/.local/bin/$FILE missing"
+    fi
+done
+
+section "DOTFILES"
+
+for DIR in fish fastfetch hypr easyeffects caelestia kitty; do
+    if [[ -d "$HOME/.config/$DIR" ]]; then
+        ok "~/.config/$DIR"
+    else
+        fail "~/.config/$DIR missing"
+    fi
+done
+
+section "PACKAGES"
+
+REPO_TOTAL=0
+REPO_MISSING=0
+
+while IFS= read -r PKG; do
+    [[ -z "$PKG" ]] && continue
+    REPO_TOTAL=$((REPO_TOTAL + 1))
+    if ! pacman -Qq "$PKG" >/dev/null 2>&1; then
+        printf "         missing: %s\n" "$PKG"
+        REPO_MISSING=$((REPO_MISSING + 1))
+    fi
+done < "$MAN/packages-repo.txt"
+
+if (( REPO_MISSING == 0 )); then
+    ok "repo packages $REPO_TOTAL/$REPO_TOTAL"
+else
+    fail "$REPO_MISSING repo package(s) missing"
+fi
+
+AUR_TOTAL=0
+AUR_MISSING=0
+
+while IFS= read -r PKG; do
+    [[ -z "$PKG" ]] && continue
+    AUR_TOTAL=$((AUR_TOTAL + 1))
+    if ! pacman -Qq "$PKG" >/dev/null 2>&1; then
+        printf "         missing: %s\n" "$PKG"
+        AUR_MISSING=$((AUR_MISSING + 1))
+    fi
+done < "$MAN/packages-aur.txt"
+
+if (( AUR_MISSING == 0 )); then
+    ok "AUR/foreign packages $AUR_TOTAL/$AUR_TOTAL"
+else
+    fail "$AUR_MISSING AUR/foreign package(s) missing"
+fi
+
+section "SERVICES"
+
+SYS_MISSING=0
+while IFS= read -r UNIT; do
+    [[ -z "$UNIT" ]] && continue
+    if ! systemctl is-enabled "$UNIT" >/dev/null 2>&1; then
+        printf "         not enabled: %s\n" "$UNIT"
+        SYS_MISSING=$((SYS_MISSING + 1))
+    fi
+done < "$MAN/services-system.txt"
+
+if (( SYS_MISSING == 0 )); then
+    ok "recorded system services"
+else
+    fail "$SYS_MISSING system service(s) differ"
+fi
+
+USER_MISSING=0
+while IFS= read -r UNIT; do
+    [[ -z "$UNIT" ]] && continue
+    if ! systemctl --user is-enabled "$UNIT" >/dev/null 2>&1; then
+        printf "         not enabled: %s\n" "$UNIT"
+        USER_MISSING=$((USER_MISSING + 1))
+    fi
+done < "$MAN/services-user.txt"
+
+if (( USER_MISSING == 0 )); then
+    ok "recorded user services"
+else
+    fail "$USER_MISSING user service(s) differ"
+fi
+
+section "AUDIO"
+
+WP="$(wpctl status 2>/dev/null || true)"
+
+if grep -q "Speaker" <<< "$WP"; then
+    ok "PipeWire Speaker sink"
+else
+    fail "Speaker sink not found"
+fi
+
+if grep -q "WirePlumber" <<< "$WP"; then
+    ok "WirePlumber"
+else
+    fail "WirePlumber not visible"
+fi
+
+if pgrep -x easyeffects >/dev/null 2>&1; then
+    ok "EasyEffects running"
+else
+    warn "EasyEffects not running"
+fi
+
+section "BLUEPRINT"
+
+if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    ok "Git repository"
+else
+    fail "Git repository missing"
+fi
+
+if [[ -n "$(git -C "$REPO" status --porcelain)" ]]; then
+    warn "working tree has uncommitted changes"
+else
+    ok "working tree clean"
+fi
+
+printf "\n========================================\n"
+printf "OK: %d   WARN: %d   FAIL: %d\n" "$OK" "$WARN" "$FAIL"
+
+if (( FAIL == 0 )); then
+    printf "RESULT: PASS\n"
+    exit 0
+else
+    printf "RESULT: FAIL\n"
+    exit 1
+fi
