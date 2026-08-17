@@ -3,6 +3,11 @@ set -u
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 MAN="$REPO/manifests"
+VIRT="$(systemd-detect-virt 2>/dev/null || true)"
+IS_VM=false
+case "$VIRT" in
+    kvm|qemu) IS_VM=true ;;
+esac
 
 OK=0
 WARN=0
@@ -42,6 +47,8 @@ fi
 MODEL="$(cat /sys/class/dmi/id/product_name 2>/dev/null || true)"
 if [[ "$MODEL" == *"UX3405CA"* ]]; then
     ok "ASUS UX3405CA"
+elif [[ "$IS_VM" == true ]]; then
+    ok "KVM/QEMU test VM (${MODEL:-unknown})"
 else
     warn "Different hardware: ${MODEL:-unknown}"
 fi
@@ -95,7 +102,6 @@ section "PACKAGES"
 
 REPO_TOTAL=0
 REPO_MISSING=0
-
 while IFS= read -r PKG; do
     [[ -z "$PKG" ]] && continue
     REPO_TOTAL=$((REPO_TOTAL + 1))
@@ -113,7 +119,6 @@ fi
 
 AUR_TOTAL=0
 AUR_MISSING=0
-
 while IFS= read -r PKG; do
     [[ -z "$PKG" ]] && continue
     AUR_TOTAL=$((AUR_TOTAL + 1))
@@ -127,6 +132,14 @@ if (( AUR_MISSING == 0 )); then
     ok "AUR/foreign packages $AUR_TOTAL/$AUR_TOTAL"
 else
     fail "$AUR_MISSING AUR/foreign package(s) missing"
+fi
+
+if pacman -Qq caelestia-shell >/dev/null 2>&1; then
+    if pacman -Qq quickshell-git >/dev/null 2>&1; then
+        ok "Caelestia-compatible quickshell-git"
+    else
+        fail "quickshell-git missing for Caelestia"
+    fi
 fi
 
 section "SERVICES"
@@ -161,14 +174,26 @@ else
     fail "$USER_MISSING user service(s) differ"
 fi
 
+section "DESKTOP"
+
+if pgrep -f 'quickshell.*caelestia|caelestia.*shell' >/dev/null 2>&1; then
+    ok "Caelestia shell running"
+else
+    warn "Caelestia shell not running in this session"
+fi
+
 section "AUDIO"
 
 WP="$(wpctl status 2>/dev/null || true)"
 
-if grep -q "Speaker" <<< "$WP"; then
-    ok "PipeWire Speaker sink"
+if [[ "$IS_VM" == true ]]; then
+    warn "Physical Zenbook Speaker sink check skipped in VM"
 else
-    fail "Speaker sink not found"
+    if grep -q "Speaker" <<< "$WP"; then
+        ok "PipeWire Speaker sink"
+    else
+        fail "Speaker sink not found"
+    fi
 fi
 
 if grep -q "WirePlumber" <<< "$WP"; then
@@ -179,6 +204,8 @@ fi
 
 if pgrep -x easyeffects >/dev/null 2>&1; then
     ok "EasyEffects running"
+elif [[ "$IS_VM" == true ]]; then
+    warn "EasyEffects not running in VM"
 else
     warn "EasyEffects not running"
 fi
