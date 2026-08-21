@@ -20,6 +20,7 @@
         }
     },
     "services": {
+        "brightnessIncrement": 0.01,
         "defaultPlayer": "YouTube Music for Desktop"
     },
     "utilities": {
