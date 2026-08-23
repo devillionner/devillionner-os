@@ -140,6 +140,13 @@ rsync -a "$REPO/dotfiles/.config/" "$HOME/.config/"
 rsync -a "$REPO/dotfiles/.local/"  "$HOME/.local/"
 find "$HOME/.local/bin" -maxdepth 1 -type f -exec chmod +x {} + 2>/dev/null || true
 
+if [[ -x "$REPO/scripts/patch-caelestia-fullscreen" ]]; then
+    info "Applying Caelestia fullscreen UI patch"
+    if ! "$REPO/scripts/patch-caelestia-fullscreen"; then
+        warn "Caelestia fullscreen patch could not be applied; upstream files may have changed"
+    fi
+fi
+
 mkdir -p "$HOME/.cache"
 if [[ ! -e "$HOME/.cache/ff-audio-preset" ]]; then
     printf "%s\n" "Zenbook / Laptop" > "$HOME/.cache/ff-audio-preset"
