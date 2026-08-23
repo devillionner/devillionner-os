@@ -48,7 +48,7 @@ return {
     inactiveWindowBorderColour = "rgba(" .. scheme.onSurfaceVariant .. "11)",
 
     -- Misc
-    volumeStep                 = 1,
+    volumeStep                 = 5,
     volumeMax                  = 100,
     cursorTheme                = "sweet-cursors",
     cursorSize                 = 24,
@@ -64,7 +64,7 @@ return {
     kbMoveWinToWs              = "SUPER + ALT",
     kbMoveWinToWsGroup         = "CTRL + SUPER + ALT",
 
-    -- All the following binds can be either an array of binds to bind multiple keys, or a single string.
+    -- All the following binds can be either an array of binds, or a single string.
 
     -- Workspaces
     kbMoveWinToWsSpecial       = { "SUPER + ALT + S", "CTRL + SUPER + SHIFT + Up" },
