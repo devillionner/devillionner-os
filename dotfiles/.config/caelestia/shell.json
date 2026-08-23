@@ -10,6 +10,7 @@
         "showOnHover": true
     },
     "general": {
+        "showOverFullscreen": true,
         "apps": {
             "playback": [
                 "clapper"
@@ -20,7 +21,7 @@
         }
     },
     "services": {
-        "brightnessIncrement": 0.01,
+        "brightnessIncrement": 0.05,
         "defaultPlayer": "YouTube Music for Desktop"
     },
     "utilities": {
