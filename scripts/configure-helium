@@ -10,7 +10,7 @@ if ! command -v helium-browser >/dev/null 2>&1; then
     exit 0
 fi
 
-DESKTOP="helium-browser.desktop"
+DESKTOP="helium.desktop"
 
 info "Setting Helium as the default browser"
 xdg-settings set default-web-browser "$DESKTOP" >/dev/null 2>&1 || warn "xdg-settings could not set the default browser"
@@ -24,7 +24,7 @@ if pgrep -x helium >/dev/null 2>&1 || pgrep -f '/opt/helium-browser-bin/' >/dev/
     exit 0
 fi
 
-PREFS="${XDG_CONFIG_HOME:-$HOME/.config}/helium/Default/Preferences"
+PREFS="${XDG_CONFIG_HOME:-$HOME/.config}/net.imput.helium/Default/Preferences"
 mkdir -p "$(dirname "$PREFS")"
 
 if [[ -f "$PREFS" ]]; then
