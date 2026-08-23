@@ -14,4 +14,7 @@ Reproducible configuration for my CachyOS workstation.
 - ~/.local/bin helpers
 - Hardware reference
 
+## Manual extras
+- [YouTube Music + Better Lyrics setup](docs/youtube-music.md)
+
 Browser profiles, cookies, passwords, SSH private keys and caches are intentionally excluded.
