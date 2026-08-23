@@ -26,7 +26,8 @@
     },
     "utilities": {
         "toasts": {
-            "nowPlaying": false
+            "nowPlaying": false,
+            "fullscreen": "all"
         }
     }
 }
