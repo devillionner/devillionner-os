@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+info() { printf "==> %s\n" "$*"; }
+ok()   { printf "    [OK] %s\n" "$*"; }
+warn() { printf "    [WARN] %s\n" "$*" >&2; }
+
+if ! pacman -Qq caelestia-shell >/dev/null 2>&1; then
+    warn "caelestia-shell is not installed; skipping fullscreen patch"
+    exit 0
+fi
+
+SHORTCUTS="$(pacman -Ql caelestia-shell | awk '/\/modules\/Shortcuts\.qml$/ {print $2; exit}')"
+CONTENT="$(pacman -Ql caelestia-shell | awk '/\/modules\/drawers\/ContentWindow\.qml$/ {print $2; exit}')"
+
+if [[ -z "$SHORTCUTS" || -z "$CONTENT" ]]; then
+    warn "Could not locate Caelestia QML files; skipping fullscreen patch"
+    exit 0
+fi
+
+info "Patching Caelestia fullscreen sidebar behavior"
+
+sudo python - "$SHORTCUTS" "$CONTENT" <<'PY'
+from pathlib import Path
+import sys
+
+shortcuts = Path(sys.argv[1])
+content = Path(sys.argv[2])
+
+# Allow SUPER+N/sidebar shortcut while a fullscreen client is active.
+s = shortcuts.read_text()
+old_sidebar = '''    CustomShortcut {
+        // qmllint enable unresolved-type
+        name: "sidebar"
+        description: "Toggle sidebar"
+        onPressed: {
+            if (root.hasFullscreen)
+                return;
+            const screenState = ShellState.forActive();
+            screenState.sidebar = !screenState.sidebar;
+        }
+    }'''
+new_sidebar = '''    CustomShortcut {
+        // qmllint enable unresolved-type
+        name: "sidebar"
+        description: "Toggle sidebar"
+        onPressed: {
+            const screenState = ShellState.forActive();
+            screenState.sidebar = !screenState.sidebar;
+        }
+    }'''
+
+if new_sidebar in s:
+    print("Shortcuts.qml: already patched")
+elif old_sidebar in s:
+    shortcuts.write_text(s.replace(old_sidebar, new_sidebar, 1))
+    print("Shortcuts.qml: patched")
+else:
+    raise SystemExit("Shortcuts.qml: expected sidebar block not found; refusing to modify")
+
+# Keep fullscreen input masked normally, but make the sidebar interactive while open.
+c = content.read_text()
+old_mask = "mask: hasFullscreen ? emptyRegion : regions"
+new_mask = "mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions"
+
+if new_mask in c:
+    print("ContentWindow.qml: already patched")
+elif old_mask in c:
+    content.write_text(c.replace(old_mask, new_mask, 1))
+    print("ContentWindow.qml: patched")
+else:
+    raise SystemExit("ContentWindow.qml: expected fullscreen mask not found; refusing to modify")
+PY
+
+ok "Caelestia fullscreen sidebar patch applied"
