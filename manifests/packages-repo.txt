@@ -185,6 +185,7 @@ pwvucontrol
 python
 python-defusedxml
 python-packaging
+python-websocket-client
 realtime-privileges
 rebuild-detector
 reflector

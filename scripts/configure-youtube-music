@@ -1,0 +1,378 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+EXT_ID="effdbpeggelllpfkjppbokhmmiinhlmg"
+PROFILE="${XDG_CONFIG_HOME:-$HOME/.config}/ytm-isolated"
+PREFS="$PROFILE/Default/Preferences"
+DESKTOP="$HOME/.local/share/applications/youtube-music.desktop"
+THEME="$REPO/assets/better-lyrics/blyrics-theme.rics"
+
+info() { printf "\n==> %s\n" "$*"; }
+ok()   { printf "    [OK] %s\n" "$*"; }
+warn() { printf "    [WARN] %s\n" "$*" >&2; }
+die()  { printf "    [ERROR] %s\n" "$*" >&2; exit 1; }
+
+command -v helium-browser >/dev/null 2>&1 \
+    || die "helium-browser is not installed"
+
+[[ -f "$THEME" ]] \
+    || die "Better Lyrics theme is missing: $THEME"
+
+mkdir -p "$PROFILE/Default"
+mkdir -p "$(dirname "$DESKTOP")"
+
+# Never modify the isolated profile while YouTube Music is using it.
+if pgrep -af helium 2>/dev/null \
+    | grep -F -- "--user-data-dir=$PROFILE" \
+    | grep -v grep >/dev/null; then
+    die "YouTube Music isolated profile is currently running. Close it and retry."
+fi
+
+
+# ------------------------------------------------------------
+# Helium first-run preseed
+# ------------------------------------------------------------
+
+info "Preparing isolated Helium profile"
+
+python - "$PREFS" <<'PY'
+from pathlib import Path
+import json
+import os
+import sys
+import tempfile
+
+path = Path(sys.argv[1])
+
+if path.exists():
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise SystemExit(
+            f"Refusing to modify invalid Preferences JSON: {exc}"
+        )
+else:
+    data = {}
+
+helium = data.setdefault("helium", {})
+
+helium["completed_onboarding"] = True
+
+services = helium.setdefault("services", {})
+services["schema_version"] = 1
+services["user_consented"] = True
+
+path.parent.mkdir(parents=True, exist_ok=True)
+
+fd, tmp = tempfile.mkstemp(
+    prefix="Preferences.",
+    dir=path.parent
+)
+
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            separators=(",", ":")
+        )
+        f.write("\n")
+
+    os.replace(tmp, path)
+
+finally:
+    if os.path.exists(tmp):
+        os.unlink(tmp)
+PY
+
+ok "Helium onboarding/services preseed applied"
+
+
+# ------------------------------------------------------------
+# Application launcher
+# ------------------------------------------------------------
+
+info "Creating YouTube Music launcher"
+
+cat > "$DESKTOP" <<EOF
+[Desktop Entry]
+Name=YouTube Music
+GenericName=Music Player
+Comment=Listen to YouTube Music
+Exec=helium-browser --app=https://music.youtube.com --user-data-dir=$PROFILE --class=YouTubeMusic
+Icon=youtube-music
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=YouTubeMusic
+EOF
+
+chmod +x "$DESKTOP"
+
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$HOME/.local/share/applications" \
+        >/dev/null 2>&1 || true
+fi
+
+ok "Launcher installed: $DESKTOP"
+
+
+# ------------------------------------------------------------
+# Better Lyrics detection
+# ------------------------------------------------------------
+
+EXT_DIR="$PROFILE/Default/Extensions/$EXT_ID"
+
+if [[ ! -d "$EXT_DIR" ]]; then
+    warn "Better Lyrics is not installed in ytm-isolated yet."
+    warn "YouTube Music launcher/profile are ready."
+    warn "After installing Better Lyrics once, rerun:"
+    warn "  scripts/configure-youtube-music"
+    exit 0
+fi
+
+if ! python - <<'PY' >/dev/null 2>&1
+import websocket
+PY
+then
+    warn "python-websocket-client is missing."
+    warn "Install it with: sudo pacman -S python-websocket-client"
+    exit 0
+fi
+
+
+# ------------------------------------------------------------
+# Pick a free local DevTools port
+# ------------------------------------------------------------
+
+PORT="$(
+python - <<'PY'
+import socket
+
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+)"
+
+DEBUG_URL="http://127.0.0.1:$PORT"
+OPTIONS_URL="chrome-extension://$EXT_ID/options_ui/page.html"
+
+cleanup() {
+    pkill -TERM -f -- "--user-data-dir=$PROFILE" \
+        >/dev/null 2>&1 || true
+}
+
+trap cleanup EXIT
+
+
+# ------------------------------------------------------------
+# Start temporary extension context
+# ------------------------------------------------------------
+
+info "Starting temporary Better Lyrics configuration session"
+
+helium-browser \
+    --user-data-dir="$PROFILE" \
+    --remote-debugging-port="$PORT" \
+    --remote-allow-origins="$DEBUG_URL" \
+    "$OPTIONS_URL" \
+    >/tmp/devillionner-ytm-theme-import.log 2>&1 &
+
+for _ in {1..30}; do
+    if curl -fsS "$DEBUG_URL/json" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.25
+done
+
+curl -fsS "$DEBUG_URL/json" >/dev/null 2>&1 \
+    || die "Helium DevTools endpoint did not start"
+
+
+# ------------------------------------------------------------
+# Import .rics through chrome.storage API
+# ------------------------------------------------------------
+
+info "Importing Better Lyrics theme"
+
+python - "$THEME" "$PORT" "$EXT_ID" <<'PY'
+import json
+import sys
+import urllib.request
+from pathlib import Path
+
+import websocket
+
+theme_path = Path(sys.argv[1])
+port = int(sys.argv[2])
+ext_id = sys.argv[3]
+
+css = theme_path.read_text(encoding="utf-8")
+
+targets = json.load(
+    urllib.request.urlopen(
+        f"http://127.0.0.1:{port}/json"
+    )
+)
+
+wanted = (
+    f"chrome-extension://{ext_id}/"
+    "options_ui/page.html"
+)
+
+target = next(
+    (t for t in targets if t.get("url") == wanted),
+    None
+)
+
+if target is None:
+    raise SystemExit(
+        "Better Lyrics options DevTools target not found"
+    )
+
+ws = websocket.create_connection(
+    target["webSocketDebuggerUrl"]
+)
+
+expr = f"""
+(async () => {{
+    const css = {json.dumps(css)};
+
+    await chrome.storage.local.set({{
+        customCSS: css,
+        cssCompressed: false
+    }});
+
+    const allLocal =
+        await chrome.storage.local.get(null);
+
+    const staleChunks =
+        Object.keys(allLocal).filter(
+            k => k.startsWith("customCSS_chunk_")
+        );
+
+    if (staleChunks.length) {{
+        await chrome.storage.local.remove(
+            staleChunks
+        );
+    }}
+
+    await chrome.storage.local.remove([
+        "customCSS_chunked",
+        "customCSS_chunkCount"
+    ]);
+
+    await chrome.storage.sync.set({{
+        cssStorageType: "local",
+        cssCompressed: false
+    }});
+
+    await chrome.storage.sync.remove([
+        "customCSS",
+        "customCSS_chunkCount"
+    ]);
+
+    const local =
+        await chrome.storage.local.get([
+            "customCSS",
+            "cssCompressed",
+            "customCSS_chunked",
+            "customCSS_chunkCount"
+        ]);
+
+    const sync =
+        await chrome.storage.sync.get([
+            "cssStorageType",
+            "cssCompressed"
+        ]);
+
+    return {{
+        cssLength:
+            local.customCSS?.length ?? 0,
+        storageType:
+            sync.cssStorageType,
+        localCompressed:
+            local.cssCompressed,
+        syncCompressed:
+            sync.cssCompressed,
+        chunked:
+            local.customCSS_chunked ?? false,
+        chunkCount:
+            local.customCSS_chunkCount ?? 0
+    }};
+}})()
+"""
+
+ws.send(json.dumps({
+    "id": 1,
+    "method": "Runtime.evaluate",
+    "params": {
+        "expression": expr,
+        "awaitPromise": True,
+        "returnByValue": True
+    }
+}))
+
+while True:
+    message = json.loads(ws.recv())
+    if message.get("id") == 1:
+        break
+
+ws.close()
+
+remote = (
+    message.get("result", {})
+           .get("result", {})
+           .get("value")
+)
+
+if not isinstance(remote, dict):
+    raise SystemExit(
+        f"Unexpected DevTools result: {message}"
+    )
+
+expected_length = len(css)
+
+if remote.get("cssLength") != expected_length:
+    raise SystemExit(
+        "CSS length verification failed: "
+        f"{remote.get('cssLength')} "
+        f"!= {expected_length}"
+    )
+
+if remote.get("storageType") != "local":
+    raise SystemExit(
+        "Better Lyrics storage type verification failed"
+    )
+
+if remote.get("localCompressed") is not False:
+    raise SystemExit(
+        "Local CSS compression state is unexpected"
+    )
+
+if remote.get("syncCompressed") is not False:
+    raise SystemExit(
+        "Sync CSS compression state is unexpected"
+    )
+
+if remote.get("chunked") is not False:
+    raise SystemExit(
+        "Theme unexpectedly entered chunked mode"
+    )
+
+print(
+    "    [OK] Better Lyrics theme imported "
+    f"({expected_length} characters)"
+)
+PY
+
+cleanup
+trap - EXIT
+
+ok "YouTube Music isolated profile configured"
+ok "Better Lyrics theme active"

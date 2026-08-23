@@ -154,6 +154,13 @@ if [[ -f "$REPO/scripts/configure-helium" ]]; then
     fi
 fi
 
+if [[ -f "$REPO/scripts/configure-youtube-music" ]]; then
+    info "Configuring isolated YouTube Music"
+    if ! bash "$REPO/scripts/configure-youtube-music"; then
+        warn "YouTube Music could not be fully configured"
+    fi
+fi
+
 mkdir -p "$HOME/.cache"
 if [[ ! -e "$HOME/.cache/ff-audio-preset" ]]; then
     printf "%s\n" "Zenbook / Laptop" > "$HOME/.cache/ff-audio-preset"
