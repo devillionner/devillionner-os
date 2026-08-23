@@ -147,6 +147,13 @@ if [[ -f "$REPO/scripts/patch-caelestia-fullscreen" ]]; then
     fi
 fi
 
+if [[ -f "$REPO/scripts/configure-helium" ]]; then
+    info "Configuring Helium browser defaults"
+    if ! bash "$REPO/scripts/configure-helium"; then
+        warn "Helium browser defaults could not be fully applied"
+    fi
+fi
+
 mkdir -p "$HOME/.cache"
 if [[ ! -e "$HOME/.cache/ff-audio-preset" ]]; then
     printf "%s\n" "Zenbook / Laptop" > "$HOME/.cache/ff-audio-preset"
