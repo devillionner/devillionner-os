@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+DESC="${1:-devillionner-os pre-restore}"
+FSTYPE="$(findmnt -no FSTYPE /)"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+STATE_DIR="$(bp_state_dir)"
+mkdir -p "$STATE_DIR"
+
+[[ "$FSTYPE" == "btrfs" ]] \
+    || bp_die "Automatic recovery points currently require a Btrfs root (found: $FSTYPE)."
+
+bp_info "Creating pre-restore recovery point"
+
+if command -v snapper >/dev/null 2>&1 \
+    && sudo snapper -c root get-config >/dev/null 2>&1; then
+    NUMBER="$(
+        sudo snapper -c root create \
+            --type single \
+            --description "$DESC" \
+            --userdata "important=yes" \
+            --print-number
+    )"
+    printf 'snapper:%s\n' "$NUMBER" > "$STATE_DIR/last-checkpoint"
+    bp_ok "Snapper checkpoint #$NUMBER"
+    exit 0
+fi
+
+command -v btrfs >/dev/null 2>&1 \
+    || bp_die "Neither a working root Snapper config nor btrfs command is available."
+
+sudo btrfs subvolume show / >/dev/null 2>&1 \
+    || bp_die "Root is Btrfs but / is not a subvolume; refusing to continue without a rollback point."
+
+BASE="/.snapshots/devillionner-os"
+TARGET="$BASE/pre-restore-$STAMP"
+
+sudo mkdir -p "$BASE"
+sudo btrfs subvolume snapshot -r / "$TARGET"
+
+printf 'btrfs:%s\n' "$TARGET" > "$STATE_DIR/last-checkpoint"
+bp_ok "Read-only Btrfs checkpoint: $TARGET"

@@ -2,235 +2,112 @@
 set -u
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-MAN="$REPO/manifests"
+MAN="$REPO/manifests/profiles"
+source "$REPO/scripts/lib/common.sh"
+
+PROFILE=""
+if [[ "${1:-}" == "--profile" && -n "${2:-}" ]]; then
+    PROFILE="$(bp_normalize_profile "$2" 2>/dev/null || true)"
+fi
+if [[ -z "$PROFILE" ]]; then
+    PROFILE="$(cat "$(bp_config_dir)/profile" 2>/dev/null || true)"
+fi
+PROFILE="$(bp_normalize_profile "$PROFILE" 2>/dev/null || printf '%s' work)"
+
 VIRT="$(systemd-detect-virt 2>/dev/null || true)"
 IS_VM=false
-case "$VIRT" in
-    kvm|qemu) IS_VM=true ;;
-esac
+case "$VIRT" in kvm|qemu) IS_VM=true ;; esac
 
-OK=0
-WARN=0
-FAIL=0
-
-ok() {
-    printf "  [OK]   %s\n" "$*"
-    OK=$((OK + 1))
-}
-
-warn() {
-    printf "  [WARN] %s\n" "$*"
-    WARN=$((WARN + 1))
-}
-
-fail() {
-    printf "  [FAIL] %s\n" "$*"
-    FAIL=$((FAIL + 1))
-}
-
-section() {
-    printf "\n%s\n" "$1"
-}
+OK=0; WARN=0; FAIL=0
+ok() { printf "  [OK]   %s\n" "$*"; OK=$((OK + 1)); }
+warn() { printf "  [WARN] %s\n" "$*"; WARN=$((WARN + 1)); }
+fail() { printf "  [FAIL] %s\n" "$*"; FAIL=$((FAIL + 1)); }
+section() { printf "\n%s\n" "$1"; }
 
 printf "========================================\n"
 printf "       devillionner-os validation\n"
 printf "========================================\n"
+printf "Profile: %s\n" "$PROFILE"
 
 section "SYSTEM"
+if grep -Eq '^ID="?cachyos"?$' /etc/os-release 2>/dev/null; then ok "CachyOS"; else fail "Not running CachyOS"; fi
+MODEL="$(bp_product_name)"
+if bp_is_zenbook; then ok "ASUS UX3405CA"; elif [[ "$IS_VM" == true ]]; then ok "KVM/QEMU test VM (${MODEL:-unknown})"; else ok "Generic hardware (${MODEL:-unknown})"; fi
+CHECKPOINT="$(cat "$(bp_state_dir)/last-checkpoint" 2>/dev/null || true)"
+[[ -n "$CHECKPOINT" ]] && ok "pre-restore recovery point recorded" || warn "no Blueprint recovery point record found"
 
-if grep -Eq "^ID=\"?cachyos\"?$" /etc/os-release 2>/dev/null; then
-    ok "CachyOS"
-else
-    fail "Not running CachyOS"
-fi
-
-MODEL="$(cat /sys/class/dmi/id/product_name 2>/dev/null || true)"
-if [[ "$MODEL" == *"UX3405CA"* ]]; then
-    ok "ASUS UX3405CA"
-elif [[ "$IS_VM" == true ]]; then
-    ok "KVM/QEMU test VM (${MODEL:-unknown})"
-else
-    warn "Different hardware: ${MODEL:-unknown}"
-fi
+section "PROFILE"
+CONFIGURED="$(cat "$(bp_config_dir)/profile" 2>/dev/null || true)"
+[[ "$CONFIGURED" == "$PROFILE" ]] && ok "profile state: $PROFILE" || warn "profile state differs (${CONFIGURED:-unset})"
 
 section "CORE"
-
-for CMD in fish fastfetch Hyprland easyeffects kitty git rsync wpctl; do
-    if command -v "$CMD" >/dev/null 2>&1; then
-        ok "$CMD"
-    else
-        fail "$CMD missing"
-    fi
+for cmd in fish fastfetch Hyprland easyeffects kitty git rsync wpctl qs; do
+    command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
+if qs --version >/tmp/devillionner-qs-version 2>&1; then ok "Quickshell runtime"; else fail "Quickshell runtime broken: $(tail -1 /tmp/devillionner-qs-version 2>/dev/null)"; fi
+rm -f /tmp/devillionner-qs-version
 
 section "SHELL"
-
 LOGIN_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
-if [[ "$LOGIN_SHELL" == */fish ]]; then
-    ok "fish is login shell"
-else
-    fail "login shell is $LOGIN_SHELL"
-fi
-
-for FILE in c disk eq-laptop eq-sony eq-dolby fish_greeting; do
-    if [[ -f "$HOME/.config/fish/functions/$FILE.fish" ]]; then
-        ok "fish function: $FILE"
-    else
-        fail "fish function missing: $FILE"
-    fi
+[[ "$LOGIN_SHELL" == */fish ]] && ok "fish is login shell" || fail "login shell is $LOGIN_SHELL"
+for file in c disk eq-dolby fish_greeting; do
+    [[ -f "$HOME/.config/fish/functions/$file.fish" ]] && ok "fish function: $file" || fail "fish function missing: $file"
 done
+HARDWARE="$(cat "$(bp_config_dir)/hardware-profile" 2>/dev/null || true)"
+case "$HARDWARE" in
+    asus-zenbook-ux3405ca)
+        for file in eq-laptop eq-sony; do [[ -f "$HOME/.config/fish/functions/$file.fish" ]] && ok "Zenbook audio function: $file" || fail "Zenbook audio function missing: $file"; done ;;
+    generic-laptop) [[ -f "$HOME/.config/fish/functions/eq-laptop.fish" ]] && ok "generic laptop audio function" || fail "eq-laptop missing" ;;
+    generic-pc) [[ -f "$HOME/.config/fish/functions/eq-pc.fish" ]] && ok "generic PC audio function" || fail "eq-pc missing" ;;
+    *) warn "hardware profile state missing" ;;
+esac
 
-for FILE in ff-audio-status ff-disk-status; do
-    if [[ -x "$HOME/.local/bin/$FILE" ]]; then
-        ok "~/.local/bin/$FILE"
-    else
-        fail "~/.local/bin/$FILE missing"
-    fi
-done
+section "KEYBOARD"
+INPUT="$HOME/.config/hypr/hyprland/input.lua"
+grep -Eq 'kb_layout[[:space:]]*=[[:space:]]*"us,ua"' "$INPUT" 2>/dev/null && ok "English + Ukrainian layouts" || fail "Hyprland keyboard layout is not us,ua"
+KEYBOARD_MODE="$(cat "$(bp_config_dir)/keyboard-mode" 2>/dev/null || true)"
+case "$KEYBOARD_MODE" in windows|mac|copilot) ok "layout switch mode: $KEYBOARD_MODE" ;; *) warn "layout switch mode missing" ;; esac
 
 section "DOTFILES"
-
-for DIR in fish fastfetch hypr easyeffects caelestia kitty; do
-    if [[ -d "$HOME/.config/$DIR" ]]; then
-        ok "~/.config/$DIR"
-    else
-        fail "~/.config/$DIR missing"
-    fi
-done
+for dir in fish fastfetch hypr easyeffects caelestia kitty; do [[ -d "$HOME/.config/$dir" ]] && ok "~/.config/$dir" || fail "~/.config/$dir missing"; done
 
 section "PACKAGES"
-
-REPO_TOTAL=0
+mapfile -t REPO_PKGS < <({ bp_strip_manifest "$MAN/common-repo.txt"; bp_strip_manifest "$MAN/$PROFILE-repo.txt"; } | sort -u)
 REPO_MISSING=0
-while IFS= read -r PKG; do
-    [[ -z "$PKG" ]] && continue
-    REPO_TOTAL=$((REPO_TOTAL + 1))
-    if ! pacman -Qq "$PKG" >/dev/null 2>&1; then
-        printf "         missing: %s\n" "$PKG"
-        REPO_MISSING=$((REPO_MISSING + 1))
-    fi
-done < "$MAN/packages-repo.txt"
-
-if (( REPO_MISSING == 0 )); then
-    ok "repo packages $REPO_TOTAL/$REPO_TOTAL"
-else
-    fail "$REPO_MISSING repo package(s) missing"
-fi
-
-AUR_TOTAL=0
+for pkg in "${REPO_PKGS[@]}"; do pacman -Qq "$pkg" >/dev/null 2>&1 || { printf "         missing: %s\n" "$pkg"; REPO_MISSING=$((REPO_MISSING + 1)); }; done
+((REPO_MISSING == 0)) && ok "repo packages ${#REPO_PKGS[@]}/${#REPO_PKGS[@]}" || fail "$REPO_MISSING repo package(s) missing"
+mapfile -t AUR_PKGS < <({ bp_strip_manifest "$MAN/common-aur.txt"; bp_strip_manifest "$MAN/$PROFILE-aur.txt"; } | sort -u)
 AUR_MISSING=0
-while IFS= read -r PKG; do
-    [[ -z "$PKG" ]] && continue
-    AUR_TOTAL=$((AUR_TOTAL + 1))
-    if ! pacman -Qq "$PKG" >/dev/null 2>&1; then
-        printf "         missing: %s\n" "$PKG"
-        AUR_MISSING=$((AUR_MISSING + 1))
-    fi
-done < "$MAN/packages-aur.txt"
+for pkg in "${AUR_PKGS[@]}"; do pacman -Qq "$pkg" >/dev/null 2>&1 || { printf "         missing: %s\n" "$pkg"; AUR_MISSING=$((AUR_MISSING + 1)); }; done
+((AUR_MISSING == 0)) && ok "AUR/foreign packages ${#AUR_PKGS[@]}/${#AUR_PKGS[@]}" || fail "$AUR_MISSING AUR/foreign package(s) missing"
 
-if (( AUR_MISSING == 0 )); then
-    ok "AUR/foreign packages $AUR_TOTAL/$AUR_TOTAL"
+section "CAELESTIA"
+SHELL_QML="/etc/xdg/quickshell/caelestia/shell.qml"
+if [[ -f "$SHELL_QML" ]]; then
+    ENV_MISSING=0
+    for name in QS_NO_RELOAD_POPUP QS_DROP_EXPENSIVE_FONTS QSG_RENDER_LOOP QT_QUICK_FLICKABLE_WHEEL_DECELERATION; do
+        grep -q "^//@ pragma Env $name=" "$SHELL_QML" || { printf "         missing Env pragma: %s\n" "$name"; ENV_MISSING=$((ENV_MISSING + 1)); }
+    done
+    ((ENV_MISSING == 0)) && ok "Caelestia runtime Env pragmas" || fail "$ENV_MISSING Caelestia Env pragma(s) missing"
 else
-    fail "$AUR_MISSING AUR/foreign package(s) missing"
+    fail "Caelestia shell.qml missing"
 fi
-
-if pacman -Qq caelestia-shell >/dev/null 2>&1; then
-    if pacman -Qq quickshell-git >/dev/null 2>&1; then
-        ok "Caelestia-compatible quickshell-git"
-    else
-        fail "quickshell-git missing for Caelestia"
-    fi
-fi
-
-section "SERVICES"
-
-SYS_MISSING=0
-while IFS= read -r UNIT; do
-    [[ -z "$UNIT" ]] && continue
-    if ! systemctl is-enabled "$UNIT" >/dev/null 2>&1; then
-        printf "         not enabled: %s\n" "$UNIT"
-        SYS_MISSING=$((SYS_MISSING + 1))
-    fi
-done < "$MAN/services-system.txt"
-
-if (( SYS_MISSING == 0 )); then
-    ok "recorded system services"
-else
-    fail "$SYS_MISSING system service(s) differ"
-fi
-
-USER_MISSING=0
-while IFS= read -r UNIT; do
-    [[ -z "$UNIT" ]] && continue
-    if ! systemctl --user is-enabled "$UNIT" >/dev/null 2>&1; then
-        printf "         not enabled: %s\n" "$UNIT"
-        USER_MISSING=$((USER_MISSING + 1))
-    fi
-done < "$MAN/services-user.txt"
-
-if (( USER_MISSING == 0 )); then
-    ok "recorded user services"
-else
-    fail "$USER_MISSING user service(s) differ"
-fi
-
-section "DESKTOP"
-
-if pgrep -f 'quickshell.*caelestia|caelestia.*shell' >/dev/null 2>&1; then
-    ok "Caelestia shell running"
-else
-    warn "Caelestia shell not running in this session"
-fi
+SHORTCUTS="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/Shortcuts\.qml$/ {print $2; exit}')"
+CONTENT="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/drawers\/ContentWindow\.qml$/ {print $2; exit}')"
+if [[ -n "$SHORTCUTS" ]] && ! grep -A7 'name: "sidebar"' "$SHORTCUTS" | grep -q 'if (root.hasFullscreen)'; then ok "fullscreen sidebar shortcut patch"; else fail "fullscreen sidebar shortcut patch missing"; fi
+if [[ -n "$CONTENT" ]] && grep -q 'mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions' "$CONTENT"; then ok "fullscreen sidebar input-mask patch"; else fail "fullscreen sidebar input-mask patch missing"; fi
+pgrep -f 'quickshell.*caelestia|caelestia.*shell' >/dev/null 2>&1 && ok "Caelestia shell running" || warn "Caelestia shell not running in this session"
 
 section "AUDIO"
-
 WP="$(wpctl status 2>/dev/null || true)"
-
-if [[ "$IS_VM" == true ]]; then
-    warn "Physical Zenbook Speaker sink check skipped in VM"
-else
-    if grep -q "Speaker" <<< "$WP"; then
-        ok "PipeWire Speaker sink"
-    else
-        fail "Speaker sink not found"
-    fi
-fi
-
-if grep -q "WirePlumber" <<< "$WP"; then
-    ok "WirePlumber"
-else
-    fail "WirePlumber not visible"
-fi
-
-if pgrep -x easyeffects >/dev/null 2>&1; then
-    ok "EasyEffects running"
-elif [[ "$IS_VM" == true ]]; then
-    warn "EasyEffects not running in VM"
-else
-    warn "EasyEffects not running"
-fi
+if [[ "$IS_VM" == true ]]; then warn "physical speaker check skipped in VM"; else grep -q "Speaker" <<< "$WP" && ok "PipeWire speaker sink" || warn "speaker sink not found by generic check"; fi
+grep -q "WirePlumber" <<< "$WP" && ok "WirePlumber" || fail "WirePlumber not visible"
 
 section "BLUEPRINT"
-
-if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    ok "Git repository"
-else
-    fail "Git repository missing"
-fi
-
-if [[ -n "$(git -C "$REPO" status --porcelain)" ]]; then
-    warn "working tree has uncommitted changes"
-else
-    ok "working tree clean"
-fi
+git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1 && ok "Git repository" || fail "Git repository missing"
+[[ -n "$(git -C "$REPO" status --porcelain)" ]] && warn "working tree has uncommitted changes" || ok "working tree clean"
 
 printf "\n========================================\n"
 printf "OK: %d   WARN: %d   FAIL: %d\n" "$OK" "$WARN" "$FAIL"
-
-if (( FAIL == 0 )); then
-    printf "RESULT: PASS\n"
-    exit 0
-else
-    printf "RESULT: FAIL\n"
-    exit 1
-fi
+if ((FAIL == 0)); then printf "RESULT: PASS\n"; exit 0; fi
+printf "RESULT: FAIL\n"; exit 1

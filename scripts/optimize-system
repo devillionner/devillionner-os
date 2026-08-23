@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+PROFILE="$(bp_normalize_profile "${1:-}")" \
+    || bp_die "Usage: scripts/optimize-system gaming|work|laboratory"
+
+bp_info "Applying conservative system optimizations"
+
+for unit in fstrim.timer paccache.timer; do
+    if systemctl cat "$unit" >/dev/null 2>&1; then
+        sudo systemctl enable "$unit" >/dev/null 2>&1 || bp_warn "Could not enable $unit"
+    fi
+done
+
+if [[ "$PROFILE" == "gaming" ]] \
+    && systemctl cat ananicy-cpp.service >/dev/null 2>&1; then
+    sudo systemctl enable ananicy-cpp.service >/dev/null 2>&1 \
+        || bp_warn "Could not enable ananicy-cpp.service"
+fi
+
+if command -v powerprofilesctl >/dev/null 2>&1; then
+    powerprofilesctl set balanced >/dev/null 2>&1 || true
+fi
+
+CONFIG_DIR="$(bp_config_dir)"
+mkdir -p "$CONFIG_DIR"
+printf '%s\n' "$PROFILE" > "$CONFIG_DIR/profile"
+
+bp_ok "Safe maintenance timers configured"
+[[ "$PROFILE" == "gaming" ]] && bp_ok "Gaming scheduler enabled when available"
+bp_ok "No experimental kernel/sysctl tweaks were applied"

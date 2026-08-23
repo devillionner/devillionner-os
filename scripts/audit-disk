@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+printf "========================================\n"
+printf "       devillionner-os disk audit\n"
+printf "========================================\n"
+
+printf "\nHOME (top level)\n"
+du -xhd1 "$HOME" 2>/dev/null | sort -h | tail -30 || true
+
+printf "\nSYSTEM /var (top level)\n"
+sudo du -xhd1 /var 2>/dev/null | sort -h | tail -30 || true
+
+printf "\nPACKAGE CACHE\n"
+du -sh /var/cache/pacman/pkg 2>/dev/null || true
+
+printf "\nORPHAN PACKAGES\n"
+pacman -Qtdq 2>/dev/null || printf "none\n"
+
+printf "\nJOURNAL\n"
+journalctl --disk-usage 2>/dev/null || true
+
+printf "\nThis command is report-only. It deletes nothing.\n"
+command -v baobab >/dev/null 2>&1 && printf "GUI analyzer available: baobab\n"

@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+PROFILE=""
+KEYBOARD=""
+TARGET=""
+NON_INTERACTIVE=false
+
+usage() {
+    cat <<'EOF'
+Usage: bash scripts/install [options]
+
+Options:
+  --profile gaming|work|laboratory
+  --keyboard copilot|windows|mac
+  --vm
+  --test-partition
+  --non-interactive
+  -h, --help
+
+Recommended:
+  VM:                 bash scripts/install
+  Reserved test disk: bash scripts/install --test-partition
+EOF
+}
+
+while (($#)); do
+    case "$1" in
+        --profile)
+            [[ $# -ge 2 ]] || bp_die "--profile needs a value"
+            PROFILE="$(bp_normalize_profile "$2")" || bp_die "Unknown profile: $2"
+            shift 2
+            ;;
+        --keyboard)
+            [[ $# -ge 2 ]] || bp_die "--keyboard needs a value"
+            case "$2" in
+                copilot|windows|mac) KEYBOARD="$2" ;;
+                *) bp_die "Unknown keyboard mode: $2" ;;
+            esac
+            shift 2
+            ;;
+        --vm) TARGET="--vm"; shift ;;
+        --test-partition) TARGET="--test-partition"; shift ;;
+        --non-interactive) NON_INTERACTIVE=true; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) bp_die "Unknown option: $1" ;;
+    esac
+done
+
+if [[ -z "$PROFILE" ]]; then
+    if [[ "$NON_INTERACTIVE" == true ]]; then
+        PROFILE="work"
+    else
+        printf "\nChoose Blueprint profile:\n"
+        printf "  1) Gaming      - Steam, GameMode, Gamescope, MangoHud, Vesktop\n"
+        printf "  2) Work        - browser, Telegram, calculator, scanner, disk analyzer\n"
+        printf "  3) Laboratory  - compilers, Python/Node, GitHub CLI, VS Code\n"
+        read -r -p "Profile [1-3]: " answer
+        case "$answer" in
+            1) PROFILE="gaming" ;;
+            2|"") PROFILE="work" ;;
+            3) PROFILE="laboratory" ;;
+            *) bp_die "Invalid profile choice" ;;
+        esac
+    fi
+fi
+
+if [[ -z "$KEYBOARD" ]]; then
+    if bp_is_zenbook; then
+        DEFAULT_KEYBOARD="copilot"
+    else
+        DEFAULT_KEYBOARD="windows"
+    fi
+
+    if [[ "$NON_INTERACTIVE" == true ]]; then
+        KEYBOARD="$DEFAULT_KEYBOARD"
+    else
+        printf "\nChoose keyboard layout switch:\n"
+        printf "  1) Alt+Shift    (Windows-style)\n"
+        printf "  2) Super+Space  (macOS-style)\n"
+        printf "  3) Copilot/Menu key\n"
+        printf "Default for this machine: %s\n" "$DEFAULT_KEYBOARD"
+        read -r -p "Keyboard [1-3, Enter=default]: " answer
+        case "$answer" in
+            "") KEYBOARD="$DEFAULT_KEYBOARD" ;;
+            1) KEYBOARD="windows" ;;
+            2) KEYBOARD="mac" ;;
+            3) KEYBOARD="copilot" ;;
+            *) bp_die "Invalid keyboard choice" ;;
+        esac
+    fi
+fi
+
+if [[ -z "$TARGET" ]]; then
+    if bp_is_vm; then
+        TARGET="--vm"
+    elif [[ "$(bp_root_partuuid)" == "1c08b2fd-b4c8-4933-920b-80746d466558" ]]; then
+        TARGET="--test-partition"
+    else
+        bp_die "Physical install is intentionally blocked on an unknown root. Test in KVM first, or boot the reserved Blueprint test partition."
+    fi
+fi
+
+bp_info "Installation plan"
+printf "    Profile:  %s\n" "$PROFILE"
+printf "    Keyboard: %s\n" "$KEYBOARD"
+printf "    Target:   %s\n" "$TARGET"
+
+exec "$REPO/scripts/restore" \
+    "$TARGET" \
+    --profile "$PROFILE" \
+    --keyboard "$KEYBOARD"

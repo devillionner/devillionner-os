@@ -1,0 +1,7 @@
+baobab
+gnome-calculator
+meld
+networkmanager-openvpn
+simple-scan
+telegram-desktop
+vesktop-bin

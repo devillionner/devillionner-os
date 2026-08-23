@@ -1,0 +1,13 @@
+clang
+cmake
+direnv
+gdb
+git-lfs
+github-cli
+lazygit
+ninja
+nodejs
+npm
+python-pip
+python-virtualenv
+shellcheck

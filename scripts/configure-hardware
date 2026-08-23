@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+FUN="$HOME/.config/fish/functions"
+CONFIG_DIR="$(bp_config_dir)"
+mkdir -p "$FUN" "$CONFIG_DIR" "$HOME/.cache"
+
+MODEL="$(bp_product_name)"
+CHASSIS="$(cat /sys/class/dmi/id/chassis_type 2>/dev/null || true)"
+
+write_generic_laptop() {
+    cat > "$FUN/eq-laptop.fish" <<'EOF'
+function eq-laptop
+    mkdir -p ~/.cache
+    printf "%s\n" "Laptop / Generic" > ~/.cache/ff-audio-preset
+    command easyeffects >/dev/null 2>&1 &
+    echo "🔊 Режим: Laptop / Generic — EasyEffects"
+end
+EOF
+}
+
+write_generic_pc() {
+    cat > "$FUN/eq-pc.fish" <<'EOF'
+function eq-pc
+    mkdir -p ~/.cache
+    printf "%s\n" "PC / Generic" > ~/.cache/ff-audio-preset
+    command easyeffects >/dev/null 2>&1 &
+    echo "🔊 Режим: PC / Generic — EasyEffects"
+end
+EOF
+}
+
+if bp_is_zenbook; then
+    printf '%s\n' "asus-zenbook-ux3405ca" > "$CONFIG_DIR/hardware-profile"
+    printf '%s\n' "Zenbook / Laptop" > "$HOME/.cache/ff-audio-preset"
+    rm -f "$FUN/eq-pc.fish"
+    bp_ok "Hardware profile: ASUS Zenbook UX3405CA"
+    bp_ok "Audio commands: eq-laptop, eq-dolby, eq-sony"
+    exit 0
+fi
+
+rm -f "$FUN/eq-sony.fish"
+
+case "$CHASSIS" in
+    8|9|10|11|14|30|31|32)
+        printf '%s\n' "generic-laptop" > "$CONFIG_DIR/hardware-profile"
+        rm -f "$FUN/eq-pc.fish"
+        write_generic_laptop
+        printf '%s\n' "Laptop / Generic" > "$HOME/.cache/ff-audio-preset"
+        bp_ok "Hardware profile: generic laptop"
+        bp_ok "Audio commands: eq-laptop, eq-dolby"
+        ;;
+    *)
+        printf '%s\n' "generic-pc" > "$CONFIG_DIR/hardware-profile"
+        rm -f "$FUN/eq-laptop.fish"
+        write_generic_pc
+        printf '%s\n' "PC / Generic" > "$HOME/.cache/ff-audio-preset"
+        bp_ok "Hardware profile: generic desktop/PC"
+        bp_ok "Audio commands: eq-pc, eq-dolby"
+        ;;
+esac
+
+bp_warn "Zenbook-specific speaker tuning was not selected for ${MODEL:-unknown hardware}."

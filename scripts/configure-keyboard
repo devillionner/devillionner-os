@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+MODE="${1:-}"
+case "$MODE" in
+    windows|mac|copilot) ;;
+    *) bp_die "Usage: scripts/configure-keyboard windows|mac|copilot" ;;
+esac
+
+INPUT="$HOME/.config/hypr/hyprland/input.lua"
+KEYBINDS="$HOME/.config/hypr/hyprland/keybinds.lua"
+
+[[ -f "$INPUT" && -f "$KEYBINDS" ]] \
+    || bp_die "Hyprland Lua configuration is missing."
+
+python - "$INPUT" "$KEYBINDS" "$MODE" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+input_path = Path(sys.argv[1])
+keybinds_path = Path(sys.argv[2])
+mode = sys.argv[3]
+
+text = input_path.read_text(encoding="utf-8")
+text, count = re.subn(
+    r'kb_layout\s*=\s*"[^"]*"',
+    'kb_layout          = "us,ua"',
+    text,
+    count=1,
+)
+if count != 1:
+    raise SystemExit("input.lua: kb_layout not found")
+
+option = "grp:alt_shift_toggle" if mode == "windows" else ""
+if re.search(r'kb_options\s*=', text):
+    text = re.sub(
+        r'kb_options\s*=\s*"[^"]*"',
+        f'kb_options         = "{option}"',
+        text,
+        count=1,
+    )
+else:
+    text = text.replace(
+        'kb_layout          = "us,ua",',
+        'kb_layout          = "us,ua",\n'
+        f'        kb_options         = "{option}",',
+        1,
+    )
+input_path.write_text(text, encoding="utf-8")
+
+keys = keybinds_path.read_text(encoding="utf-8")
+legacy = '''-- Switch keyboard layout (Copilot key)
+create_bind("SUPER+ SHIFT + F23", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))
+create_bind("Menu", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))
+'''
+keys = keys.replace(legacy, "")
+
+begin = "-- Blueprint keyboard layout switch: BEGIN"
+end = "-- Blueprint keyboard layout switch: END"
+if begin in keys and end in keys:
+    left, rest = keys.split(begin, 1)
+    _, right = rest.split(end, 1)
+    keys = left.rstrip() + "\n" + right.lstrip("\n")
+
+lines = [begin]
+if mode == "mac":
+    lines.append('create_bind("SUPER + SPACE", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))')
+elif mode == "copilot":
+    lines.append('create_bind("SUPER + SHIFT + F23", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))')
+    lines.append('create_bind("Menu", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))')
+else:
+    lines.append("-- Alt+Shift is handled by kb_options = grp:alt_shift_toggle")
+lines.append(end)
+
+keys = keys.rstrip() + "\n\n" + "\n".join(lines) + "\n"
+keybinds_path.write_text(keys, encoding="utf-8")
+PY
+
+CONFIG_DIR="$(bp_config_dir)"
+mkdir -p "$CONFIG_DIR"
+printf '%s\n' "$MODE" > "$CONFIG_DIR/keyboard-mode"
+
+bp_ok "Keyboard layouts: English + Ukrainian"
+case "$MODE" in
+    windows) bp_ok "Layout switch: Alt+Shift" ;;
+    mac) bp_ok "Layout switch: Super+Space" ;;
+    copilot) bp_ok "Layout switch: Copilot/Menu key" ;;
+esac

@@ -1,20 +1,61 @@
-# CachyOS Blueprint
+# devillionner-os
 
-Reproducible configuration for my CachyOS workstation.
+A reproducible CachyOS + Hyprland workstation blueprint focused on a clean Windows-to-Linux experience.
 
-## v0.1
-- Pacman/AUR package manifests
-- Enabled services
-- Fish
-- Fastfetch
-- Hyprland
-- Caelestia
-- Kitty / Foot
-- EasyEffects presets and configuration
-- ~/.local/bin helpers
-- Hardware reference
+The repository restores programs, package choices, desktop configuration, services, themes and system behavior. Personal files, browser data, passwords, SSH keys and game saves are intentionally excluded.
 
-## Manual extras
-- [YouTube Music + Better Lyrics setup](docs/youtube-music.md)
+## Install
 
-Browser profiles, cookies, passwords, SSH private keys and caches are intentionally excluded.
+Clone the repository on a fresh CachyOS install, then run:
+
+```bash
+git clone https://github.com/devillionner/devillionner-os.git
+cd devillionner-os
+bash scripts/install
+```
+
+The installer asks for:
+
+- **Gaming** — Steam, Gamescope, MangoHud, GameMode, gaming scheduler and Vesktop.
+- **Work** — Helium, Telegram, calculator, scanner, disk analyzer and communication tools.
+- **Laboratory** — compilers, Python/Node tooling, GitHub CLI, debugging tools and VS Code.
+- keyboard layout switching: **Alt+Shift**, **Super+Space**, or the **Copilot/Menu key**.
+
+On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbook audio helpers are preserved. Other laptops/desktops receive generic audio helpers instead of Zenbook-specific ones.
+
+## Safety
+
+- The real/main CachyOS PARTUUID is hard-blocked.
+- `scripts/install` auto-detects KVM/QEMU.
+- Physical restore is currently allowed only on the reserved Blueprint test partition.
+- A pre-restore Btrfs/Snapper recovery point is created before package/system changes.
+- The scripts never repartition disks or touch Windows partitions.
+
+Recommended validation order:
+
+1. fresh KVM VM;
+2. reserved physical test partition;
+3. only after both pass, consider production use.
+
+## Useful commands
+
+```bash
+bash scripts/check
+bash scripts/audit-disk
+```
+
+See:
+
+- [Profiles and hardware behavior](docs/profiles.md)
+- [Recovery points](docs/recovery.md)
+- [Tools and helper commands](docs/tools.md)
+- [YouTube Music manual setup](docs/youtube-music.md)
+- [Roadmap](docs/roadmap.md)
+
+## Current design decisions
+
+- Kitty is the single default terminal. Alacritty/Ptyxis are not part of the active profile manifests.
+- System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
+- Quickshell runtime health is validated, so a Qt ABI break is caught instead of silently passing.
+- Caelestia fullscreen and `Env` compatibility patches are applied during restore.
+- Color/ICC tuning is not guessed on unknown displays; the Zenbook color-profile decision remains a measured/researched task.

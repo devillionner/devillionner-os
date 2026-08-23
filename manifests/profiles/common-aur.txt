@@ -1,0 +1,8 @@
+# Caelestia / Hyprland desktop
+caelestia-cli
+caelestia-shell
+darkly-bin
+hyprmod
+papirus-folders
+qtengine
+quickshell-git
