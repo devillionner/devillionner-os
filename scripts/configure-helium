@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+info() { printf "==> %s\n" "$*"; }
+ok()   { printf "    [OK] %s\n" "$*"; }
+warn() { printf "    [WARN] %s\n" "$*" >&2; }
+
+if ! command -v helium-browser >/dev/null 2>&1; then
+    warn "helium-browser is not installed; skipping Helium configuration"
+    exit 0
+fi
+
+DESKTOP="helium-browser.desktop"
+
+info "Setting Helium as the default browser"
+xdg-settings set default-web-browser "$DESKTOP" >/dev/null 2>&1 || warn "xdg-settings could not set the default browser"
+xdg-mime default "$DESKTOP" x-scheme-handler/http  >/dev/null 2>&1 || true
+xdg-mime default "$DESKTOP" x-scheme-handler/https >/dev/null 2>&1 || true
+xdg-mime default "$DESKTOP" text/html              >/dev/null 2>&1 || true
+
+if pgrep -x helium >/dev/null 2>&1 || pgrep -f '/opt/helium-browser-bin/' >/dev/null 2>&1; then
+    warn "Helium is currently running; skipping profile preference edit to avoid profile corruption"
+    warn "Close Helium and run scripts/configure-helium again to apply the vertical sidebar preference"
+    exit 0
+fi
+
+PREFS="${XDG_CONFIG_HOME:-$HOME/.config}/helium/Default/Preferences"
+mkdir -p "$(dirname "$PREFS")"
+
+if [[ -f "$PREFS" ]]; then
+    cp -a "$PREFS" "$PREFS.blueprint-backup"
+fi
+
+info "Configuring Helium vertical sidebar"
+python - "$PREFS" <<'PY'
+from pathlib import Path
+import json
+import os
+import sys
+import tempfile
+
+p = Path(sys.argv[1])
+
+if p.exists():
+    try:
+        data = json.loads(p.read_text())
+    except Exception as exc:
+        raise SystemExit(f"Refusing to modify invalid Preferences JSON: {exc}")
+else:
+    data = {}
+
+helium = data.setdefault("helium", {})
+browser = helium.setdefault("browser", {})
+
+# HeliumLayoutType::kVertical = 2 in current Helium.
+browser["layout"] = 2
+# Keep the vertical tab/sidebar on the left.
+browser["vertical_right_aligned"] = False
+
+vertical_tabs = data.setdefault("vertical_tabs", {})
+# Start with the sidebar expanded/visible.
+vertical_tabs["collapsed_state"] = False
+
+p.parent.mkdir(parents=True, exist_ok=True)
+fd, tmp_name = tempfile.mkstemp(prefix="Preferences.", dir=p.parent)
+try:
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+        f.write("\n")
+    os.replace(tmp_name, p)
+finally:
+    if os.path.exists(tmp_name):
+        os.unlink(tmp_name)
+PY
+
+ok "Helium is the default browser with the vertical sidebar enabled"
