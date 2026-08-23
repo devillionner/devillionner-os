@@ -6,26 +6,32 @@ ok()   { printf "    [OK] %s\n" "$*"; }
 warn() { printf "    [WARN] %s\n" "$*" >&2; }
 
 if ! pacman -Qq caelestia-shell >/dev/null 2>&1; then
-    warn "caelestia-shell is not installed; skipping fullscreen patch"
+    warn "caelestia-shell is not installed; skipping Caelestia patches"
     exit 0
 fi
 
 SHORTCUTS="$(pacman -Ql caelestia-shell | awk '/\/modules\/Shortcuts\.qml$/ {print $2; exit}')"
 CONTENT="$(pacman -Ql caelestia-shell | awk '/\/modules\/drawers\/ContentWindow\.qml$/ {print $2; exit}')"
+SHELL_QML="/etc/xdg/quickshell/caelestia/shell.qml"
 
-if [[ -z "$SHORTCUTS" || -z "$CONTENT" ]]; then
-    warn "Could not locate Caelestia QML files; skipping fullscreen patch"
+if [[ ! -f "$SHELL_QML" ]]; then
+    SHELL_QML="$(pacman -Ql caelestia-shell | awk '/\/shell\.qml$/ {print $2; exit}')"
+fi
+
+if [[ -z "$SHORTCUTS" || -z "$CONTENT" || -z "$SHELL_QML" || ! -f "$SHELL_QML" ]]; then
+    warn "Could not locate required Caelestia QML files; skipping patches"
     exit 0
 fi
 
-info "Patching Caelestia fullscreen sidebar behavior"
+info "Patching Caelestia fullscreen sidebar behavior and runtime environment"
 
-sudo python - "$SHORTCUTS" "$CONTENT" <<'PY'
+sudo python - "$SHORTCUTS" "$CONTENT" "$SHELL_QML" <<'PY'
 from pathlib import Path
 import sys
 
 shortcuts = Path(sys.argv[1])
 content = Path(sys.argv[2])
+shell_qml = Path(sys.argv[3])
 
 # Allow SUPER+N/sidebar shortcut while a fullscreen client is active.
 s = shortcuts.read_text()
@@ -70,6 +76,44 @@ elif old_mask in c:
     print("ContentWindow.qml: patched")
 else:
     raise SystemExit("ContentWindow.qml: expected fullscreen mask not found; refusing to modify")
+
+# Caelestia currently needs these values forced with Env rather than DefaultEnv
+# on this setup; with DefaultEnv the shell may start without rendering.
+env_names = (
+    "QS_NO_RELOAD_POPUP",
+    "QS_DROP_EXPENSIVE_FONTS",
+    "QSG_RENDER_LOOP",
+    "QT_QUICK_FLICKABLE_WHEEL_DECELERATION",
+)
+
+q = shell_qml.read_text()
+changed = []
+already = []
+missing = []
+
+for name in env_names:
+    old = f"//@ pragma DefaultEnv {name}="
+    new = f"//@ pragma Env {name}="
+
+    if new in q:
+        already.append(name)
+    elif old in q:
+        q = q.replace(old, new, 1)
+        changed.append(name)
+    else:
+        missing.append(name)
+
+if missing:
+    raise SystemExit(
+        "shell.qml: expected environment pragmas not found: "
+        + ", ".join(missing)
+    )
+
+if changed:
+    shell_qml.write_text(q)
+    print("shell.qml: Env patched: " + ", ".join(changed))
+else:
+    print("shell.qml: environment pragmas already patched")
 PY
 
-ok "Caelestia fullscreen sidebar patch applied"
+ok "Caelestia patches applied"
