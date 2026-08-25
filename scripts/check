@@ -109,7 +109,7 @@ mapfile -t AUR_PKGS < <(
 )
 AUR_MISSING=0
 for pkg in "${AUR_PKGS[@]}"; do pacman -Qq "$pkg" >/dev/null 2>&1 || { printf "         missing: %s\n" "$pkg"; AUR_MISSING=$((AUR_MISSING + 1)); }; done
-((AUR_MISSING == 0)) && ok "AUR/foreign packages ${#AUR_PKGS[@]}/${#AUR_PKGS[@]}" || fail "$AUR_MISSING AUR/foreign package(s) missing"
+((AUR_MISSING == 0)) && ok "AUR/foreign packages ${#AUR_PKGS[@]}/${#AUR_PKGS[@]}" || fail "$AUR_MISSING AUR package(s) missing"
 
 section "CAELESTIA"
 SHELL_QML="/etc/xdg/quickshell/caelestia/shell.qml"
@@ -126,7 +126,13 @@ SHORTCUTS="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/Shortcuts
 CONTENT="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/drawers\/ContentWindow\.qml$/ {print $2; exit}')"
 if [[ -n "$SHORTCUTS" ]] && ! grep -A7 'name: "sidebar"' "$SHORTCUTS" | grep -q 'if (root.hasFullscreen)'; then ok "fullscreen sidebar shortcut patch"; else fail "fullscreen sidebar shortcut patch missing"; fi
 if [[ -n "$CONTENT" ]] && grep -q 'mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions' "$CONTENT"; then ok "fullscreen sidebar input-mask patch"; else fail "fullscreen sidebar input-mask patch missing"; fi
-pgrep -f 'quickshell.*caelestia|caelestia.*shell' >/dev/null 2>&1 && ok "Caelestia shell running" || warn "Caelestia shell not running in this session"
+# Caelestia launches Quickshell as `qs -c caelestia ...`; older validation only
+# matched a literal `quickshell` process name and produced a false warning.
+if pgrep -af '(^|/)(qs|quickshell)([[:space:]].*)?-c[[:space:]]+caelestia|caelestia[[:space:]]+shell' >/dev/null 2>&1; then
+    ok "Caelestia shell running"
+else
+    warn "Caelestia shell not running in this session"
+fi
 
 section "AUDIO"
 WP="$(wpctl status 2>/dev/null || true)"
