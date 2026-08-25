@@ -7,6 +7,7 @@ source "$REPO/scripts/lib/common.sh"
 FUN="$HOME/.config/fish/functions"
 CONFIG_DIR="$(bp_config_dir)"
 ZENBOOK_EE="$REPO/hardware/asus-zenbook-ux3405ca/easyeffects"
+EE_DATA="$HOME/.local/share/easyeffects"
 mkdir -p "$FUN" "$CONFIG_DIR" "$HOME/.cache"
 
 MODEL="$(bp_product_name)"
@@ -25,10 +26,16 @@ if bp_is_zenbook; then
     printf '%s\n' "Zenbook / Laptop" > "$HOME/.cache/ff-audio-preset"
     rm -f "$FUN/eq-pc.fish" "$FUN/eq-audio.fish"
 
-    if [[ -d "$ZENBOOK_EE" ]] && find "$ZENBOOK_EE" -type f -name '*.json' -print -quit | grep -q .; then
-        mkdir -p "$HOME/.config/easyeffects"
-        rsync -a "$ZENBOOK_EE/" "$HOME/.config/easyeffects/"
-        bp_ok "Zenbook EasyEffects presets restored"
+    if [[ -d "$ZENBOOK_EE/output" ]] \
+        && [[ -f "$ZENBOOK_EE/output/Laptop.json" ]] \
+        && [[ -f "$ZENBOOK_EE/output/Dolby Atmos.json" ]] \
+        && [[ -f "$ZENBOOK_EE/output/Sony AutoEq Harman.json" ]]; then
+        mkdir -p "$EE_DATA/output" "$EE_DATA/irs"
+        rsync -a "$ZENBOOK_EE/output/" "$EE_DATA/output/"
+        if [[ -d "$ZENBOOK_EE/irs" ]]; then
+            rsync -a "$ZENBOOK_EE/irs/" "$EE_DATA/irs/"
+        fi
+        bp_ok "Zenbook EasyEffects presets restored to ~/.local/share/easyeffects"
     else
         bp_warn "Zenbook EasyEffects preset files are not captured in the Blueprint yet"
     fi
