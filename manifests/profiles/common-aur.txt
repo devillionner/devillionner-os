@@ -1,7 +1,7 @@
 # Caelestia / Hyprland desktop
 caelestia-cli
 caelestia-shell
-darkly-bin
+darkly
 hyprmod
 papirus-folders
 qtengine
