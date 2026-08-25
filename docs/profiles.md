@@ -8,9 +8,17 @@ The active manifests intentionally do not install several duplicate applications
 
 The old `manifests/packages-explicit-with-versions.txt` remains an audit/reference snapshot; it is not the active install set.
 
+## Reusable features
+
+Capabilities that may make sense in more than one profile live separately from the profile manifests. The first such feature is `virtualization`.
+
+This means the same tested VM stack can be attached to Laboratory, Work or Gaming without duplicating package/configuration logic.
+
 ## Gaming
 
 Adds Steam, Gamescope, MangoHud, GameMode, the 32-bit Mesa/Vulkan stack, `ananicy-cpp`, Vesktop and Vulkan tools.
+
+Virtualization defaults to **off**, but can be enabled during installation.
 
 The installer does not force a permanent performance power profile. That is intentionally avoided on laptops; game-specific performance behavior can be applied at launch time.
 
@@ -18,9 +26,13 @@ The installer does not force a permanent performance power profile. That is inte
 
 Adds Telegram Desktop, Vesktop, GNOME Calculator (temporary choice until the calculator redesign), Baobab Disk Usage Analyzer, Simple Scan, Meld and the OpenVPN NetworkManager plugin.
 
+Virtualization defaults to **off**, but can be enabled during installation.
+
 ## Laboratory
 
 Adds Clang, CMake, Ninja, GDB, Python pip/virtualenv, Node.js + npm, GitHub CLI + Git LFS, Lazygit, direnv, shellcheck and VS Code (`visual-studio-code-bin`).
+
+Laboratory enables the reusable **virtualization** feature by default: KVM/QEMU, libvirt, virt-manager, virt-viewer, OVMF/UEFI, swtpm, virglrenderer, NAT networking and a VM storage pool.
 
 Aliases `lab`, `dev` and `dev-laboratory` normalize to `laboratory`.
 

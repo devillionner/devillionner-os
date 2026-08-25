@@ -3,6 +3,7 @@ set -u
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 MAN="$REPO/manifests/profiles"
+FEATURE_MAN="$REPO/manifests/features"
 source "$REPO/scripts/lib/common.sh"
 
 PROFILE=""
@@ -13,6 +14,21 @@ if [[ -z "$PROFILE" ]]; then
     PROFILE="$(cat "$(bp_config_dir)/profile" 2>/dev/null || true)"
 fi
 PROFILE="$(bp_normalize_profile "$PROFILE" 2>/dev/null || printf '%s' work)"
+
+FEATURES=()
+if [[ -f "$(bp_config_dir)/features" ]]; then
+    while IFS= read -r feature; do
+        case "$feature" in virtualization) FEATURES+=("$feature") ;; esac
+    done < "$(bp_config_dir)/features"
+fi
+
+feature_enabled() {
+    local wanted="$1" feature
+    for feature in "${FEATURES[@]}"; do
+        [[ "$feature" == "$wanted" ]] && return 0
+    done
+    return 1
+}
 
 VIRT="$(systemd-detect-virt 2>/dev/null || true)"
 IS_VM=false
@@ -28,6 +44,7 @@ printf "========================================\n"
 printf "       devillionner-os validation\n"
 printf "========================================\n"
 printf "Profile: %s\n" "$PROFILE"
+printf "Features: %s\n" "${FEATURES[*]:-none}"
 
 section "SYSTEM"
 if grep -Eq '^ID="?cachyos"?$' /etc/os-release 2>/dev/null; then ok "CachyOS"; else fail "Not running CachyOS"; fi
@@ -72,11 +89,24 @@ section "DOTFILES"
 for dir in fish fastfetch hypr easyeffects caelestia kitty; do [[ -d "$HOME/.config/$dir" ]] && ok "~/.config/$dir" || fail "~/.config/$dir missing"; done
 
 section "PACKAGES"
-mapfile -t REPO_PKGS < <({ bp_strip_manifest "$MAN/common-repo.txt"; bp_strip_manifest "$MAN/$PROFILE-repo.txt"; } | sort -u)
+mapfile -t REPO_PKGS < <(
+    {
+        bp_strip_manifest "$MAN/common-repo.txt"
+        bp_strip_manifest "$MAN/$PROFILE-repo.txt"
+        for feature in "${FEATURES[@]}"; do bp_strip_manifest "$FEATURE_MAN/$feature-repo.txt"; done
+    } | sort -u
+)
 REPO_MISSING=0
 for pkg in "${REPO_PKGS[@]}"; do pacman -Qq "$pkg" >/dev/null 2>&1 || { printf "         missing: %s\n" "$pkg"; REPO_MISSING=$((REPO_MISSING + 1)); }; done
 ((REPO_MISSING == 0)) && ok "repo packages ${#REPO_PKGS[@]}/${#REPO_PKGS[@]}" || fail "$REPO_MISSING repo package(s) missing"
-mapfile -t AUR_PKGS < <({ bp_strip_manifest "$MAN/common-aur.txt"; bp_strip_manifest "$MAN/$PROFILE-aur.txt"; } | sort -u)
+
+mapfile -t AUR_PKGS < <(
+    {
+        bp_strip_manifest "$MAN/common-aur.txt"
+        bp_strip_manifest "$MAN/$PROFILE-aur.txt"
+        for feature in "${FEATURES[@]}"; do bp_strip_manifest "$FEATURE_MAN/$feature-aur.txt"; done
+    } | sort -u
+)
 AUR_MISSING=0
 for pkg in "${AUR_PKGS[@]}"; do pacman -Qq "$pkg" >/dev/null 2>&1 || { printf "         missing: %s\n" "$pkg"; AUR_MISSING=$((AUR_MISSING + 1)); }; done
 ((AUR_MISSING == 0)) && ok "AUR/foreign packages ${#AUR_PKGS[@]}/${#AUR_PKGS[@]}" || fail "$AUR_MISSING AUR/foreign package(s) missing"
@@ -102,6 +132,21 @@ section "AUDIO"
 WP="$(wpctl status 2>/dev/null || true)"
 if [[ "$IS_VM" == true ]]; then warn "physical speaker check skipped in VM"; else grep -q "Speaker" <<< "$WP" && ok "PipeWire speaker sink" || warn "speaker sink not found by generic check"; fi
 grep -q "WirePlumber" <<< "$WP" && ok "WirePlumber" || fail "WirePlumber not visible"
+
+if feature_enabled virtualization; then
+    section "VIRTUALIZATION"
+    for cmd in virsh virt-manager qemu-system-x86_64; do command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"; done
+    systemctl is-enabled libvirtd.socket >/dev/null 2>&1 && ok "libvirtd.socket enabled" || fail "libvirtd.socket not enabled"
+    [[ -x "$HOME/.local/bin/devos-vm" ]] && ok "devos-vm launcher" || fail "devos-vm launcher missing"
+    if [[ -e /dev/kvm ]]; then
+        ok "/dev/kvm hardware acceleration"
+    elif [[ "$IS_VM" == true ]]; then
+        warn "nested /dev/kvm not exposed by outer VM"
+    else
+        fail "/dev/kvm missing on physical virtualization host"
+    fi
+    if virsh -c qemu:///system net-info default >/dev/null 2>&1; then ok "libvirt default network accessible"; else warn "libvirt network will be rechecked after relogin (libvirt group membership may be new)"; fi
+fi
 
 section "BLUEPRINT"
 git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1 && ok "Git repository" || fail "Git repository missing"

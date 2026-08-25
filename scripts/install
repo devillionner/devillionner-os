@@ -7,6 +7,7 @@ source "$REPO/scripts/lib/common.sh"
 PROFILE=""
 KEYBOARD=""
 TARGET=""
+VIRTUALIZATION=""
 NON_INTERACTIVE=false
 
 usage() {
@@ -16,14 +17,16 @@ Usage: bash scripts/install [options]
 Options:
   --profile gaming|work|laboratory
   --keyboard copilot|windows|mac
+  --with virtualization
+  --without virtualization
   --vm
   --test-partition
   --non-interactive
   -h, --help
 
-Recommended:
-  VM:                 bash scripts/install
-  Reserved test disk: bash scripts/install --test-partition
+Defaults:
+  Laboratory includes virtualization.
+  Gaming and Work do not, but it can be enabled during install or with --with virtualization.
 EOF
 }
 
@@ -42,6 +45,12 @@ while (($#)); do
             esac
             shift 2
             ;;
+        --with|--without)
+            [[ $# -ge 2 ]] || bp_die "$1 needs a feature name"
+            [[ "$2" == "virtualization" ]] || bp_die "Unknown feature: $2"
+            [[ "$1" == "--with" ]] && VIRTUALIZATION=true || VIRTUALIZATION=false
+            shift 2
+            ;;
         --vm) TARGET="--vm"; shift ;;
         --test-partition) TARGET="--test-partition"; shift ;;
         --non-interactive) NON_INTERACTIVE=true; shift ;;
@@ -57,7 +66,7 @@ if [[ -z "$PROFILE" ]]; then
         printf "\nChoose Blueprint profile:\n"
         printf "  1) Gaming      - Steam, GameMode, Gamescope, MangoHud, Vesktop\n"
         printf "  2) Work        - browser, Telegram, calculator, scanner, disk analyzer\n"
-        printf "  3) Laboratory  - compilers, Python/Node, GitHub CLI, VS Code\n"
+        printf "  3) Laboratory  - dev stack + KVM/QEMU virtual machines by default\n"
         read -r -p "Profile [1-3]: " answer
         case "$answer" in
             1) PROFILE="gaming" ;;
@@ -65,6 +74,23 @@ if [[ -z "$PROFILE" ]]; then
             3) PROFILE="laboratory" ;;
             *) bp_die "Invalid profile choice" ;;
         esac
+    fi
+fi
+
+if [[ -z "$VIRTUALIZATION" ]]; then
+    [[ "$PROFILE" == "laboratory" ]] && DEFAULT_VIRT=true || DEFAULT_VIRT=false
+
+    if [[ "$NON_INTERACTIVE" == true ]]; then
+        VIRTUALIZATION="$DEFAULT_VIRT"
+    else
+        printf "\nVirtual machines (KVM/QEMU + libvirt + virt-manager)\n"
+        if [[ "$DEFAULT_VIRT" == true ]]; then
+            read -r -p "Install virtualization? [Y/n]: " answer
+            case "${answer,,}" in n|no) VIRTUALIZATION=false ;; *) VIRTUALIZATION=true ;; esac
+        else
+            read -r -p "Install virtualization? [y/N]: " answer
+            case "${answer,,}" in y|yes) VIRTUALIZATION=true ;; *) VIRTUALIZATION=false ;; esac
+        fi
     fi
 fi
 
@@ -105,11 +131,12 @@ if [[ -z "$TARGET" ]]; then
 fi
 
 bp_info "Installation plan"
-printf "    Profile:  %s\n" "$PROFILE"
-printf "    Keyboard: %s\n" "$KEYBOARD"
-printf "    Target:   %s\n" "$TARGET"
+printf "    Profile:        %s\n" "$PROFILE"
+printf "    Virtualization: %s\n" "$VIRTUALIZATION"
+printf "    Keyboard:       %s\n" "$KEYBOARD"
+printf "    Target:         %s\n" "$TARGET"
 
-exec "$REPO/scripts/restore" \
-    "$TARGET" \
-    --profile "$PROFILE" \
-    --keyboard "$KEYBOARD"
+ARGS=("$TARGET" --profile "$PROFILE" --keyboard "$KEYBOARD")
+[[ "$VIRTUALIZATION" == true ]] && ARGS+=(--feature virtualization)
+
+exec "$REPO/scripts/restore" "${ARGS[@]}"

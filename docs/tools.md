@@ -6,7 +6,7 @@
 bash scripts/check
 ```
 
-Checks the selected profile, core binaries, Quickshell runtime, Caelestia compatibility patches, keyboard mode, hardware/audio helper selection, services and Git state.
+Checks the selected profile, enabled features, core binaries, Quickshell runtime, Caelestia compatibility patches, keyboard mode, hardware/audio helper selection, services and Git state.
 
 ## Disk audit
 
@@ -17,6 +17,18 @@ bash scripts/audit-disk
 Reports the largest top-level home directories, `/var` usage, Pacman cache size, orphan packages and journal size. It deletes nothing.
 
 The Work profile also installs Baobab for a visual disk-usage view.
+
+## Virtual machines
+
+If the virtualization feature is enabled:
+
+```bash
+devos-vm               # open virt-manager
+devos-vm list          # list guests
+devos-vm validate      # validate KVM/QEMU host support
+```
+
+The app launcher also contains **Virtual Machines**. See `docs/virtualization.md`.
 
 ## Audio helpers
 

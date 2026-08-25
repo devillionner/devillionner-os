@@ -14,12 +14,20 @@ cd devillionner-os
 bash scripts/install
 ```
 
-The installer asks for:
+The installer asks for a profile:
 
 - **Gaming** — Steam, Gamescope, MangoHud, GameMode, gaming scheduler and Vesktop.
 - **Work** — Helium, Telegram, calculator, scanner, disk analyzer and communication tools.
-- **Laboratory** — compilers, Python/Node tooling, GitHub CLI, debugging tools and VS Code.
-- keyboard layout switching: **Alt+Shift**, **Super+Space**, or the **Copilot/Menu key**.
+- **Laboratory** — compilers, Python/Node tooling, GitHub CLI, debugging tools, VS Code, and **KVM/QEMU virtual machines by default**.
+
+Virtualization is a reusable feature, not hard-wired to one profile. Work or Gaming can enable the same KVM/libvirt/virt-manager stack during install or with:
+
+```bash
+bash scripts/install --profile work --with virtualization
+bash scripts/install --profile gaming --with virtualization
+```
+
+The installer also asks for keyboard layout switching: **Alt+Shift**, **Super+Space**, or the **Copilot/Menu key**.
 
 On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbook audio helpers are preserved. Other laptops/desktops receive generic audio helpers instead of Zenbook-specific ones.
 
@@ -42,11 +50,13 @@ Recommended validation order:
 ```bash
 bash scripts/check
 bash scripts/audit-disk
+devos-vm
 ```
 
 See:
 
 - [Profiles and hardware behavior](docs/profiles.md)
+- [Virtual machines](docs/virtualization.md)
 - [Recovery points](docs/recovery.md)
 - [Tools and helper commands](docs/tools.md)
 - [YouTube Music manual setup](docs/youtube-music.md)
@@ -58,4 +68,5 @@ See:
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
 - Quickshell runtime health is validated, so a Qt ABI break is caught instead of silently passing.
 - Caelestia fullscreen and `Env` compatibility patches are applied during restore.
+- KVM/QEMU + libvirt + virt-manager is the standard general VM stack; VirtualBox is not the Blueprint default.
 - Color/ICC tuning is not guessed on unknown displays; the Zenbook color-profile decision remains a measured/researched task.

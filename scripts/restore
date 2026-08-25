@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 MAN="$REPO/manifests/profiles"
+FEATURE_MAN="$REPO/manifests/features"
 source "$REPO/scripts/lib/common.sh"
 
 MAIN_PARTUUID="dd1a5d46-e370-454d-8278-2335f9eb1262"
@@ -11,6 +12,15 @@ TEST_PARTUUID="1c08b2fd-b4c8-4933-920b-80746d466558"
 PROFILE=""
 KEYBOARD=""
 TARGET=""
+FEATURES=()
+
+feature_enabled() {
+    local wanted="$1" feature
+    for feature in "${FEATURES[@]}"; do
+        [[ "$feature" == "$wanted" ]] && return 0
+    done
+    return 1
+}
 
 while (($#)); do
     case "$1" in
@@ -27,6 +37,16 @@ while (($#)); do
             esac
             shift 2
             ;;
+        --feature)
+            [[ $# -ge 2 ]] || bp_die "--feature needs a value"
+            case "$2" in
+                virtualization)
+                    feature_enabled virtualization || FEATURES+=(virtualization)
+                    ;;
+                *) bp_die "Unknown feature: $2" ;;
+            esac
+            shift 2
+            ;;
         --vm) TARGET="vm"; shift ;;
         --test-partition) TARGET="test"; shift ;;
         *) bp_die "Unknown option: $1" ;;
@@ -38,7 +58,7 @@ done
 [[ -n "$TARGET" ]] || bp_die "Target is required (--vm or --test-partition)."
 
 printf "========================================\n"
-printf "       devillionner-os restore v0.2\n"
+printf "       devillionner-os restore v0.3\n"
 printf "========================================\n"
 
 grep -Eq '^ID="?cachyos"?$' /etc/os-release 2>/dev/null \
@@ -56,6 +76,7 @@ printf "Root device:     %s\n" "$ROOT_DEV"
 printf "Root PARTUUID:   %s\n" "${ROOT_PARTUUID:-unknown}"
 printf "Virtualization:  %s\n" "${VIRT:-none}"
 printf "Profile:         %s\n" "$PROFILE"
+printf "Features:        %s\n" "${FEATURES[*]:-none}"
 printf "Keyboard:        %s\n" "$KEYBOARD"
 
 if [[ "$ROOT_PARTUUID" == "$MAIN_PARTUUID" ]]; then
@@ -76,7 +97,7 @@ case "$TARGET" in
         ;;
 esac
 
-printf "\nThis installs the selected profile, restores desktop config, and creates a rollback point first.\n"
+printf "\nThis installs the selected profile/features, restores desktop config, and creates a rollback point first.\n"
 printf "It does NOT repartition disks, touch Windows partitions, or restore personal data.\n\n"
 read -r -p "Type RESTORE to continue: " ANSWER
 [[ "$ANSWER" == "RESTORE" ]] || bp_die "Cancelled."
@@ -85,7 +106,7 @@ bp_info "Authorizing sudo"
 sudo -v
 
 "$REPO/scripts/create-recovery-point" \
-    "devillionner-os pre-restore ($PROFILE)"
+    "devillionner-os pre-restore ($PROFILE; ${FEATURES[*]:-no extra features})"
 
 bp_info "Installing restore prerequisites"
 sudo pacman -Syu --needed --noconfirm base-devel git rsync
@@ -94,6 +115,9 @@ mapfile -t REPO_PKGS < <(
     {
         bp_strip_manifest "$MAN/common-repo.txt"
         bp_strip_manifest "$MAN/$PROFILE-repo.txt"
+        for feature in "${FEATURES[@]}"; do
+            bp_strip_manifest "$FEATURE_MAN/$feature-repo.txt"
+        done
     } | sort -u
 )
 
@@ -101,6 +125,9 @@ mapfile -t AUR_PKGS < <(
     {
         bp_strip_manifest "$MAN/common-aur.txt"
         bp_strip_manifest "$MAN/$PROFILE-aur.txt"
+        for feature in "${FEATURES[@]}"; do
+            bp_strip_manifest "$FEATURE_MAN/$feature-aur.txt"
+        done
     } | sort -u
 )
 
@@ -116,8 +143,6 @@ if ((${#REPO_PKGS[@]})); then
     sudo pacman -S --needed --noconfirm "${REPO_PKGS[@]}"
 fi
 
-# Caelestia must use current upstream Quickshell. This also repairs the
-# Qt private-ABI break that can happen after a Qt update.
 NEED_QS=false
 FILTERED_AUR=()
 for pkg in "${AUR_PKGS[@]}"; do
@@ -195,6 +220,10 @@ if [[ -f "$REPO/scripts/configure-helium" ]]; then
     fi
 fi
 
+if feature_enabled virtualization; then
+    "$REPO/scripts/configure-virtualization"
+fi
+
 "$REPO/scripts/optimize-system" "$PROFILE"
 
 bp_info "Configuring Fish"
@@ -235,6 +264,9 @@ enable_user_manifest() {
 bp_info "Enabling services"
 enable_system_manifest "$MAN/services-common.txt"
 enable_system_manifest "$MAN/services-$PROFILE.txt"
+for feature in "${FEATURES[@]}"; do
+    enable_system_manifest "$FEATURE_MAN/services-$feature.txt"
+done
 systemctl --user daemon-reload
 enable_user_manifest "$MAN/services-user-common.txt"
 
@@ -242,12 +274,14 @@ CONFIG_DIR="$(bp_config_dir)"
 mkdir -p "$CONFIG_DIR"
 printf '%s\n' "$PROFILE" > "$CONFIG_DIR/profile"
 printf '%s\n' "$KEYBOARD" > "$CONFIG_DIR/keyboard-mode"
+printf '%s\n' "${FEATURES[@]}" > "$CONFIG_DIR/features"
 
 bp_info "Running Blueprint validation"
 if "$REPO/scripts/check" --profile "$PROFILE"; then
     printf "\n========================================\n"
     printf "RESTORE COMPLETED\n"
     printf "Profile: %s\n" "$PROFILE"
+    printf "Features: %s\n" "${FEATURES[*]:-none}"
     printf "Validation: PASS\n"
     printf "========================================\n"
 else

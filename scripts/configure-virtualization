@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+for cmd in virsh virt-manager; do
+    command -v "$cmd" >/dev/null 2>&1 || bp_die "$cmd is missing; virtualization packages were not installed correctly."
+done
+
+bp_info "Configuring KVM/QEMU virtualization"
+
+sudo systemctl enable --now libvirtd.socket >/dev/null 2>&1 \
+    || bp_die "Could not enable/start libvirtd.socket"
+
+if systemctl cat virtlogd.socket >/dev/null 2>&1; then
+    sudo systemctl enable --now virtlogd.socket >/dev/null 2>&1 \
+        || bp_warn "Could not enable/start virtlogd.socket"
+fi
+
+if getent group libvirt >/dev/null 2>&1; then
+    sudo usermod -aG libvirt "$USER"
+    bp_ok "User added to libvirt group (takes effect after next login)"
+fi
+
+sudo mkdir -p /var/lib/libvirt/images
+
+if ! sudo virsh -c qemu:///system pool-info default >/dev/null 2>&1; then
+    sudo virsh -c qemu:///system pool-define-as \
+        --name default \
+        --type dir \
+        --target /var/lib/libvirt/images >/dev/null
+fi
+
+sudo virsh -c qemu:///system pool-autostart default >/dev/null 2>&1 || true
+if ! sudo virsh -c qemu:///system pool-info default 2>/dev/null | grep -q 'State:.*running'; then
+    sudo virsh -c qemu:///system pool-start default >/dev/null 2>&1 \
+        || bp_warn "Default VM storage pool could not be started"
+fi
+
+if ! sudo virsh -c qemu:///system net-list --all --name 2>/dev/null | grep -qx default; then
+    TMP_NET="$(mktemp)"
+    cat > "$TMP_NET" <<'EOF_NET'
+<network>
+  <name>default</name>
+  <forward mode='nat'/>
+  <bridge name='virbr0' stp='on' delay='0'/>
+  <ip address='192.168.122.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='192.168.122.2' end='192.168.122.254'/>
+    </dhcp>
+  </ip>
+</network>
+EOF_NET
+    sudo virsh -c qemu:///system net-define "$TMP_NET" >/dev/null
+    rm -f "$TMP_NET"
+fi
+
+sudo virsh -c qemu:///system net-autostart default >/dev/null 2>&1 || true
+if ! sudo virsh -c qemu:///system net-info default 2>/dev/null | grep -q 'Active:.*yes'; then
+    sudo virsh -c qemu:///system net-start default >/dev/null 2>&1 \
+        || bp_warn "Default libvirt NAT network could not be started"
+fi
+
+cat <<'EOF_SYSCTL' | sudo tee /etc/sysctl.d/99-devillionner-virtualization.conf >/dev/null
+# Required for libvirt NAT networking.
+net.ipv4.ip_forward = 1
+EOF_SYSCTL
+sudo sysctl -q -p /etc/sysctl.d/99-devillionner-virtualization.conf \
+    || bp_warn "Could not enable IPv4 forwarding immediately"
+
+if command -v ufw >/dev/null 2>&1 \
+    && sudo ufw status 2>/dev/null | grep -q '^Status: active'; then
+    sudo ufw route allow in on virbr0 >/dev/null 2>&1 || true
+    sudo ufw route allow out on virbr0 >/dev/null 2>&1 || true
+    sudo ufw allow in on virbr0 >/dev/null 2>&1 || true
+    bp_ok "UFW rules added for libvirt NAT bridge"
+fi
+
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
+
+cat > "$HOME/.local/bin/devos-vm" <<'EOF_VM'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+case "${1:-manager}" in
+    manager|gui)
+        exec virt-manager --connect qemu:///system
+        ;;
+    list)
+        exec virsh -c qemu:///system list --all
+        ;;
+    validate)
+        exec virt-host-validate qemu
+        ;;
+    *)
+        printf 'Usage: devos-vm [manager|list|validate]\n' >&2
+        exit 2
+        ;;
+esac
+EOF_VM
+chmod +x "$HOME/.local/bin/devos-vm"
+
+cat > "$HOME/.local/share/applications/devillionner-virtual-machines.desktop" <<EOF_DESKTOP
+[Desktop Entry]
+Name=Virtual Machines
+Comment=KVM/QEMU virtual machines managed by libvirt
+Exec=$HOME/.local/bin/devos-vm manager
+Icon=virt-manager
+Terminal=false
+Type=Application
+Categories=System;Emulator;
+Keywords=VM;Virtual Machine;KVM;QEMU;libvirt;
+EOF_DESKTOP
+
+command -v update-desktop-database >/dev/null 2>&1 \
+    && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+
+if [[ -e /dev/kvm ]]; then
+    bp_ok "Hardware KVM acceleration available"
+else
+    if bp_is_vm; then
+        bp_warn "Nested /dev/kvm is not exposed in this VM; virt-manager is installed, but nested guests will be slow/unavailable."
+    else
+        bp_warn "/dev/kvm is missing. Enable Intel VT-x/AMD-V in firmware before running accelerated VMs."
+    fi
+fi
+
+[[ -e /dev/dri/renderD128 ]] \
+    && bp_ok "Host render node detected for accelerated virtio/virgl graphics" \
+    || bp_warn "No standard render node detected; 3D guest acceleration may be unavailable"
+
+bp_ok "Virtual Machines launcher installed"
+bp_ok "CLI helper: devos-vm"

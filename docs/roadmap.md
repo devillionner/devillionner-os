@@ -1,13 +1,15 @@
 # Roadmap
 
-This is the working backlog after the v0.2 profile refactor.
+This is the working backlog after the v0.3 profile + reusable-feature refactor.
 
 ## P0 — validate the new installer
 
 - [ ] Fresh **Gaming** install in KVM.
 - [ ] Fresh **Work** install in KVM.
-- [ ] Fresh **Laboratory** install in KVM.
+- [ ] Fresh **Laboratory** install in KVM (virtualization enabled by default).
 - [ ] Reboot each VM and run `bash scripts/check`.
+- [ ] Validate the virtualization feature on a physical Linux host with `/dev/kvm`.
+- [ ] Verify a Linux/Hyprland guest uses virtio/virgl rather than `llvmpipe` when 3D acceleration is enabled.
 - [ ] After VM passes, test on the reserved physical Blueprint partition.
 - [ ] Verify Snapper/Btrfs checkpoint is usable before touching the main installation.
 - [ ] Verify Quickshell rebuild logic after a Qt update.
@@ -32,6 +34,17 @@ This is the working backlog after the v0.2 profile refactor.
 - [ ] Run `bash scripts/audit-disk`, review large directories and remove only confirmed unnecessary data/packages.
 - [ ] Review services after clean install and remove anything not needed by the three profiles.
 
+## P1 — virtualization
+
+- [x] Add reusable `virtualization` feature for any profile.
+- [x] Make Laboratory enable virtualization by default.
+- [x] Standardize on KVM/QEMU + libvirt + virt-manager.
+- [x] Prepare libvirt NAT network, storage pool, UEFI/OVMF, swtpm and virglrenderer.
+- [x] Add `devos-vm` helper and desktop launcher.
+- [ ] Create a reproducible one-command **Blueprint Test VM** template after host clean-install validation.
+- [ ] Decide whether a lighter launcher/UI should sit on top of libvirt while keeping libvirt as the backend.
+- [ ] Add portable export/import instructions for VM XML + qcow2 images without committing huge VM disks to Git.
+
 ## P2 — hardware-specific
 
 - [ ] Zenbook color profile: compare the current panel behavior with an official/model-specific ICC or measured profile. Do **not** install a random generic OLED ICC.
@@ -50,6 +63,7 @@ This is the working backlog after the v0.2 profile refactor.
 ## Documentation
 
 - [x] Three install profiles documented.
+- [x] Reusable virtualization feature documented.
 - [x] Keyboard chooser documented.
 - [x] Recovery-point behavior documented.
 - [x] Hardware-aware audio behavior documented.
