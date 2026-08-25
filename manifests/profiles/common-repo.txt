@@ -13,6 +13,7 @@ easyeffects
 fastfetch
 file-roller
 fish
+frameworkintegration
 fwupd
 gdm
 git
