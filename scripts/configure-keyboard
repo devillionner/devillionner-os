@@ -11,46 +11,80 @@ case "$MODE" in
 esac
 
 INPUT="$HOME/.config/hypr/hyprland/input.lua"
+GUI="$HOME/.config/hypr/hyprland-gui.lua"
 KEYBINDS="$HOME/.config/hypr/hyprland/keybinds.lua"
 
-[[ -f "$INPUT" && -f "$KEYBINDS" ]] \
+[[ -f "$INPUT" && -f "$GUI" && -f "$KEYBINDS" ]] \
     || bp_die "Hyprland Lua configuration is missing."
 
-python - "$INPUT" "$KEYBINDS" "$MODE" <<'PY'
+python - "$INPUT" "$GUI" "$KEYBINDS" "$MODE" <<'PY'
 from pathlib import Path
 import re
 import sys
 
 input_path = Path(sys.argv[1])
-keybinds_path = Path(sys.argv[2])
-mode = sys.argv[3]
+gui_path = Path(sys.argv[2])
+keybinds_path = Path(sys.argv[3])
+mode = sys.argv[4]
 
-text = input_path.read_text(encoding="utf-8")
-text, count = re.subn(
-    r'kb_layout\s*=\s*"[^"]*"',
-    'kb_layout          = "us,ua"',
-    text,
-    count=1,
-)
-if count != 1:
-    raise SystemExit("input.lua: kb_layout not found")
+# HyprMod loads hyprland-gui.lua LAST, so keyboard values must be written to
+# both files or the GUI-generated layer will override input.lua on login.
+options = {
+    "windows": "grp:alt_shift_toggle,altwin:menu",
+    "mac": "altwin:menu",
+    "copilot": "altwin:menu",
+}[mode]
 
-option = "grp:alt_shift_toggle" if mode == "windows" else ""
-if re.search(r'kb_options\s*=', text):
-    text = re.sub(
-        r'kb_options\s*=\s*"[^"]*"',
-        f'kb_options         = "{option}"',
+
+def set_input_values(path: Path, ensure_variant: bool = False):
+    text = path.read_text(encoding="utf-8")
+
+    text, count = re.subn(
+        r'kb_layout\s*=\s*"[^"]*"',
+        'kb_layout = "us,ua"',
         text,
         count=1,
     )
-else:
-    text = text.replace(
-        'kb_layout          = "us,ua",',
-        'kb_layout          = "us,ua",\n'
-        f'        kb_options         = "{option}",',
-        1,
-    )
-input_path.write_text(text, encoding="utf-8")
+    if count != 1:
+        raise SystemExit(f"{path.name}: kb_layout not found")
+
+    if re.search(r'kb_options\s*=', text):
+        text = re.sub(
+            r'kb_options\s*=\s*"[^"]*"',
+            f'kb_options = "{options}"',
+            text,
+            count=1,
+        )
+    else:
+        text = text.replace(
+            'kb_layout = "us,ua",',
+            'kb_layout = "us,ua",\n        '
+            f'kb_options = "{options}",',
+            1,
+        )
+
+    if ensure_variant:
+        # Keep the Windows-enhanced Ukrainian layout already used by the
+        # Blueprint/HyprMod UI. The first layout has no variant.
+        if re.search(r'kb_variant\s*=', text):
+            text = re.sub(
+                r'kb_variant\s*=\s*"[^"]*"',
+                'kb_variant = ",winkeysenhanced"',
+                text,
+                count=1,
+            )
+        else:
+            text = text.replace(
+                f'kb_options = "{options}",',
+                f'kb_options = "{options}",\n        kb_variant = ",winkeysenhanced",',
+                1,
+            )
+
+    path.write_text(text, encoding="utf-8")
+
+
+set_input_values(input_path)
+set_input_values(gui_path, ensure_variant=True)
 
 keys = keybinds_path.read_text(encoding="utf-8")
 legacy = '''-- Switch keyboard layout (Copilot key)
@@ -73,18 +107,31 @@ elif mode == "copilot":
     lines.append('create_bind("SUPER + SHIFT + F23", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))')
     lines.append('create_bind("Menu", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))')
 else:
-    lines.append("-- Alt+Shift is handled by kb_options = grp:alt_shift_toggle")
+    lines.append("-- Alt+Shift handled by XKB option grp:alt_shift_toggle")
 lines.append(end)
 
 keys = keys.rstrip() + "\n\n" + "\n".join(lines) + "\n"
 keybinds_path.write_text(keys, encoding="utf-8")
 PY
 
+# Apply immediately when run from an active Hyprland session. During a restore
+# from GNOME/live media these commands simply wait until the next Hyprland login.
+if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 2>&1; then
+    case "$MODE" in
+        windows) RUNTIME_OPTIONS="grp:alt_shift_toggle,altwin:menu" ;;
+        mac|copilot) RUNTIME_OPTIONS="altwin:menu" ;;
+    esac
+    hyprctl keyword input:kb_layout 'us,ua' >/dev/null 2>&1 || true
+    hyprctl keyword input:kb_variant ',winkeysenhanced' >/dev/null 2>&1 || true
+    hyprctl keyword input:kb_options "$RUNTIME_OPTIONS" >/dev/null 2>&1 || true
+    hyprctl reload >/dev/null 2>&1 || true
+fi
+
 CONFIG_DIR="$(bp_config_dir)"
 mkdir -p "$CONFIG_DIR"
 printf '%s\n' "$MODE" > "$CONFIG_DIR/keyboard-mode"
 
-bp_ok "Keyboard layouts: English + Ukrainian"
+bp_ok "Keyboard layouts: English + Ukrainian (Windows Enhanced)"
 case "$MODE" in
     windows) bp_ok "Layout switch: Alt+Shift" ;;
     mac) bp_ok "Layout switch: Super+Space" ;;
