@@ -141,11 +141,12 @@ WP="$(wpctl status 2>/dev/null || true)"
 if [[ "$IS_VM" == true ]]; then warn "physical speaker check skipped in VM"; else grep -q "Speaker" <<< "$WP" && ok "PipeWire speaker sink" || warn "speaker sink not found by generic check"; fi
 grep -q "WirePlumber" <<< "$WP" && ok "WirePlumber" || fail "WirePlumber not visible"
 if [[ "$HARDWARE" == "asus-zenbook-ux3405ca" ]]; then
-    if find "$HOME/.config/easyeffects" -maxdepth 3 -type f -name '*.json' -print -quit 2>/dev/null | grep -q .; then
-        ok "Zenbook EasyEffects preset files present"
-    else
-        warn "Zenbook EasyEffects presets are not captured/restored yet"
-    fi
+    EE_OUT="$HOME/.local/share/easyeffects/output"
+    PRESET_MISSING=0
+    for preset in "Laptop.json" "Dolby Atmos.json" "Sony AutoEq Harman.json"; do
+        [[ -f "$EE_OUT/$preset" ]] || { printf "         missing preset: %s\n" "$preset"; PRESET_MISSING=$((PRESET_MISSING + 1)); }
+    done
+    ((PRESET_MISSING == 0)) && ok "Zenbook EasyEffects presets present" || warn "$PRESET_MISSING Zenbook EasyEffects preset(s) missing"
 else
     ok "EasyEffects presets are user-managed on generic hardware"
 fi
