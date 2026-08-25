@@ -67,15 +67,19 @@ rm -f /tmp/devillionner-qs-version
 section "SHELL"
 LOGIN_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
 [[ "$LOGIN_SHELL" == */fish ]] && ok "fish is login shell" || fail "login shell is $LOGIN_SHELL"
-for file in c disk eq-dolby fish_greeting; do
+for file in c disk fish_greeting; do
     [[ -f "$HOME/.config/fish/functions/$file.fish" ]] && ok "fish function: $file" || fail "fish function missing: $file"
 done
 HARDWARE="$(cat "$(bp_config_dir)/hardware-profile" 2>/dev/null || true)"
 case "$HARDWARE" in
     asus-zenbook-ux3405ca)
-        for file in eq-laptop eq-sony; do [[ -f "$HOME/.config/fish/functions/$file.fish" ]] && ok "Zenbook audio function: $file" || fail "Zenbook audio function missing: $file"; done ;;
-    generic-laptop) [[ -f "$HOME/.config/fish/functions/eq-laptop.fish" ]] && ok "generic laptop audio function" || fail "eq-laptop missing" ;;
-    generic-pc) [[ -f "$HOME/.config/fish/functions/eq-pc.fish" ]] && ok "generic PC audio function" || fail "eq-pc missing" ;;
+        for file in eq-laptop eq-dolby eq-sony; do
+            [[ -f "$HOME/.config/fish/functions/$file.fish" ]] && ok "Zenbook audio function: $file" || fail "Zenbook audio function missing: $file"
+        done
+        ;;
+    generic)
+        [[ -f "$HOME/.config/fish/functions/eq-audio.fish" ]] && ok "generic EasyEffects helper: eq-audio" || fail "eq-audio missing"
+        ;;
     *) warn "hardware profile state missing" ;;
 esac
 
@@ -86,7 +90,7 @@ KEYBOARD_MODE="$(cat "$(bp_config_dir)/keyboard-mode" 2>/dev/null || true)"
 case "$KEYBOARD_MODE" in windows|mac|copilot) ok "layout switch mode: $KEYBOARD_MODE" ;; *) warn "layout switch mode missing" ;; esac
 
 section "DOTFILES"
-for dir in fish fastfetch hypr easyeffects caelestia kitty; do [[ -d "$HOME/.config/$dir" ]] && ok "~/.config/$dir" || fail "~/.config/$dir missing"; done
+for dir in fish fastfetch hypr caelestia kitty; do [[ -d "$HOME/.config/$dir" ]] && ok "~/.config/$dir" || fail "~/.config/$dir missing"; done
 
 section "PACKAGES"
 mapfile -t REPO_PKGS < <(
@@ -126,8 +130,6 @@ SHORTCUTS="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/Shortcuts
 CONTENT="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/drawers\/ContentWindow\.qml$/ {print $2; exit}')"
 if [[ -n "$SHORTCUTS" ]] && ! grep -A7 'name: "sidebar"' "$SHORTCUTS" | grep -q 'if (root.hasFullscreen)'; then ok "fullscreen sidebar shortcut patch"; else fail "fullscreen sidebar shortcut patch missing"; fi
 if [[ -n "$CONTENT" ]] && grep -q 'mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions' "$CONTENT"; then ok "fullscreen sidebar input-mask patch"; else fail "fullscreen sidebar input-mask patch missing"; fi
-# Caelestia launches Quickshell as `qs -c caelestia ...`; older validation only
-# matched a literal `quickshell` process name and produced a false warning.
 if pgrep -af '(^|/)(qs|quickshell)([[:space:]].*)?-c[[:space:]]+caelestia|caelestia[[:space:]]+shell' >/dev/null 2>&1; then
     ok "Caelestia shell running"
 else
@@ -138,6 +140,15 @@ section "AUDIO"
 WP="$(wpctl status 2>/dev/null || true)"
 if [[ "$IS_VM" == true ]]; then warn "physical speaker check skipped in VM"; else grep -q "Speaker" <<< "$WP" && ok "PipeWire speaker sink" || warn "speaker sink not found by generic check"; fi
 grep -q "WirePlumber" <<< "$WP" && ok "WirePlumber" || fail "WirePlumber not visible"
+if [[ "$HARDWARE" == "asus-zenbook-ux3405ca" ]]; then
+    if find "$HOME/.config/easyeffects" -maxdepth 3 -type f -name '*.json' -print -quit 2>/dev/null | grep -q .; then
+        ok "Zenbook EasyEffects preset files present"
+    else
+        warn "Zenbook EasyEffects presets are not captured/restored yet"
+    fi
+else
+    ok "EasyEffects presets are user-managed on generic hardware"
+fi
 
 if feature_enabled virtualization; then
     section "VIRTUALIZATION"
