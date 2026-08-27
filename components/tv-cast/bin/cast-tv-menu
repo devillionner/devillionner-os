@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+source /usr/local/lib/cast-tv-i18n
+
+
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+PIDFILE="$RUNTIME/cast-tv-menu.pid"
+
+# Повторне натискання F-кнопки закриває тільки меню.
+if [ -f "$PIDFILE" ]; then
+    OLDPID="$(cat "$PIDFILE" 2>/dev/null)"
+
+    if [ -n "$OLDPID" ] &&
+       kill -0 "$OLDPID" 2>/dev/null &&
+       tr '\0' ' ' < "/proc/$OLDPID/cmdline" 2>/dev/null | grep -q "fuzzel"; then
+        kill "$OLDPID" 2>/dev/null
+        exit 0
+    fi
+
+    rm -f "$PIDFILE"
+fi
+
+INFO=$(/usr/local/bin/cast-tv-status 2>/dev/null || echo "off|")
+STATE="${INFO%%|*}"
+MODE="${INFO#*|}"
+
+case "$STATE" in
+    connected)
+        HEADER="● $TXT_CONNECTED • ${MODE} FPS"
+        ;;
+    searching)
+        HEADER="◌ $TXT_SEARCHING • ${MODE} FPS"
+        ;;
+    *)
+        HEADER="○ $TXT_OFF"
+        ;;
+esac
+
+if [ "$MODE" = "30" ] && [ "$STATE" != "off" ]; then
+    MODE30="●  $TXT_30"
+else
+    MODE30="○  $TXT_30"
+fi
+
+if [ "$MODE" = "60" ] && [ "$STATE" != "off" ]; then
+    MODE60="●  $TXT_60"
+else
+    MODE60="○  $TXT_60"
+fi
+
+OUT="$(mktemp "$RUNTIME/cast-tv-menu.XXXXXX")"
+
+cleanup() {
+    rm -f "$PIDFILE" "$OUT"
+}
+trap cleanup EXIT
+
+printf "%s\n%s\n%s\n" \
+    "$MODE30" \
+    "$MODE60" \
+    "⏹  $TXT_STOP" |
+fuzzel \
+    --config="$HOME/.config/fuzzel/tvcast.ini" \
+    --dmenu \
+    --hide-prompt \
+    --mesg="TV Cast
+$HEADER" \
+    --no-sort \
+    --only-match \
+    > "$OUT" &
+
+FUZPID=$!
+echo "$FUZPID" > "$PIDFILE"
+
+wait "$FUZPID"
+RESULT=$?
+
+[ "$RESULT" -eq 0 ] || exit 0
+
+CHOICE="$(cat "$OUT")"
+
+case "$CHOICE" in
+    *"$TXT_30")
+        notify-send \
+            --app-name="TV Cast" \
+            --icon=video-display \
+            "TV Cast" \
+            "$TXT_CONNECTING_30"
+
+        /usr/local/bin/cast-tv-start 30
+
+        nohup /usr/local/bin/cast-tv-wait-connected 30 \
+            >/dev/null 2>&1 &
+        ;;
+
+    *"$TXT_60")
+        notify-send \
+            --app-name="TV Cast" \
+            --icon=video-display \
+            "TV Cast" \
+            "$TXT_CONNECTING_60"
+
+        /usr/local/bin/cast-tv-start 60
+
+        nohup /usr/local/bin/cast-tv-wait-connected 60 \
+            >/dev/null 2>&1 &
+        ;;
+
+    *"$TXT_STOP")
+        /usr/local/bin/cast-tv-stop
+        ;;
+esac

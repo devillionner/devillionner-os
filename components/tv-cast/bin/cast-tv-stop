@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+source /usr/local/lib/cast-tv-i18n
+
+SESSION="cast-tv"
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+
+STATE="$RUNTIME/cast-tv-was-muted"
+PROFILE="$RUNTIME/cast-tv-profile"
+SWITCH="$RUNTIME/cast-tv-switching"
+
+SWITCHING=0
+
+if [ "${1:-}" = "--switch" ]; then
+    SWITCHING=1
+    touch "$SWITCH"
+fi
+
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux send-keys -t "$SESSION" C-c
+fi
+
+for _ in $(seq 1 20); do
+    tmux has-session -t "$SESSION" 2>/dev/null || break
+    sleep 0.1
+done
+
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux kill-session -t "$SESSION"
+fi
+
+nmcli connection down "FluxCast WFD" >/dev/null 2>&1 || true
+
+rm -f "$PROFILE"
+
+if [ "$SWITCHING" -eq 0 ]; then
+    if [ -f "$STATE" ] && [ "$(cat "$STATE")" = "0" ]; then
+        wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1 || true
+    fi
+
+    rm -f "$STATE" "$SWITCH"
+
+    notify-send \
+        --app-name="TV Cast" \
+        --icon=video-display \
+        "TV Cast" \
+        "$TXT_STOPPED_NOTIFICATION"
+fi

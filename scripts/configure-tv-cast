@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+SRC="$REPO/components/tv-cast"
+HYPR_USER="$HOME/.config/caelestia/hypr-user.lua"
+FUZZEL_DIR="$HOME/.config/fuzzel"
+
+[[ -d "$SRC" ]] || bp_die "TV Cast component source is missing: $SRC"
+
+bp_info "Installing shared TV Cast component"
+
+sudo install -Dm755 "$SRC/bin/cast-tv-status" /usr/local/bin/cast-tv-status
+sudo install -Dm755 "$SRC/bin/cast-tv-menu" /usr/local/bin/cast-tv-menu
+sudo install -Dm755 "$SRC/bin/cast-tv-start" /usr/local/bin/cast-tv-start
+sudo install -Dm755 "$SRC/bin/cast-tv-stop" /usr/local/bin/cast-tv-stop
+sudo install -Dm755 "$SRC/bin/cast-tv-wait-connected" /usr/local/bin/cast-tv-wait-connected
+
+sudo install -Dm755 "$SRC/lib/cast-tv-bin/wf-recorder" /usr/local/lib/cast-tv-bin/wf-recorder
+sudo install -Dm755 "$SRC/lib/cast-tv-worker" /usr/local/lib/cast-tv-worker
+sudo install -Dm644 "$SRC/lib/cast-tv-i18n" /usr/local/lib/cast-tv-i18n
+
+sudo install -Dm755 "$SRC/sbin/cast-tv-fluxcast-tune" /usr/local/sbin/cast-tv-fluxcast-tune
+sudo install -Dm644 \
+    "$SRC/pacman/99-cast-tv-fluxcast-tune.hook" \
+    /etc/pacman.d/hooks/99-cast-tv-fluxcast-tune.hook
+
+mkdir -p "$FUZZEL_DIR" "$(dirname "$HYPR_USER")"
+install -Dm644 "$SRC/fuzzel/tvcast.ini" "$FUZZEL_DIR/tvcast.ini"
+touch "$HYPR_USER"
+
+bp_info "Installing TV Cast gettext catalogs"
+while IFS= read -r po; do
+    lang="$(basename "$po" .po)"
+    tmp="$(mktemp)"
+    msgfmt --check -o "$tmp" "$po"
+    sudo install -Dm644 \
+        "$tmp" \
+        "/usr/local/share/locale/$lang/LC_MESSAGES/tvcast.mo"
+    rm -f "$tmp"
+done < <(find "$SRC/locale" -maxdepth 1 -type f -name '*.po' | sort)
+
+bp_info "Configuring persistent Super+P TV Cast menu bind"
+python - "$HYPR_USER" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8") if path.exists() else ""
+
+begin = "-- TV CAST MENU START"
+end = "-- TV CAST MENU END"
+
+pattern = re.compile(
+    rf"\n?{re.escape(begin)}.*?{re.escape(end)}\n?",
+    re.DOTALL,
+)
+text = pattern.sub("\n", text).rstrip()
+
+block = """-- TV CAST MENU START
+hl.unbind("SUPER + P")
+hl.bind(
+    "SUPER + P",
+    hl.dsp.exec_cmd("/usr/local/bin/cast-tv-menu"),
+    { description = "TV Cast menu" }
+)
+-- TV CAST MENU END"""
+
+path.write_text((text + "\n\n" if text else "") + block + "\n", encoding="utf-8")
+PY
+
+bp_info "Applying tested FluxCast low-latency tuning"
+sudo /usr/local/sbin/cast-tv-fluxcast-tune
+
+if command -v ufw >/dev/null 2>&1; then
+    ADDED="$(sudo ufw show added 2>/dev/null || true)"
+
+    if ! grep -Eq 'allow[[:space:]]+7236/tcp' <<<"$ADDED"; then
+        sudo ufw allow 7236/tcp comment 'FluxCast Miracast RTSP' >/dev/null
+        bp_ok "UFW: allowed Miracast RTSP 7236/tcp"
+    else
+        bp_ok "UFW: Miracast RTSP rule already present"
+    fi
+
+    if ! grep -Eq 'allow[[:space:]]+67/udp' <<<"$ADDED"; then
+        sudo ufw allow 67/udp comment 'FluxCast WiFi Direct DHCP' >/dev/null
+        bp_ok "UFW: allowed Wi-Fi Direct DHCP 67/udp"
+    else
+        bp_ok "UFW: Wi-Fi Direct DHCP rule already present"
+    fi
+fi
+
+if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 2>&1; then
+    hyprctl reload >/dev/null 2>&1 || true
+fi
+
+bp_ok "TV Cast installed: Super+P opens the Fuzzel menu"

@@ -1,0 +1,36 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: TV Cast 1.0\n"
+"Language: de\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "30 FPS — 1080p"
+msgstr "30 FPS — 1080p"
+
+msgid "60 FPS — 720p"
+msgstr "60 FPS — 720p"
+
+msgid "Casting stopped"
+msgstr "Übertragung beendet"
+
+msgid "Connected"
+msgstr "Verbunden"
+
+msgid "Connecting to TV… • 1080p 30 FPS"
+msgstr "Verbindung mit TV… • 1080p 30 FPS"
+
+msgid "Connecting to TV… • 720p 60 FPS"
+msgstr "Verbindung mit TV… • 720p 60 FPS"
+
+msgid "Off"
+msgstr "Aus"
+
+msgid "Searching for TV"
+msgstr "Fernseher wird gesucht"
+
+msgid "Stop casting"
+msgstr "Übertragung beenden"
+
+msgid "TV connected"
+msgstr "TV verbunden"

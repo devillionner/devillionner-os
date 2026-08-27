@@ -1,0 +1,36 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: TV Cast 1.0\n"
+"Language: zh_CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "30 FPS — 1080p"
+msgstr "30 FPS — 1080p"
+
+msgid "60 FPS — 720p"
+msgstr "60 FPS — 720p"
+
+msgid "Casting stopped"
+msgstr "投屏已停止"
+
+msgid "Connected"
+msgstr "已连接"
+
+msgid "Connecting to TV… • 1080p 30 FPS"
+msgstr "正在连接电视… • 1080p 30 FPS"
+
+msgid "Connecting to TV… • 720p 60 FPS"
+msgstr "正在连接电视… • 720p 60 FPS"
+
+msgid "Off"
+msgstr "已关闭"
+
+msgid "Searching for TV"
+msgstr "正在搜索电视"
+
+msgid "Stop casting"
+msgstr "停止投屏"
+
+msgid "TV connected"
+msgstr "电视已连接"

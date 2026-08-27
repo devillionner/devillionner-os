@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = fluxcast-git
+
+[Action]
+Description = Applying TV Cast low-latency FluxCast tuning
+When = PostTransaction
+Exec = /usr/local/sbin/cast-tv-fluxcast-tune

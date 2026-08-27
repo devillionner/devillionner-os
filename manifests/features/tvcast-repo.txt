@@ -1,0 +1,6 @@
+# TV Cast / Miracast shared feature
+fuzzel
+gettext
+libnotify
+tmux
+wf-recorder

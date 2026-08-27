@@ -1,0 +1,36 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: TV Cast 1.0\n"
+"Language: ja\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "30 FPS — 1080p"
+msgstr "30 FPS — 1080p"
+
+msgid "60 FPS — 720p"
+msgstr "60 FPS — 720p"
+
+msgid "Casting stopped"
+msgstr "キャストを停止しました"
+
+msgid "Connected"
+msgstr "接続済み"
+
+msgid "Connecting to TV… • 1080p 30 FPS"
+msgstr "テレビに接続中… • 1080p 30 FPS"
+
+msgid "Connecting to TV… • 720p 60 FPS"
+msgstr "テレビに接続中… • 720p 60 FPS"
+
+msgid "Off"
+msgstr "オフ"
+
+msgid "Searching for TV"
+msgstr "テレビを検索中"
+
+msgid "Stop casting"
+msgstr "キャストを停止"
+
+msgid "TV connected"
+msgstr "テレビに接続しました"

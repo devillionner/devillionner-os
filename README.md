@@ -20,6 +20,8 @@ The installer asks for a profile:
 - **Work** — Helium, Telegram, calculator, scanner, disk analyzer and communication tools.
 - **Laboratory** — compilers, Python/Node tooling, GitHub CLI, debugging tools, VS Code, and **KVM/QEMU virtual machines by default**.
 
+**TV Cast / Miracast is a shared system feature and is installed in all three profiles.** Press `Super+P` to open its Fuzzel menu and choose 30 FPS / 1080p or 60 FPS / 720p.
+
 Virtualization is a reusable feature, not hard-wired to one profile. Work or Gaming can enable the same KVM/libvirt/virt-manager stack during install or with:
 
 ```bash
@@ -49,6 +51,7 @@ Recommended validation order:
 
 ```bash
 bash scripts/check
+bash scripts/check-tv-cast
 bash scripts/audit-disk
 devos-vm
 ```
@@ -56,6 +59,7 @@ devos-vm
 See:
 
 - [Profiles and hardware behavior](docs/profiles.md)
+- [TV Cast / Miracast](docs/tv-cast.md)
 - [Virtual machines](docs/virtualization.md)
 - [Recovery points](docs/recovery.md)
 - [Tools and helper commands](docs/tools.md)
@@ -68,5 +72,6 @@ See:
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
 - Quickshell runtime health is validated, so a Qt ABI break is caught instead of silently passing.
 - Caelestia fullscreen and `Env` compatibility patches are applied during restore.
+- TV Cast uses FluxCast/WFD + wf-recorder + Fuzzel and is shared by Gaming, Work and Laboratory.
 - KVM/QEMU + libvirt + virt-manager is the standard general VM stack; VirtualBox is not the Blueprint default.
 - Color/ICC tuning is not guessed on unknown displays; the Zenbook color-profile decision remains a measured/researched task.

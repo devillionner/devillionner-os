@@ -1,0 +1,36 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: TV Cast 1.0\n"
+"Language: ro\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "30 FPS — 1080p"
+msgstr "30 FPS — 1080p"
+
+msgid "60 FPS — 720p"
+msgstr "60 FPS — 720p"
+
+msgid "Casting stopped"
+msgstr "Transmisie oprită"
+
+msgid "Connected"
+msgstr "Conectat"
+
+msgid "Connecting to TV… • 1080p 30 FPS"
+msgstr "Conectare la TV… • 1080p 30 FPS"
+
+msgid "Connecting to TV… • 720p 60 FPS"
+msgstr "Conectare la TV… • 720p 60 FPS"
+
+msgid "Off"
+msgstr "Oprit"
+
+msgid "Searching for TV"
+msgstr "Se caută televizorul"
+
+msgid "Stop casting"
+msgstr "Oprește transmisia"
+
+msgid "TV connected"
+msgstr "TV conectat"

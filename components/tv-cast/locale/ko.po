@@ -1,0 +1,36 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: TV Cast 1.0\n"
+"Language: ko\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "30 FPS — 1080p"
+msgstr "30 FPS — 1080p"
+
+msgid "60 FPS — 720p"
+msgstr "60 FPS — 720p"
+
+msgid "Casting stopped"
+msgstr "미러링이 중지됨"
+
+msgid "Connected"
+msgstr "연결됨"
+
+msgid "Connecting to TV… • 1080p 30 FPS"
+msgstr "TV에 연결 중… • 1080p 30 FPS"
+
+msgid "Connecting to TV… • 720p 60 FPS"
+msgstr "TV에 연결 중… • 720p 60 FPS"
+
+msgid "Off"
+msgstr "꺼짐"
+
+msgid "Searching for TV"
+msgstr "TV 검색 중"
+
+msgid "Stop casting"
+msgstr "미러링 중지"
+
+msgid "TV connected"
+msgstr "TV 연결됨"

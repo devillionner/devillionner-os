@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+PROFILE="$RUNTIME/cast-tv-profile"
+
+if ! tmux has-session -t cast-tv 2>/dev/null; then
+    echo "off|"
+    exit 0
+fi
+
+MODE="$(cat "$PROFILE" 2>/dev/null || echo "")"
+
+if ss -tn 2>/dev/null | grep -qE 'ESTAB.*:7236|:7236.*ESTAB'; then
+    echo "connected|$MODE"
+else
+    echo "searching|$MODE"
+fi

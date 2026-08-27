@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+TARGET="${CAST_TV_RES:-1920x1080}"
+
+WIDTH="${TARGET%x*}"
+HEIGHT="${TARGET#*x}"
+
+case "$WIDTH:$HEIGHT" in
+    *[!0-9:]*|"")
+        WIDTH=1920
+        HEIGHT=1080
+        ;;
+esac
+
+exec /usr/bin/wf-recorder \
+    -F "scale=${WIDTH}:${HEIGHT}:flags=fast_bilinear" \
+    "$@"

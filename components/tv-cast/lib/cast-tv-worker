@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+MODE="${1:-30}"
+
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+STATE="$RUNTIME/cast-tv-was-muted"
+PROFILE="$RUNTIME/cast-tv-profile"
+SWITCH="$RUNTIME/cast-tv-switching"
+
+case "$MODE" in
+    60)
+        FPS=60
+        RES="1280x720"
+        BITRATE="8M"
+        ;;
+    *)
+        MODE=30
+        FPS=30
+        RES="1920x1080"
+        BITRATE="6M"
+        ;;
+esac
+
+echo "$MODE" > "$PROFILE"
+
+# Запам'ятовуємо початковий стан звуку тільки один раз.
+if [ ! -f "$STATE" ]; then
+    if wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep -q MUTED; then
+        echo 1 > "$STATE"
+    else
+        echo 0 > "$STATE"
+    fi
+fi
+
+cleanup() {
+    rm -f "$PROFILE"
+
+    # Під час 30 <-> 60 FPS звук не чіпаємо.
+    if [ ! -f "$SWITCH" ]; then
+        if [ -f "$STATE" ] && [ "$(cat "$STATE")" = "0" ]; then
+            wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1 || true
+        fi
+        rm -f "$STATE"
+    fi
+}
+
+trap cleanup EXIT
+trap "exit 130" INT TERM HUP
+
+wpctl set-mute @DEFAULT_AUDIO_SINK@ 1
+
+export FPS RES BITRATE
+export CAST_TV_RES="$RES"
+
+systemd-inhibit \
+    --what=handle-lid-switch:sleep:idle \
+    --who="TV Cast" \
+    --why="TV casting in progress" \
+    --mode=block \
+    bash -c '
+        while true; do
+            printf "\n" |
+            env \
+                CAST_TV_RES="$CAST_TV_RES" \
+                PATH="/usr/local/lib/cast-tv-bin:$PATH" \
+            fluxcast \
+                --protocol wfd \
+                --monitor eDP-1 \
+                --wfd-timeout 3 \
+                --wfd-go-intent 0 \
+                --wfd-capture-backend wf-recorder \
+                --output-res "$RES" \
+                --fps "$FPS" \
+                --bitrate "$BITRATE" \
+                --wfd-media-pipeline ffmpeg
+
+            sleep 0.2
+        done
+    '

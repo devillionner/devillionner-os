@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+source /usr/local/lib/cast-tv-i18n
+
+MODE="$1"
+
+for _ in $(seq 1 240); do
+    INFO=$(/usr/local/bin/cast-tv-status 2>/dev/null || echo "off|")
+
+    STATE="${INFO%%|*}"
+    CURRENT_MODE="${INFO#*|}"
+
+    if [ "$STATE" = "connected" ] && [ "$CURRENT_MODE" = "$MODE" ]; then
+        notify-send \
+            --app-name="TV Cast" \
+            --icon=video-display \
+            "TV Cast" \
+            "$TXT_CONNECTED_NOTIFICATION • ${MODE} FPS"
+        exit 0
+    fi
+
+    [ "$STATE" = "off" ] && exit 0
+
+    if [ -n "$CURRENT_MODE" ] && [ "$CURRENT_MODE" != "$MODE" ]; then
+        exit 0
+    fi
+
+    sleep 0.25
+done

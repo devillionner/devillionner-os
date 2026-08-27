@@ -1,0 +1,2 @@
+# TV Cast has no permanent daemon.
+# FluxCast runs only while a cast is active.

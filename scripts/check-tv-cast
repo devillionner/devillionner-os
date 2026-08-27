@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -u
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SRC="$REPO/components/tv-cast"
+
+OK=0
+WARN=0
+FAIL=0
+
+ok() { printf "  [OK]   %s\n" "$*"; OK=$((OK + 1)); }
+warn() { printf "  [WARN] %s\n" "$*"; WARN=$((WARN + 1)); }
+fail() { printf "  [FAIL] %s\n" "$*"; FAIL=$((FAIL + 1)); }
+
+printf "\nTV CAST\n"
+
+for cmd in fluxcast wf-recorder fuzzel tmux notify-send gettext msgfmt nmcli systemd-inhibit ss wpctl; do
+    command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
+done
+
+for path in \
+    /usr/local/bin/cast-tv-menu \
+    /usr/local/bin/cast-tv-start \
+    /usr/local/bin/cast-tv-stop \
+    /usr/local/bin/cast-tv-status \
+    /usr/local/bin/cast-tv-wait-connected \
+    /usr/local/lib/cast-tv-bin/wf-recorder \
+    /usr/local/lib/cast-tv-worker \
+    /usr/local/sbin/cast-tv-fluxcast-tune
+do
+    [[ -x "$path" ]] && ok "$path" || fail "$path missing/not executable"
+done
+
+[[ -r /usr/local/lib/cast-tv-i18n ]] \
+    && ok "/usr/local/lib/cast-tv-i18n" \
+    || fail "/usr/local/lib/cast-tv-i18n missing"
+
+[[ -f /etc/pacman.d/hooks/99-cast-tv-fluxcast-tune.hook ]] \
+    && ok "FluxCast pacman hook" \
+    || fail "FluxCast pacman hook missing"
+
+[[ -f "$HOME/.config/fuzzel/tvcast.ini" ]] \
+    && ok "Fuzzel TV Cast config" \
+    || fail "Fuzzel TV Cast config missing"
+
+SYNTAX_FAIL=0
+for script in \
+    /usr/local/bin/cast-tv-menu \
+    /usr/local/bin/cast-tv-start \
+    /usr/local/bin/cast-tv-stop \
+    /usr/local/bin/cast-tv-status \
+    /usr/local/bin/cast-tv-wait-connected \
+    /usr/local/lib/cast-tv-bin/wf-recorder \
+    /usr/local/lib/cast-tv-worker \
+    /usr/local/lib/cast-tv-i18n
+do
+    bash -n "$script" >/dev/null 2>&1 || {
+        printf "         syntax error: %s\n" "$script"
+        SYNTAX_FAIL=$((SYNTAX_FAIL + 1))
+    }
+done
+((SYNTAX_FAIL == 0)) && ok "TV Cast Bash syntax" || fail "$SYNTAX_FAIL TV Cast shell script(s) invalid"
+
+python -c 'import ast; ast.parse(open("/usr/local/sbin/cast-tv-fluxcast-tune", encoding="utf-8").read())' \
+    >/dev/null 2>&1 \
+    && ok "FluxCast tuner Python syntax" \
+    || fail "FluxCast tuner Python syntax"
+
+WLROOTS="/opt/fluxcast/wfd/media/wlroots.py"
+if [[ -f "$WLROOTS" ]]; then
+    grep -Eq '"-thread_queue_size"[[:space:]]*,[[:space:]]*"32"' "$WLROOTS" \
+        && ok "FluxCast thread_queue_size = 32" \
+        || fail "FluxCast thread_queue_size tuning missing"
+    grep -Eq '"-preset"[[:space:]]*,[[:space:]]*"ultrafast"[[:space:]]*,' "$WLROOTS" \
+        && ok "FluxCast x264 preset = ultrafast" \
+        || fail "FluxCast ultrafast preset tuning missing"
+else
+    fail "FluxCast wlroots.py missing"
+fi
+
+WORKER="/usr/local/lib/cast-tv-worker"
+WRAPPER="/usr/local/lib/cast-tv-bin/wf-recorder"
+grep -q 'RES="1920x1080"' "$WORKER" && grep -q 'FPS=30' "$WORKER" \
+    && ok "30 FPS = 1920x1080" || fail "30 FPS mode differs"
+grep -q 'RES="1280x720"' "$WORKER" && grep -q 'FPS=60' "$WORKER" \
+    && ok "60 FPS = 1280x720" || fail "60 FPS mode differs"
+grep -q -- '--wfd-timeout 3' "$WORKER" \
+    && ok "short WFD scan iterations" || fail "WFD timeout differs"
+grep -q 'flags=fast_bilinear' "$WRAPPER" \
+    && ok "fast_bilinear cast scaling" || fail "fast_bilinear scaling missing"
+
+HYPR_USER="$HOME/.config/caelestia/hypr-user.lua"
+BIND_COUNT="$(grep -Fc 'hl.dsp.exec_cmd("/usr/local/bin/cast-tv-menu")' "$HYPR_USER" 2>/dev/null || true)"
+[[ "$BIND_COUNT" == "1" ]] \
+    && ok "Super+P TV Cast bind exactly once" \
+    || fail "Super+P TV Cast bind count: ${BIND_COUNT:-0}"
+
+LOCALE_FAIL=0
+while IFS= read -r po; do
+    lang="$(basename "$po" .po)"
+    mo="/usr/local/share/locale/$lang/LC_MESSAGES/tvcast.mo"
+    msgfmt --check -o /dev/null "$po" >/dev/null 2>&1 || {
+        printf "         invalid PO: %s\n" "$po"
+        LOCALE_FAIL=$((LOCALE_FAIL + 1))
+        continue
+    }
+    [[ -f "$mo" ]] || {
+        printf "         missing MO: %s\n" "$mo"
+        LOCALE_FAIL=$((LOCALE_FAIL + 1))
+    }
+done < <(find "$SRC/locale" -maxdepth 1 -type f -name '*.po' | sort)
+((LOCALE_FAIL == 0)) && ok "gettext catalogs" || fail "$LOCALE_FAIL gettext catalog issue(s)"
+
+if command -v ufw >/dev/null 2>&1; then
+    RULES="$(sudo -n ufw show added 2>/dev/null || true)"
+    if [[ -z "$RULES" ]]; then
+        warn "UFW rules not checked (sudo authorization required)"
+    else
+        grep -Eq 'allow[[:space:]]+7236/tcp' <<<"$RULES" \
+            && ok "UFW Miracast RTSP rule" || fail "UFW 7236/tcp rule missing"
+        grep -Eq 'allow[[:space:]]+67/udp' <<<"$RULES" \
+            && ok "UFW Wi-Fi Direct DHCP rule" || fail "UFW 67/udp rule missing"
+    fi
+fi
+
+printf "TV Cast: OK=%d WARN=%d FAIL=%d\n" "$OK" "$WARN" "$FAIL"
+((FAIL == 0))

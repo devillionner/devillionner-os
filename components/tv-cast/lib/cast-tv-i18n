@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+export TEXTDOMAIN="tvcast"
+export TEXTDOMAINDIR="/usr/local/share/locale"
+
+# Необов'язковий override лише для тестування.
+# У звичайному режимі мова завжди береться із системи.
+if [ -n "${TVCAST_LANG:-}" ]; then
+    export LANGUAGE="$TVCAST_LANG"
+
+    # LANGUAGE у gettext ігнорується під чистою C-locale,
+    # тому для тесту беремо будь-яку встановлену UTF-8 locale.
+    TVCAST_BASE_LOCALE="$(
+        locale -a 2>/dev/null |
+        grep -Eiv '^(C|POSIX|C\.UTF-8|C\.utf8)$' |
+        head -n 1
+    )"
+
+    if [ -n "$TVCAST_BASE_LOCALE" ]; then
+        export LC_MESSAGES="$TVCAST_BASE_LOCALE"
+    fi
+fi
+
+_() {
+    gettext "$1"
+}
+
+TXT_OFF="$(_ "Off")"
+TXT_SEARCHING="$(_ "Searching for TV")"
+TXT_CONNECTED="$(_ "Connected")"
+
+TXT_30="$(_ "30 FPS — 1080p")"
+TXT_60="$(_ "60 FPS — 720p")"
+TXT_STOP="$(_ "Stop casting")"
+
+TXT_CONNECTING_30="$(_ "Connecting to TV… • 1080p 30 FPS")"
+TXT_CONNECTING_60="$(_ "Connecting to TV… • 720p 60 FPS")"
+
+TXT_CONNECTED_NOTIFICATION="$(_ "TV connected")"
+TXT_STOPPED_NOTIFICATION="$(_ "Casting stopped")"
