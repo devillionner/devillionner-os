@@ -22,6 +22,8 @@ The installer asks for a profile:
 
 **TV Cast / Miracast is a shared system feature and is installed in all three profiles.** Press `Super+P` to open its Fuzzel menu and choose 30 FPS / 1080p or 60 FPS / 720p.
 
+All three profiles use **Dolphin** as the single file manager with the **Colloid-Dark** icon theme. `Super+E` opens Dolphin; JPEG, PNG and WEBP open in Swappy.
+
 Virtualization is a reusable feature, not hard-wired to one profile. Work or Gaming can enable the same KVM/libvirt/virt-manager stack during install or with:
 
 ```bash
@@ -51,6 +53,7 @@ Recommended validation order:
 
 ```bash
 bash scripts/check
+bash scripts/check-dolphin
 bash scripts/check-tv-cast
 bash scripts/audit-disk
 devos-vm
@@ -59,6 +62,7 @@ devos-vm
 See:
 
 - [Profiles and hardware behavior](docs/profiles.md)
+- [Dolphin file manager](docs/dolphin.md)
 - [TV Cast / Miracast](docs/tv-cast.md)
 - [Virtual machines](docs/virtualization.md)
 - [Recovery points](docs/recovery.md)
@@ -69,6 +73,8 @@ See:
 ## Current design decisions
 
 - Kitty is the single default terminal. Alacritty/Ptyxis are not part of the active profile manifests.
+- Dolphin is the single default file manager; Thunar is not part of the active manifests.
+- Colloid-Dark is the common icon theme. Papirus is no longer declared by the Blueprint just to theme the file manager.
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
 - Quickshell runtime health is validated, so a Qt ABI break is caught instead of silently passing.
 - Caelestia fullscreen and `Env` compatibility patches are applied during restore.

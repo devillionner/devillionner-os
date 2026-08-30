@@ -1,8 +1,8 @@
 # Caelestia / Hyprland desktop
 caelestia-cli
 caelestia-shell
+colloid-icon-theme-git
 darkly
 hyprmod
-papirus-folders
 qtengine
 quickshell-git

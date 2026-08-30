@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -u
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+OK=0; WARN=0; FAIL=0
+ok() { printf "  [OK]   %s\n" "$*"; OK=$((OK + 1)); }
+warn() { printf "  [WARN] %s\n" "$*"; WARN=$((WARN + 1)); }
+fail() { printf "  [FAIL] %s\n" "$*"; FAIL=$((FAIL + 1)); }
+
+printf "========================================\n"
+printf "       Dolphin validation\n"
+printf "========================================\n"
+
+for cmd in dolphin swappy kwriteconfig6; do
+    command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
+done
+
+[[ -d /usr/share/icons/Colloid-Dark ]] \
+    && ok "Colloid-Dark icon theme installed" \
+    || fail "Colloid-Dark icon theme missing"
+
+grep -qx 'Theme=Colloid-Dark' "$HOME/.config/kdeglobals" 2>/dev/null \
+    && ok "KDE icon theme: Colloid-Dark" \
+    || fail "KDE icon theme is not Colloid-Dark"
+
+grep -qx 'SingleClick=false' "$HOME/.config/dolphinrc" 2>/dev/null \
+    && ok "Dolphin double-click activation" \
+    || fail "Dolphin is not configured for double-click"
+
+grep -qx 'IconSize=16' "$HOME/.config/dolphinrc" 2>/dev/null \
+    && ok "Dolphin Places icon size: 16" \
+    || fail "Dolphin Places icon size differs"
+
+grep -qx 'MenuBar=Disabled' "$HOME/.config/dolphinrc" 2>/dev/null \
+    && ok "Dolphin menu bar hidden" \
+    || fail "Dolphin menu bar setting differs"
+
+grep -qx 'ConfirmDelete=true' "$HOME/.config/kiorc" 2>/dev/null \
+    && ok "delete confirmation enabled" \
+    || fail "delete confirmation setting differs"
+
+MIME="$HOME/.config/mimeapps.list"
+grep -qx 'inode/directory=org.kde.dolphin.desktop' "$MIME" 2>/dev/null \
+    && ok "Dolphin is default directory handler" \
+    || fail "Dolphin is not the default directory handler"
+
+for mime in image/jpeg image/png image/webp; do
+    grep -qx "$mime=swappy.desktop" "$MIME" 2>/dev/null \
+        && ok "$mime -> Swappy" \
+        || fail "$mime is not assigned to Swappy"
+done
+
+grep -Eq 'fileExplorer[[:space:]]*=[[:space:]]*"dolphin"' \
+    "$HOME/.config/caelestia/hypr-vars.lua" 2>/dev/null \
+    && ok "Super+E application target: Dolphin" \
+    || fail "Hyprland fileExplorer override is not Dolphin"
+
+python3 - <<'PY' >/dev/null 2>&1
+import json
+from pathlib import Path
+p = Path.home() / ".config/caelestia/cli.json"
+data = json.loads(p.read_text())
+assert data.get("theme", {}).get("iconTheme") == "Colloid-Dark"
+PY
+if [[ $? -eq 0 ]]; then
+    ok "Caelestia theme keeps Colloid-Dark"
+else
+    fail "Caelestia iconTheme override missing"
+fi
+
+if [[ -f "$(bp_config_dir)/dolphin-information-panel" ]]; then
+    ok "Dolphin Information panel initialized"
+elif [[ -f "$HOME/.local/state/dolphinstaterc" ]]; then
+    warn "Dolphin state exists but Blueprint Information-panel marker is missing"
+else
+    warn "Dolphin Information panel not initialized (headless restore is allowed)"
+fi
+
+if pacman -Qq thunar >/dev/null 2>&1; then
+    warn "legacy Thunar package still installed; it is no longer in active Blueprint manifests"
+else
+    ok "no legacy Thunar package"
+fi
+
+printf "\nOK: %d   WARN: %d   FAIL: %d\n" "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then
+    printf "RESULT: PASS\n"
+    exit 0
+fi
+printf "RESULT: FAIL\n"
+exit 1

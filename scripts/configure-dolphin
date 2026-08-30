@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+command -v dolphin >/dev/null 2>&1 || bp_die "Dolphin is not installed"
+command -v kwriteconfig6 >/dev/null 2>&1 || bp_die "kwriteconfig6 is required by Dolphin configuration"
+
+mkdir -p "$HOME/.config" "$HOME/.local/state"
+CONFIG_DIR="$(bp_config_dir)"
+mkdir -p "$CONFIG_DIR"
+
+bp_info "Configuring Dolphin as the default file manager"
+
+# Reproduce the tested local Dolphin/KDE settings without copying transient
+# timestamps, machine-specific disk UUIDs or absolute home paths.
+kwriteconfig6 --file dolphinrc --group KDE --key SingleClick false
+kwriteconfig6 --file dolphinrc --group "KFileDialog Settings" --key "Places Icons Auto-resize" false
+kwriteconfig6 --file dolphinrc --group "KFileDialog Settings" --key "Places Icons Static Size" 16
+kwriteconfig6 --file dolphinrc --group MainWindow --key MenuBar Disabled
+kwriteconfig6 --file dolphinrc --group PlacesPanel --key IconSize 16
+kwriteconfig6 --file kdeglobals --group KDE --key SingleClick false
+kwriteconfig6 --file kdeglobals --group Icons --key Theme Colloid-Dark
+kwriteconfig6 --file kiorc --group Confirmations --key ConfirmDelete true
+
+# Keep Caelestia's generated Qt/GTK theme on Colloid too. This prevents a
+# wallpaper/scheme refresh from switching Dolphin back to Papirus.
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+home = Path.home()
+
+cli = home / ".config/caelestia/cli.json"
+cli.parent.mkdir(parents=True, exist_ok=True)
+try:
+    data = json.loads(cli.read_text()) if cli.exists() else {}
+except (json.JSONDecodeError, OSError):
+    data = {}
+if not isinstance(data, dict):
+    data = {}
+theme = data.setdefault("theme", {})
+if not isinstance(theme, dict):
+    theme = {}
+    data["theme"] = theme
+theme["iconTheme"] = "Colloid-Dark"
+cli.write_text(json.dumps(data, indent=4, ensure_ascii=False) + "\n")
+
+qtengine = home / ".config/qtengine/config.json"
+if qtengine.exists():
+    try:
+        qdata = json.loads(qtengine.read_text())
+    except (json.JSONDecodeError, OSError):
+        qdata = None
+    if isinstance(qdata, dict):
+        qdata["iconTheme"] = "Colloid-Dark"
+        qtengine.write_text(json.dumps(qdata, indent=4, ensure_ascii=False) + "\n")
+PY
+
+if command -v dconf >/dev/null 2>&1; then
+    dconf write /org/gnome/desktop/interface/icon-theme "'Colloid-Dark'" >/dev/null 2>&1 || true
+fi
+
+# Preserve unrelated browser/protocol associations. Only the associations that
+# were present on the tested host are managed here.
+python3 - <<'PY'
+from configparser import RawConfigParser
+from pathlib import Path
+
+path = Path.home() / ".config/mimeapps.list"
+cfg = RawConfigParser(interpolation=None, strict=False)
+cfg.optionxform = str
+if path.exists():
+    cfg.read(path, encoding="utf-8")
+if not cfg.has_section("Default Applications"):
+    cfg.add_section("Default Applications")
+defaults = {
+    "inode/directory": "org.kde.dolphin.desktop",
+    "image/jpeg": "swappy.desktop",
+    "image/png": "swappy.desktop",
+    "image/webp": "swappy.desktop",
+}
+for mime, desktop in defaults.items():
+    cfg.set("Default Applications", mime, desktop)
+with path.open("w", encoding="utf-8") as handle:
+    cfg.write(handle, space_around_delimiters=False)
+PY
+
+# The Information panel is part of QMainWindow state rather than dolphinrc.
+# On the first Blueprint configuration, create that state through Dolphin's
+# own action API instead of committing a resolution-specific binary state blob.
+LAYOUT_MARKER="$CONFIG_DIR/dolphin-information-panel"
+if [[ ! -f "$LAYOUT_MARKER" ]]; then
+    if command -v busctl >/dev/null 2>&1 && [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+        LOG="$(mktemp)"
+        QT_QPA_PLATFORM=offscreen dolphin --new-window "$HOME" >"$LOG" 2>&1 &
+        DOLPHIN_PID=$!
+        SERVICE=""
+
+        for _ in $(seq 1 60); do
+            SERVICE="$(
+                busctl --user list --no-legend 2>/dev/null |
+                awk -v pid="$DOLPHIN_PID" '$1 ~ /^org\.kde\.dolphin/ && $2 == pid {print $1; exit}'
+            )"
+            [[ -n "$SERVICE" ]] && break
+            kill -0 "$DOLPHIN_PID" 2>/dev/null || break
+            sleep 0.1
+        done
+
+        if [[ -n "$SERVICE" ]] && busctl --user call \
+            "$SERVICE" \
+            /dolphin/Dolphin_1 \
+            org.kde.KMainWindow \
+            activateAction s show_information_panel >/dev/null 2>&1; then
+            sleep 0.2
+            busctl --user call \
+                "$SERVICE" \
+                /dolphin/Dolphin_1 \
+                org.kde.KMainWindow \
+                activateAction s file_quit >/dev/null 2>&1 || true
+
+            for _ in $(seq 1 30); do
+                kill -0 "$DOLPHIN_PID" 2>/dev/null || break
+                sleep 0.1
+            done
+
+            if grep -q '^State=' "$HOME/.local/state/dolphinstaterc" 2>/dev/null; then
+                touch "$LAYOUT_MARKER"
+                bp_ok "Dolphin Information panel enabled"
+            else
+                bp_warn "Dolphin layout state was not saved; preview panel will be rechecked interactively"
+            fi
+        else
+            bp_warn "Could not initialize Dolphin Information panel through D-Bus"
+        fi
+
+        kill "$DOLPHIN_PID" >/dev/null 2>&1 || true
+        wait "$DOLPHIN_PID" 2>/dev/null || true
+        rm -f "$LOG"
+    else
+        bp_warn "No user D-Bus session; Dolphin Information panel initialization deferred"
+    fi
+else
+    bp_ok "Dolphin Information panel already initialized"
+fi
+
+bp_ok "Dolphin configured: Colloid-Dark, double-click, 16px Places, Swappy images"

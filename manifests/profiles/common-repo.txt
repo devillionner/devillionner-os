@@ -9,6 +9,7 @@ btrfs-progs
 cachyos-snapper-support
 cliphist
 curl
+dolphin
 easyeffects
 fastfetch
 file-roller
@@ -36,7 +37,6 @@ noto-fonts-cjk
 noto-fonts-emoji
 openssh
 pacman-contrib
-papirus-icon-theme
 papers
 pipewire
 pipewire-alsa
@@ -53,8 +53,9 @@ rsync
 showtime
 snapper
 sof-firmware
+starship
 sudo
-thunar
+swappy
 trash-cli
 ttf-jetbrains-mono-nerd
 ttf-liberation
@@ -73,4 +74,3 @@ xdg-desktop-portal-hyprland
 xdg-user-dirs
 ydotool
 zoxide
-starship
