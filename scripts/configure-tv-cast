@@ -21,6 +21,7 @@ sudo install -Dm755 "$SRC/bin/cast-tv-wait-connected" /usr/local/bin/cast-tv-wai
 sudo install -Dm755 "$SRC/lib/cast-tv-bin/wf-recorder" /usr/local/lib/cast-tv-bin/wf-recorder
 sudo install -Dm755 "$SRC/lib/cast-tv-worker" /usr/local/lib/cast-tv-worker
 sudo install -Dm644 "$SRC/lib/cast-tv-i18n" /usr/local/lib/cast-tv-i18n
+sudo install -Dm755 "$SRC/lib/cast-tv-fuzzel-theme" /usr/local/lib/cast-tv-fuzzel-theme
 
 sudo install -Dm755 "$SRC/sbin/cast-tv-fluxcast-tune" /usr/local/sbin/cast-tv-fluxcast-tune
 sudo install -Dm644 \
@@ -72,6 +73,11 @@ hl.bind(
 path.write_text((text + "\n\n" if text else "") + block + "\n", encoding="utf-8")
 PY
 
+# Generate once during configuration as a sanity check. cast-tv-menu regenerates
+# the runtime color file on every open, so wallpaper/palette changes are picked
+# up immediately without re-running restore.
+/usr/local/lib/cast-tv-fuzzel-theme >/dev/null
+
 bp_info "Applying tested FluxCast low-latency tuning"
 sudo /usr/local/sbin/cast-tv-fluxcast-tune
 
@@ -97,4 +103,4 @@ if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 
     hyprctl reload >/dev/null 2>&1 || true
 fi
 
-bp_ok "TV Cast installed: Super+P opens the Fuzzel menu"
+bp_ok "TV Cast installed: adaptive Caelestia palette + Super+P Fuzzel menu"
