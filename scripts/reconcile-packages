@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MAN="$REPO/manifests/profiles"
+FEATURE_MAN="$REPO/manifests/features"
+source "$REPO/scripts/lib/common.sh"
+
+PROFILE=""
+FEATURES=()
+
+usage() {
+    cat <<'EOF'
+Usage: bash scripts/reconcile-packages --profile PROFILE [--feature FEATURE ...]
+
+Reconciles Blueprint-managed packages to the requested target state.
+Packages not owned by the Blueprint are never removed.
+EOF
+}
+
+feature_known() {
+    case "${1:-}" in
+        virtualization|tvcast) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+feature_add() {
+    local wanted="$1" feature
+    feature_known "$wanted" || bp_die "Unknown feature: $wanted"
+    for feature in "${FEATURES[@]}"; do
+        [[ "$feature" == "$wanted" ]] && return 0
+    done
+    FEATURES+=("$wanted")
+}
+
+while (($#)); do
+    case "$1" in
+        --profile)
+            [[ $# -ge 2 ]] || bp_die "--profile needs a value"
+            PROFILE="$(bp_normalize_profile "$2")" || bp_die "Unknown profile: $2"
+            shift 2
+            ;;
+        --feature)
+            [[ $# -ge 2 ]] || bp_die "--feature needs a value"
+            feature_add "$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *) bp_die "Unknown option: $1" ;;
+    esac
+done
+
+[[ -n "$PROFILE" ]] || bp_die "Package reconciliation requires --profile"
+
+CONFIG_DIR="$(bp_config_dir)"
+MANAGED_DIR="$CONFIG_DIR/managed-packages"
+mkdir -p "$MANAGED_DIR"
+
+TMP="$(mktemp -d)"
+cleanup() { rm -rf "$TMP"; }
+trap cleanup EXIT
+
+DESIRED_REPO="$TMP/desired-repo"
+DESIRED_AUR="$TMP/desired-aur"
+DESIRED_ALL="$TMP/desired-all"
+PREVIOUS_ALL="$TMP/previous-all"
+
+{
+    bp_strip_manifest "$MAN/common-repo.txt"
+    bp_strip_manifest "$MAN/$PROFILE-repo.txt"
+    for feature in "${FEATURES[@]}"; do
+        bp_strip_manifest "$FEATURE_MAN/$feature-repo.txt"
+    done
+} | sort -u > "$DESIRED_REPO"
+
+{
+    bp_strip_manifest "$MAN/common-aur.txt"
+    bp_strip_manifest "$MAN/$PROFILE-aur.txt"
+    for feature in "${FEATURES[@]}"; do
+        bp_strip_manifest "$FEATURE_MAN/$feature-aur.txt"
+    done
+} | sort -u > "$DESIRED_AUR"
+
+cat "$DESIRED_REPO" "$DESIRED_AUR" | sort -u > "$DESIRED_ALL"
+
+# Prefer the exact ownership snapshot from the previous successful reconciliation.
+# Older Blueprint installs predate this state, so bootstrap their ownership from
+# the stored profile/features plus an explicit list of retired Blueprint packages.
+if [[ -f "$MANAGED_DIR/repo.txt" || -f "$MANAGED_DIR/aur.txt" ]]; then
+    cat "$MANAGED_DIR/repo.txt" "$MANAGED_DIR/aur.txt" 2>/dev/null | sort -u > "$PREVIOUS_ALL"
+else
+    OLD_PROFILE="$(cat "$CONFIG_DIR/profile" 2>/dev/null || true)"
+    OLD_PROFILE="$(bp_normalize_profile "$OLD_PROFILE" 2>/dev/null || true)"
+
+    if [[ -n "$OLD_PROFILE" ]]; then
+        bp_info "Bootstrapping package ownership from legacy Blueprint state"
+        {
+            bp_strip_manifest "$MAN/common-repo.txt"
+            bp_strip_manifest "$MAN/common-aur.txt"
+            bp_strip_manifest "$MAN/$OLD_PROFILE-repo.txt"
+            bp_strip_manifest "$MAN/$OLD_PROFILE-aur.txt"
+
+            if [[ -f "$CONFIG_DIR/features" ]]; then
+                while IFS= read -r feature; do
+                    feature_known "$feature" || continue
+                    bp_strip_manifest "$FEATURE_MAN/$feature-repo.txt"
+                    bp_strip_manifest "$FEATURE_MAN/$feature-aur.txt"
+                done < "$CONFIG_DIR/features"
+            fi
+
+            bp_strip_manifest "$REPO/manifests/legacy-managed-packages.txt"
+        } | sort -u > "$PREVIOUS_ALL"
+    else
+        : > "$PREVIOUS_ALL"
+    fi
+fi
+
+# Profile switching is declarative: remove only packages previously owned by the
+# Blueprint that are no longer part of the requested profile/features. Never
+# remove arbitrary user-installed packages, and never force through reverse deps.
+mapfile -t OBSOLETE < <(comm -23 "$PREVIOUS_ALL" "$DESIRED_ALL")
+INSTALLED_OBSOLETE=()
+for pkg in "${OBSOLETE[@]}"; do
+    pacman -Qq "$pkg" >/dev/null 2>&1 && INSTALLED_OBSOLETE+=("$pkg")
+done
+
+if ((${#INSTALLED_OBSOLETE[@]})); then
+    bp_info "Removing ${#INSTALLED_OBSOLETE[@]} obsolete Blueprint-managed package(s)"
+    if sudo pacman -R --noconfirm "${INSTALLED_OBSOLETE[@]}"; then
+        bp_ok "obsolete Blueprint packages removed"
+    else
+        bp_warn "Bulk cleanup was blocked by dependencies; retrying conservatively"
+        for pkg in "${INSTALLED_OBSOLETE[@]}"; do
+            pacman -Qq "$pkg" >/dev/null 2>&1 || continue
+            if sudo pacman -R --noconfirm "$pkg"; then
+                bp_ok "removed obsolete Blueprint package: $pkg"
+            else
+                bp_warn "retained $pkg because another installed package still requires it"
+            fi
+        done
+    fi
+else
+    bp_ok "no obsolete Blueprint-managed packages"
+fi
+
+mapfile -t REPO_PKGS < "$DESIRED_REPO"
+mapfile -t AUR_PKGS < "$DESIRED_AUR"
+
+bp_info "Installing repository packages (${#REPO_PKGS[@]})"
+
+if printf '%s\n' "${REPO_PKGS[@]}" | grep -qx "pipewire-jack" \
+    && pacman -Qq jack2 >/dev/null 2>&1; then
+    bp_info "Switching JACK implementation: jack2 -> pipewire-jack"
+    printf 'y\ny\n' | sudo pacman -S --needed pipewire-jack
+fi
+
+if ((${#REPO_PKGS[@]})); then
+    sudo pacman -S --needed --noconfirm "${REPO_PKGS[@]}"
+fi
+
+NEED_QS=false
+FILTERED_AUR=()
+for pkg in "${AUR_PKGS[@]}"; do
+    if [[ "$pkg" == "quickshell-git" ]]; then
+        NEED_QS=true
+    else
+        FILTERED_AUR+=("$pkg")
+    fi
+done
+
+if [[ "$NEED_QS" == true ]]; then
+    QS_HEALTHY=false
+    if pacman -Qq quickshell-git >/dev/null 2>&1 \
+        && qs --version >/dev/null 2>&1; then
+        QS_HEALTHY=true
+    fi
+
+    if [[ "$QS_HEALTHY" != true ]]; then
+        bp_info "Building current quickshell-git for Caelestia"
+
+        if pacman -Qq noctalia-qs >/dev/null 2>&1; then
+            bp_info "Removing conflicting noctalia-qs provider"
+            sudo pacman -R --noconfirm noctalia-qs
+        fi
+
+        TMP_QS="$TMP/quickshell-git"
+        git clone --depth 1 https://aur.archlinux.org/quickshell-git.git "$TMP_QS"
+        (
+            cd "$TMP_QS"
+            makepkg -si --needed --noconfirm
+        )
+
+        qs --version >/dev/null 2>&1 \
+            || bp_die "quickshell-git still fails after rebuild."
+        bp_ok "quickshell-git runtime healthy"
+    else
+        bp_ok "quickshell-git runtime healthy"
+    fi
+fi
+
+install_aur_target() {
+    ((${#FILTERED_AUR[@]})) || return 0
+    paru -S --needed --noconfirm "${FILTERED_AUR[@]}"
+}
+
+if ((${#FILTERED_AUR[@]})); then
+    if ! command -v paru >/dev/null 2>&1; then
+        sudo pacman -S --needed --noconfirm paru
+    fi
+
+    bp_info "Installing AUR / foreign packages (${#FILTERED_AUR[@]})"
+    if ! install_aur_target; then
+        # Generic migration recovery for AUR packages whose new dependency graph
+        # conflicts with the old installed package (for example a new dependency
+        # that declares conflicts with package<new-version). First let paru try the
+        # normal atomic upgrade. Only on failure, temporarily remove Blueprint
+        # target packages that paru itself reports as upgradeable, then reinstall
+        # the complete desired AUR target immediately.
+        bp_warn "AUR transaction failed; checking for managed package migration blockers"
+
+        mapfile -t UPGRADABLE < <(paru -Qua --quiet 2>/dev/null || true)
+        MIGRATION_BLOCKERS=()
+        for pkg in "${FILTERED_AUR[@]}"; do
+            pacman -Qq "$pkg" >/dev/null 2>&1 || continue
+            printf '%s\n' "${UPGRADABLE[@]}" | grep -qxF "$pkg" \
+                && MIGRATION_BLOCKERS+=("$pkg")
+        done
+
+        if ((${#MIGRATION_BLOCKERS[@]} == 0)); then
+            bp_die "AUR install failed and no safe Blueprint-managed upgrade blocker was identified"
+        fi
+
+        bp_info "Refreshing ${#MIGRATION_BLOCKERS[@]} managed AUR package(s) to resolve dependency-layout changes"
+        sudo pacman -Rdd --noconfirm "${MIGRATION_BLOCKERS[@]}"
+
+        if ! install_aur_target; then
+            bp_die "AUR install still fails after managed-package migration recovery"
+        fi
+
+        bp_ok "AUR dependency-layout migration recovered"
+    fi
+fi
+
+# Record only explicit Blueprint ownership, never dependency closure. This is the
+# safety boundary that lets future profile switches remove old Blueprint packages
+# without touching unrelated software installed by the user.
+install -Dm644 "$DESIRED_REPO" "$MANAGED_DIR/repo.txt"
+install -Dm644 "$DESIRED_AUR" "$MANAGED_DIR/aur.txt"
+printf '1\n' > "$MANAGED_DIR/schema"
+
+bp_ok "package target reconciled: ${#REPO_PKGS[@]} repo + ${#AUR_PKGS[@]} AUR/foreign"

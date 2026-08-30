@@ -1,0 +1,7 @@
+# Packages that were explicitly managed by older Blueprint revisions but are no
+# longer part of any active profile/feature manifest. This list is used only to
+# bootstrap ownership for pre-managed-state installs; it is not an install list.
+thunar
+papirus-icon-theme
+papirus-folders
+colloid-icon-theme-git

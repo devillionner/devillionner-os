@@ -112,106 +112,16 @@ sudo -v
 bp_info "Installing restore prerequisites"
 sudo pacman -Syu --needed --noconfirm base-devel git rsync
 
-mapfile -t REPO_PKGS < <(
-    {
-        bp_strip_manifest "$MAN/common-repo.txt"
-        bp_strip_manifest "$MAN/$PROFILE-repo.txt"
-        for feature in "${FEATURES[@]}"; do
-            bp_strip_manifest "$FEATURE_MAN/$feature-repo.txt"
-        done
-    } | sort -u
-)
-
-mapfile -t AUR_PKGS < <(
-    {
-        bp_strip_manifest "$MAN/common-aur.txt"
-        bp_strip_manifest "$MAN/$PROFILE-aur.txt"
-        for feature in "${FEATURES[@]}"; do
-            bp_strip_manifest "$FEATURE_MAN/$feature-aur.txt"
-        done
-    } | sort -u
-)
-
-bp_info "Installing repository packages (${#REPO_PKGS[@]})"
-
-if printf '%s\n' "${REPO_PKGS[@]}" | grep -qx "pipewire-jack" \
-    && pacman -Qq jack2 >/dev/null 2>&1; then
-    bp_info "Switching JACK implementation: jack2 -> pipewire-jack"
-    printf 'y\ny\n' | sudo pacman -S --needed pipewire-jack
-fi
-
-if ((${#REPO_PKGS[@]})); then
-    sudo pacman -S --needed --noconfirm "${REPO_PKGS[@]}"
-fi
-
-NEED_QS=false
-FILTERED_AUR=()
-for pkg in "${AUR_PKGS[@]}"; do
-    if [[ "$pkg" == "quickshell-git" ]]; then
-        NEED_QS=true
-    else
-        FILTERED_AUR+=("$pkg")
-    fi
+# Reconcile package ownership before restoring configuration. This makes profile
+# changes declarative: packages previously installed by the Blueprint but absent
+# from the new target are removed, while unrelated user-installed packages are
+# never touched. It also provides generic recovery for AUR dependency-layout
+# changes instead of accumulating one-off migrations in this restore script.
+RECONCILE_ARGS=(--profile "$PROFILE")
+for feature in "${FEATURES[@]}"; do
+    RECONCILE_ARGS+=(--feature "$feature")
 done
-
-if [[ "$NEED_QS" == true ]]; then
-    QS_HEALTHY=false
-    if pacman -Qq quickshell-git >/dev/null 2>&1 \
-        && qs --version >/dev/null 2>&1; then
-        QS_HEALTHY=true
-    fi
-
-    if [[ "$QS_HEALTHY" != true ]]; then
-        bp_info "Building current quickshell-git for Caelestia"
-
-        if pacman -Qq noctalia-qs >/dev/null 2>&1; then
-            bp_info "Removing conflicting noctalia-qs provider"
-            sudo pacman -R --noconfirm noctalia-qs
-        fi
-
-        TMP_QS="$(mktemp -d)"
-        git clone --depth 1 \
-            https://aur.archlinux.org/quickshell-git.git \
-            "$TMP_QS/quickshell-git"
-        (
-            cd "$TMP_QS/quickshell-git"
-            makepkg -si --needed --noconfirm
-        )
-        rm -rf "$TMP_QS"
-
-        qs --version >/dev/null 2>&1 \
-            || bp_die "quickshell-git still fails after rebuild."
-        bp_ok "quickshell-git runtime healthy"
-    else
-        bp_ok "quickshell-git runtime healthy"
-    fi
-fi
-
-if ((${#FILTERED_AUR[@]})); then
-    if ! command -v paru >/dev/null 2>&1; then
-        sudo pacman -S --needed --noconfirm paru
-    fi
-
-    # Caelestia 2.4 introduced qt6-m3shapes-git. That dependency explicitly
-    # conflicts with caelestia-shell<2.4.0, while paru installs dependencies
-    # before replacing the already-installed 2.3.x shell. Migrate that old
-    # layout first so an in-place Blueprint restore is as reliable as a clean
-    # install. The shell is immediately reinstalled from the active manifest.
-    if printf '%s\n' "${FILTERED_AUR[@]}" | grep -qx 'caelestia-shell' \
-        && pacman -Qq caelestia-shell >/dev/null 2>&1; then
-        CAELESTIA_INSTALLED_VERSION="$(pacman -Q caelestia-shell | awk '{print $2}')"
-        if [[ "$(vercmp "$CAELESTIA_INSTALLED_VERSION" '2.4.0')" -lt 0 ]]; then
-            bp_info "Migrating Caelestia shell $CAELESTIA_INSTALLED_VERSION to the 2.4+ dependency layout"
-            if ! sudo pacman -R --noconfirm caelestia-shell; then
-                bp_warn "Caelestia shell has reverse dependencies; removing only the old package for the immediate manifest reinstall"
-                sudo pacman -Rdd --noconfirm caelestia-shell
-            fi
-        fi
-    fi
-
-    bp_info "Installing AUR / foreign packages (${#FILTERED_AUR[@]})"
-    paru -S --needed --noconfirm "${FILTERED_AUR[@]}"
-fi
+"$REPO/scripts/reconcile-packages" "${RECONCILE_ARGS[@]}"
 
 bp_info "Restoring dotfiles"
 mkdir -p "$HOME/.config" "$HOME/.local"
