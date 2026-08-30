@@ -25,6 +25,7 @@ hyprpicker
 intel-media-driver
 intel-ucode
 jq
+kio-extras
 kitty
 less
 linux-firmware
