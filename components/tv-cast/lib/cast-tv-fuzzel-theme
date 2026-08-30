@@ -42,18 +42,27 @@ try:
 except OSError:
     pass
 
-window = parser["Colors:Window"] if parser.has_section("Colors:Window") else {}
+# Fuzzel is a list/view surface, so follow Qt's Colors:View rather than the
+# dimmer Colors:Window foreground used for window chrome and titles. This makes
+# ordinary TV Cast rows match Caelestia's bright foreground while remaining
+# fully wallpaper-adaptive.
+view = parser["Colors:View"] if parser.has_section("Colors:View") else {}
 selection = parser["Colors:Selection"] if parser.has_section("Colors:Selection") else {}
 
-background = normalize(window.get("BackgroundNormal"), "1e1e2e", "ee")
-text = normalize(window.get("ForegroundNormal"), "e8e8f2")
-selection_bg = normalize(selection.get("BackgroundNormal"), "7c75d6")
-selection_text = normalize(selection.get("ForegroundNormal"), "ffffff")
+background = normalize(view.get("BackgroundNormal"), "131317", "ee")
+text = normalize(view.get("ForegroundNormal"), "e5e1e7")
+selection_bg = normalize(selection.get("BackgroundNormal"), "4d496f")
+selection_text = normalize(selection.get("ForegroundNormal"), "f0efff")
 border = normalize(
     selection.get("DecorationFocus") or selection.get("BackgroundNormal"),
-    "7c75d6",
+    "c2c1ff",
 )
-match = normalize(selection.get("ForegroundLink") or selection.get("DecorationFocus"), "a8a4ff")
+match = normalize(
+    view.get("DecorationFocus")
+    or selection.get("DecorationFocus")
+    or selection.get("ForegroundLink"),
+    "c2c1ff",
+)
 
 # Rebuild this file every time the menu opens. Caelestia/qtengine regenerates
 # its color scheme when the wallpaper palette changes, so TV Cast follows it
