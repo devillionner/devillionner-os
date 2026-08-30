@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 source /usr/local/lib/cast-tv-i18n
 
-
 RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
 PIDFILE="$RUNTIME/cast-tv-menu.pid"
 
@@ -48,6 +47,7 @@ else
 fi
 
 OUT="$(mktemp "$RUNTIME/cast-tv-menu.XXXXXX")"
+THEME_CONFIG="$(/usr/local/lib/cast-tv-fuzzel-theme 2>/dev/null || printf '%s' "$HOME/.config/fuzzel/tvcast.ini")"
 
 cleanup() {
     rm -f "$PIDFILE" "$OUT"
@@ -59,7 +59,7 @@ printf "%s\n%s\n%s\n" \
     "$MODE60" \
     "⏹  $TXT_STOP" |
 fuzzel \
-    --config="$HOME/.config/fuzzel/tvcast.ini" \
+    --config="$THEME_CONFIG" \
     --dmenu \
     --hide-prompt \
     --mesg="TV Cast

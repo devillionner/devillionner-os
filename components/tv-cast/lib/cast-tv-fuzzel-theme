@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import configparser
+import json
+import os
+import sys
+from pathlib import Path
+
+home = Path.home()
+runtime = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
+out = runtime / "cast-tv-fuzzel.ini"
+base = home / ".config/fuzzel/tvcast.ini"
+qtengine = home / ".config/qtengine/config.json"
+
+
+def read_color_scheme() -> Path:
+    fallback = home / ".config/qtengine/caelestia.colors"
+    try:
+        data = json.loads(qtengine.read_text(encoding="utf-8"))
+        value = data.get("theme", {}).get("colorScheme")
+        if isinstance(value, str) and value.strip():
+            return Path(os.path.expandvars(os.path.expanduser(value)))
+    except (OSError, json.JSONDecodeError, TypeError, AttributeError):
+        pass
+    return fallback
+
+
+def normalize(value: str | None, fallback: str, alpha: str = "ff") -> str:
+    raw = (value or fallback).strip().lstrip("#")
+    if len(raw) == 8:
+        raw = raw[:6]
+    if len(raw) != 6 or any(ch not in "0123456789abcdefABCDEF" for ch in raw):
+        raw = fallback.lstrip("#")[:6]
+    return raw.lower() + alpha
+
+
+scheme = read_color_scheme()
+parser = configparser.ConfigParser(interpolation=None)
+try:
+    parser.read(scheme, encoding="utf-8")
+except OSError:
+    pass
+
+window = parser["Colors:Window"] if parser.has_section("Colors:Window") else {}
+selection = parser["Colors:Selection"] if parser.has_section("Colors:Selection") else {}
+
+background = normalize(window.get("BackgroundNormal"), "1e1e2e", "ee")
+text = normalize(window.get("ForegroundNormal"), "e8e8f2")
+selection_bg = normalize(selection.get("BackgroundNormal"), "7c75d6")
+selection_text = normalize(selection.get("ForegroundNormal"), "ffffff")
+border = normalize(
+    selection.get("DecorationFocus") or selection.get("BackgroundNormal"),
+    "7c75d6",
+)
+match = normalize(selection.get("ForegroundLink") or selection.get("DecorationFocus"), "a8a4ff")
+
+# Rebuild this file every time the menu opens. Caelestia/qtengine regenerates
+# its color scheme when the wallpaper palette changes, so TV Cast follows it
+# immediately without a service restart or a static copied palette.
+content = f"""include={base}\n\n[colors]\nbackground={background}\ntext={text}\nprompt={text}\nplaceholder={text}\ninput={text}\nmatch={match}\nselection={selection_bg}\nselection-text={selection_text}\nselection-match={selection_text}\ncounter={text}\nborder={border}\n"""
+
+try:
+    out.write_text(content, encoding="utf-8")
+except OSError as exc:
+    print(f"cast-tv-theme: cannot write {out}: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+print(out)
