@@ -17,9 +17,40 @@ for cmd in dolphin swappy kwriteconfig6; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
 
-[[ -d /usr/share/icons/Colloid-Dark ]] \
-    && ok "Colloid-Dark icon theme installed" \
-    || fail "Colloid-Dark icon theme missing"
+icon_theme_exists() {
+    local theme="$1"
+    [[ -d "$HOME/.local/share/icons/$theme" \
+        || -d "$HOME/.icons/$theme" \
+        || -d "/usr/share/icons/$theme" ]]
+}
+
+COLLOID_MISSING=0
+for theme in Colloid Colloid-Light Colloid-Dark; do
+    if icon_theme_exists "$theme"; then
+        ok "$theme icon theme installed"
+    else
+        fail "$theme icon theme missing"
+        COLLOID_MISSING=$((COLLOID_MISSING + 1))
+    fi
+done
+
+EXTRA_COLLOID="$(
+    for root in "$HOME/.local/share/icons" "$HOME/.icons" /usr/share/icons; do
+        [[ -d "$root" ]] || continue
+        find "$root" -mindepth 1 -maxdepth 1 -name 'Colloid*' -printf '%f\n' 2>/dev/null
+    done | sort -u | grep -Ev '^(Colloid|Colloid-Light|Colloid-Dark)$' || true
+)"
+if [[ -z "$EXTRA_COLLOID" ]]; then
+    ok "minimal Colloid set only"
+else
+    fail "extra Colloid variants installed: $(tr '\n' ' ' <<< "$EXTRA_COLLOID" | sed 's/[[:space:]]*$//')"
+fi
+
+if pacman -Qq colloid-icon-theme-git >/dev/null 2>&1; then
+    fail "legacy colloid-icon-theme-git package is installed"
+else
+    ok "full Colloid AUR variant package not installed"
+fi
 
 grep -qx 'Theme=Colloid-Dark' "$HOME/.config/kdeglobals" 2>/dev/null \
     && ok "KDE icon theme: Colloid-Dark" \

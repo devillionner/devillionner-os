@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+# Pin the exact upstream revision used by the Blueprint. Updating Colloid is an
+# explicit Blueprint change instead of silently changing every clean restore.
+COLLOID_COMMIT="ceac6608ecd0e40025cbc2ebbd32bf0e0f4ebc6a"
+COLLOID_REPO="https://github.com/vinceliuice/Colloid-icon-theme.git"
+DEST="$HOME/.local/share/icons"
+
+bp_info "Installing minimal Colloid icon set"
+
+# The AUR -git package installs the complete matrix of colour/scheme variants.
+# It is intentionally not part of the Blueprint anymore. Migrate old installs
+# away from it when nothing else depends on the package.
+if pacman -Qq colloid-icon-theme-git >/dev/null 2>&1; then
+    REQUIRED_BY="$(pacman -Qi colloid-icon-theme-git 2>/dev/null | awk -F': *' '/^Required By/ {print $2; exit}')"
+    if [[ -z "$REQUIRED_BY" || "$REQUIRED_BY" == "None" ]]; then
+        bp_info "Removing legacy full Colloid AUR package"
+        sudo pacman -R --noconfirm colloid-icon-theme-git >/dev/null
+    else
+        bp_warn "colloid-icon-theme-git is still required by: $REQUIRED_BY"
+        bp_warn "Leaving the package installed; extra variants may remain"
+    fi
+fi
+
+mkdir -p "$DEST"
+
+# Remove only Colloid variants from user icon roots. Other icon themes are left
+# untouched. Keep the three standard variants that upstream links together.
+prune_colloid_variants() {
+    local root="$1" entry name
+    [[ -d "$root" ]] || return 0
+
+    while IFS= read -r -d '' entry; do
+        name="$(basename "$entry")"
+        case "$name" in
+            Colloid|Colloid-Light|Colloid-Dark) ;;
+            Colloid*) rm -rf -- "$entry" ;;
+        esac
+    done < <(find "$root" -mindepth 1 -maxdepth 1 -name 'Colloid*' -print0 2>/dev/null)
+}
+
+prune_colloid_variants "$HOME/.local/share/icons"
+prune_colloid_variants "$HOME/.icons"
+
+TMP="$(mktemp -d)"
+cleanup() { rm -rf "$TMP"; }
+trap cleanup EXIT
+
+git clone --quiet --filter=blob:none --no-checkout "$COLLOID_REPO" "$TMP/Colloid-icon-theme"
+git -C "$TMP/Colloid-icon-theme" checkout --quiet --detach "$COLLOID_COMMIT"
+
+# With no -t/-s arguments upstream selects the default blue theme/scheme and
+# installs exactly the three linked colour variants: Light, Dark and default.
+"$TMP/Colloid-icon-theme/install.sh" --dest "$DEST"
+
+prune_colloid_variants "$DEST"
+
+for theme in Colloid Colloid-Light Colloid-Dark; do
+    [[ -d "$DEST/$theme" ]] || bp_die "Minimal Colloid install is missing $theme"
+done
+
+bp_ok "Colloid installed: Colloid, Colloid-Light, Colloid-Dark only"

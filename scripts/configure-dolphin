@@ -11,6 +11,8 @@ mkdir -p "$HOME/.config" "$HOME/.local/state" "$HOME/.config/caelestia"
 CONFIG_DIR="$(bp_config_dir)"
 mkdir -p "$CONFIG_DIR"
 
+"$REPO/scripts/configure-colloid-icons"
+
 bp_info "Configuring Dolphin as the default file manager"
 
 # Keep the standalone configurator useful after an incremental git pull too.

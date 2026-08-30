@@ -1,7 +1,6 @@
 # Caelestia / Hyprland desktop
 caelestia-cli
 caelestia-shell
-colloid-icon-theme-git
 darkly
 hyprmod
 qtengine
