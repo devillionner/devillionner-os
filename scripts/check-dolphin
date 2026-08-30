@@ -17,6 +17,23 @@ for cmd in dolphin swappy kwriteconfig6; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
 
+if [[ -x /usr/local/bin/devos-dolphin ]] \
+    && grep -q 'QT_STYLE_OVERRIDE=qtengine' /usr/local/bin/devos-dolphin \
+    && grep -q 'QT_QPA_PLATFORMTHEME=qtengine' /usr/local/bin/devos-dolphin; then
+    ok "Dolphin-only qtengine wrapper installed"
+else
+    fail "Dolphin qtengine wrapper missing or incomplete"
+fi
+
+DESKTOP="$HOME/.local/share/applications/org.kde.dolphin.desktop"
+if [[ -f "$DESKTOP" ]] \
+    && grep -q '^Exec=/usr/local/bin/devos-dolphin' "$DESKTOP" \
+    && ! grep -q '^DBusActivatable=true' "$DESKTOP"; then
+    ok "Dolphin launcher uses qtengine wrapper"
+else
+    fail "Dolphin desktop launcher does not use qtengine wrapper"
+fi
+
 icon_theme_exists() {
     local theme="$1"
     [[ -d "$HOME/.local/share/icons/$theme" \
@@ -24,13 +41,11 @@ icon_theme_exists() {
         || -d "/usr/share/icons/$theme" ]]
 }
 
-COLLOID_MISSING=0
 for theme in Colloid Colloid-Light Colloid-Dark; do
     if icon_theme_exists "$theme"; then
         ok "$theme icon theme installed"
     else
         fail "$theme icon theme missing"
-        COLLOID_MISSING=$((COLLOID_MISSING + 1))
     fi
 done
 
@@ -83,10 +98,10 @@ for mime in image/jpeg image/png image/webp; do
         || fail "$mime is not assigned to Swappy"
 done
 
-grep -Eq 'fileExplorer[[:space:]]*=[[:space:]]*"dolphin"' \
+grep -Eq 'fileExplorer[[:space:]]*=[[:space:]]*"/usr/local/bin/devos-dolphin"' \
     "$HOME/.config/caelestia/hypr-vars.lua" 2>/dev/null \
-    && ok "Super+E application target: Dolphin" \
-    || fail "Hyprland fileExplorer override is not Dolphin"
+    && ok "Super+E application target: Dolphin qtengine wrapper" \
+    || fail "Hyprland fileExplorer override is not the Dolphin wrapper"
 
 python3 - <<'PY' >/dev/null 2>&1
 import json
@@ -99,6 +114,27 @@ if [[ $? -eq 0 ]]; then
     ok "Caelestia theme keeps Colloid-Dark"
 else
     fail "Caelestia iconTheme override missing"
+fi
+
+QTENGINE="$HOME/.config/qtengine/config.json"
+if [[ -f "$QTENGINE" ]]; then
+    python3 - <<'PY' >/dev/null 2>&1
+import json
+from pathlib import Path
+p = Path.home() / ".config/qtengine/config.json"
+data = json.loads(p.read_text())
+theme = data.get("theme", {})
+assert theme.get("style") == "Darkly"
+assert theme.get("iconTheme") == "Colloid-Dark"
+assert "iconTheme" not in data
+PY
+    if [[ $? -eq 0 ]]; then
+        ok "global qtengine config: Darkly + Colloid-Dark, no stale duplicate iconTheme"
+    else
+        fail "global qtengine config differs from tested Darkly + Colloid-Dark state"
+    fi
+else
+    warn "qtengine config not generated yet; Caelestia will create it on graphical startup"
 fi
 
 if [[ -f "$(bp_config_dir)/dolphin-information-panel" ]]; then

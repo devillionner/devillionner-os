@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+# Darkly is kept as the global Qt widget style, but current Dolphin item
+# selection/focus rendering has a Darkly-specific visual glitch. Run only
+# Dolphin through qtengine's widget style while preserving the qtengine
+# platform theme, adaptive Caelestia palette and Colloid-Dark icons.
+export QT_QPA_PLATFORMTHEME=qtengine
+export QT_STYLE_OVERRIDE=qtengine
+
+exec /usr/bin/dolphin "$@"

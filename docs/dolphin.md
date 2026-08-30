@@ -8,7 +8,8 @@ The configuration was captured from the tested host and deliberately reduced to 
 
 - `Super+E` opens Dolphin.
 - Dolphin is the default handler for directories.
-- Colloid-Dark is the Qt/KDE icon theme.
+- Colloid-Dark is the active Qt/KDE icon theme.
+- Folder tint remains adaptive to the Caelestia-generated palette when the wallpaper/theme changes.
 - Dolphin uses double-click activation (`SingleClick=false`).
 - Places icons use a fixed 16 px size.
 - The menu bar is hidden.
@@ -17,6 +18,18 @@ The configuration was captured from the tested host and deliberately reduced to 
 - Delete confirmation remains enabled.
 
 Caelestia's CLI theme config is pinned to `Colloid-Dark` so a wallpaper/theme refresh does not silently restore the old Papirus icon theme.
+
+## Dolphin-only Qt style override
+
+Darkly remains the global Qt widget style. Current Dolphin item highlight/focus rendering can produce an over-bright selected+hover state with Darkly, while the same palette behaves correctly through qtengine's widget style.
+
+The Blueprint therefore installs `/usr/local/bin/devos-dolphin`, which sets `QT_QPA_PLATFORMTHEME=qtengine` and `QT_STYLE_OVERRIDE=qtengine` only for Dolphin before executing `/usr/bin/dolphin`.
+
+`Super+E` targets this wrapper. A user-level override of `org.kde.dolphin.desktop` preserves Dolphin's upstream desktop metadata/actions but rewrites its `Exec=` entries to the wrapper and disables D-Bus activation so app-menu and default-directory launches use the same fixed path.
+
+No fixed selection colour is written. The adaptive Caelestia palette remains the source of colours, so changing wallpaper can continue to retint Colloid folders normally.
+
+Upstream context: Darkly issue #316 documents the Dolphin/QStyle focus/highlight compatibility problem.
 
 ## Minimal Colloid install
 
@@ -28,7 +41,9 @@ Only the three linked standard variants are kept:
 - `Colloid-Light`
 - `Colloid-Dark`
 
-This is important because `Colloid` and `Colloid-Dark` intentionally reuse assets from `Colloid-Light`; deleting Light would leave broken links. Existing Blueprint machines that previously installed the full AUR package are migrated away from it when the package has no reverse dependencies.
+`Colloid-Dark` is active. The normal Colloid installer mode is retained (no `--notint`), because disabling tinting would freeze folder colour instead of following Caelestia's adaptive palette.
+
+`Colloid` and `Colloid-Dark` intentionally reuse assets from `Colloid-Light`; deleting Light would leave broken links. Existing Blueprint machines that previously installed the full AUR package are migrated away from it when the package has no reverse dependencies.
 
 The pinned upstream revision is `ceac6608ecd0e40025cbc2ebbd32bf0e0f4ebc6a`.
 
@@ -42,4 +57,4 @@ Likewise, `dolphinstaterc` contains screen-size keys and a serialized Qt main-wi
 
 ## Validation
 
-`scripts/check-dolphin` verifies the installed Dolphin/Swappy commands, the exact three-theme Colloid set, double-click behavior, default directory/image handlers and the `Super+E` application target. A missing first-run Information-panel marker is a warning rather than a fatal error when restore was performed without a user D-Bus session.
+`scripts/check-dolphin` verifies the exact three-theme Colloid set, active Colloid-Dark theme, Dolphin-only qtengine wrapper, launcher/default-directory routing, double-click behavior, Swappy image handlers and the `Super+E` target. A missing first-run Information-panel marker is a warning rather than a fatal error when restore was performed without a user D-Bus session.

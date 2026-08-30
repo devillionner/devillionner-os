@@ -7,7 +7,11 @@ source "$REPO/scripts/lib/common.sh"
 command -v dolphin >/dev/null 2>&1 || bp_die "Dolphin is not installed. Run the Blueprint restore or install the new common packages first."
 command -v kwriteconfig6 >/dev/null 2>&1 || bp_die "kwriteconfig6 is required by Dolphin configuration"
 
-mkdir -p "$HOME/.config" "$HOME/.local/state" "$HOME/.config/caelestia"
+mkdir -p \
+    "$HOME/.config" \
+    "$HOME/.local/state" \
+    "$HOME/.config/caelestia" \
+    "$HOME/.local/share/applications"
 CONFIG_DIR="$(bp_config_dir)"
 mkdir -p "$CONFIG_DIR"
 
@@ -15,12 +19,54 @@ mkdir -p "$CONFIG_DIR"
 
 bp_info "Configuring Dolphin as the default file manager"
 
+# Keep Darkly globally, but launch Dolphin through qtengine's widget style.
+# This avoids the current Darkly/Dolphin selected+hover/focus rendering glitch
+# without changing the appearance of other Qt applications.
+sudo install -Dm755 \
+    "$REPO/components/dolphin/devos-dolphin" \
+    /usr/local/bin/devos-dolphin
+
 # Keep the standalone configurator useful after an incremental git pull too.
 # A full restore already rsyncs this file, but configure-dolphin may be run on
 # its own while validating an existing Blueprint installation.
 install -Dm644 \
     "$REPO/dotfiles/.config/caelestia/hypr-vars.lua" \
     "$HOME/.config/caelestia/hypr-vars.lua"
+
+# Shadow Dolphin's system desktop file so application-menu launches and folder
+# opens also use the Dolphin-only qtengine wrapper. Preserve upstream actions
+# and metadata rather than maintaining a second hand-written desktop entry.
+python3 - <<'PY'
+from pathlib import Path
+
+src = Path("/usr/share/applications/org.kde.dolphin.desktop")
+dst = Path.home() / ".local/share/applications/org.kde.dolphin.desktop"
+wrapper = "/usr/local/bin/devos-dolphin"
+
+if src.exists():
+    lines = src.read_text(encoding="utf-8").splitlines()
+    out = []
+    for line in lines:
+        if line.startswith("Exec=dolphin"):
+            line = "Exec=" + wrapper + line[len("Exec=dolphin"):]
+        elif line.startswith("DBusActivatable="):
+            line = "DBusActivatable=false"
+        out.append(line)
+    dst.write_text("\n".join(out) + "\n", encoding="utf-8")
+else:
+    dst.write_text(
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=Dolphin\n"
+        "GenericName=File Manager\n"
+        "Icon=system-file-manager\n"
+        f"Exec={wrapper} %U\n"
+        "Terminal=false\n"
+        "MimeType=inode/directory;\n"
+        "Categories=Qt;KDE;System;FileTools;FileManager;\n",
+        encoding="utf-8",
+    )
+PY
 
 # Reproduce the tested local Dolphin/KDE settings without copying transient
 # timestamps, machine-specific disk UUIDs or absolute home paths.
@@ -33,8 +79,9 @@ kwriteconfig6 --file kdeglobals --group KDE --key SingleClick false
 kwriteconfig6 --file kdeglobals --group Icons --key Theme Colloid-Dark
 kwriteconfig6 --file kiorc --group Confirmations --key ConfirmDelete true
 
-# Keep Caelestia's generated Qt/GTK theme on Colloid too. This prevents a
-# wallpaper/scheme refresh from switching Dolphin back to Papirus.
+# Keep Caelestia/qtengine on the tested global setup: Darkly is the global
+# widget style and Colloid-Dark is the active icon theme. Folder colour remains
+# adaptive because the normal Colloid install is used (no --notint).
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -63,7 +110,15 @@ if qtengine.exists():
     except (json.JSONDecodeError, OSError):
         qdata = None
     if isinstance(qdata, dict):
-        qdata["iconTheme"] = "Colloid-Dark"
+        qtheme = qdata.setdefault("theme", {})
+        if not isinstance(qtheme, dict):
+            qtheme = {}
+            qdata["theme"] = qtheme
+        qtheme["style"] = "Darkly"
+        qtheme["iconTheme"] = "Colloid-Dark"
+        # This legacy duplicate disagreed with the tested host and could leave
+        # stale Papirus/Colloid values competing with theme.iconTheme.
+        qdata.pop("iconTheme", None)
         qtengine.write_text(json.dumps(qdata, indent=4, ensure_ascii=False) + "\n")
 PY
 
@@ -103,7 +158,7 @@ LAYOUT_MARKER="$CONFIG_DIR/dolphin-information-panel"
 if [[ ! -f "$LAYOUT_MARKER" ]]; then
     if command -v busctl >/dev/null 2>&1 && [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
         LOG="$(mktemp)"
-        QT_QPA_PLATFORM=offscreen dolphin --new-window "$HOME" >"$LOG" 2>&1 &
+        QT_QPA_PLATFORM=offscreen /usr/local/bin/devos-dolphin --new-window "$HOME" >"$LOG" 2>&1 &
         DOLPHIN_PID=$!
         SERVICE=""
 
@@ -154,4 +209,4 @@ else
     bp_ok "Dolphin Information panel already initialized"
 fi
 
-bp_ok "Dolphin configured: Colloid-Dark, double-click, 16px Places, Swappy images"
+bp_ok "Dolphin configured: Colloid-Dark, adaptive folders, qtengine-only Dolphin style"

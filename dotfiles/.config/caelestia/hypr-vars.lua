@@ -1,3 +1,3 @@
 return {
-    fileExplorer = "dolphin",
+    fileExplorer = "/usr/local/bin/devos-dolphin",
 }
