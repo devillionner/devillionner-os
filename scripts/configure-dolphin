@@ -4,14 +4,21 @@ set -Eeuo pipefail
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO/scripts/lib/common.sh"
 
-command -v dolphin >/dev/null 2>&1 || bp_die "Dolphin is not installed"
+command -v dolphin >/dev/null 2>&1 || bp_die "Dolphin is not installed. Run the Blueprint restore or install the new common packages first."
 command -v kwriteconfig6 >/dev/null 2>&1 || bp_die "kwriteconfig6 is required by Dolphin configuration"
 
-mkdir -p "$HOME/.config" "$HOME/.local/state"
+mkdir -p "$HOME/.config" "$HOME/.local/state" "$HOME/.config/caelestia"
 CONFIG_DIR="$(bp_config_dir)"
 mkdir -p "$CONFIG_DIR"
 
 bp_info "Configuring Dolphin as the default file manager"
+
+# Keep the standalone configurator useful after an incremental git pull too.
+# A full restore already rsyncs this file, but configure-dolphin may be run on
+# its own while validating an existing Blueprint installation.
+install -Dm644 \
+    "$REPO/dotfiles/.config/caelestia/hypr-vars.lua" \
+    "$HOME/.config/caelestia/hypr-vars.lua"
 
 # Reproduce the tested local Dolphin/KDE settings without copying transient
 # timestamps, machine-specific disk UUIDs or absolute home paths.
