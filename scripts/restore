@@ -191,6 +191,24 @@ if ((${#FILTERED_AUR[@]})); then
     if ! command -v paru >/dev/null 2>&1; then
         sudo pacman -S --needed --noconfirm paru
     fi
+
+    # Caelestia 2.4 introduced qt6-m3shapes-git. That dependency explicitly
+    # conflicts with caelestia-shell<2.4.0, while paru installs dependencies
+    # before replacing the already-installed 2.3.x shell. Migrate that old
+    # layout first so an in-place Blueprint restore is as reliable as a clean
+    # install. The shell is immediately reinstalled from the active manifest.
+    if printf '%s\n' "${FILTERED_AUR[@]}" | grep -qx 'caelestia-shell' \
+        && pacman -Qq caelestia-shell >/dev/null 2>&1; then
+        CAELESTIA_INSTALLED_VERSION="$(pacman -Q caelestia-shell | awk '{print $2}')"
+        if [[ "$(vercmp "$CAELESTIA_INSTALLED_VERSION" '2.4.0')" -lt 0 ]]; then
+            bp_info "Migrating Caelestia shell $CAELESTIA_INSTALLED_VERSION to the 2.4+ dependency layout"
+            if ! sudo pacman -R --noconfirm caelestia-shell; then
+                bp_warn "Caelestia shell has reverse dependencies; removing only the old package for the immediate manifest reinstall"
+                sudo pacman -Rdd --noconfirm caelestia-shell
+            fi
+        fi
+    fi
+
     bp_info "Installing AUR / foreign packages (${#FILTERED_AUR[@]})"
     paru -S --needed --noconfirm "${FILTERED_AUR[@]}"
 fi
