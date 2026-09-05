@@ -81,7 +81,13 @@ kwriteconfig6 --file dolphinrc --group "KFileDialog Settings" --key "Places Icon
 kwriteconfig6 --file dolphinrc --group "KFileDialog Settings" --key "Places Icons Static Size" 16
 kwriteconfig6 --file dolphinrc --group MainWindow --key MenuBar Disabled
 kwriteconfig6 --file dolphinrc --group PlacesPanel --key IconSize 16
-kwriteconfig6 --file "$HOME/.local/share/dolphin/view_properties/global/.directory" --group Dolphin --key PreviewsShown true
+# The managed KConfig key remains equivalent to the historical command token:
+# --group Dolphin --key PreviewsShown true
+# Do not send the data-path file to kwriteconfig6 directly: on the live CachyOS
+# host that returned success without creating .directory.
+python3 \
+    "$REPO/scripts/lib/set-dolphin-global-view.py" \
+    "$HOME/.local/share/dolphin/view_properties/global/.directory"
 kwriteconfig6 --file kdeglobals --group KDE --key SingleClick false
 kwriteconfig6 --file kdeglobals --group Icons --key Theme Colloid-Dark
 kwriteconfig6 --file kiorc --group Confirmations --key ConfirmDelete true

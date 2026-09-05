@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+HELPER="$REPO/scripts/lib/set-dolphin-global-view.py"
+CONFIG="$REPO/scripts/configure-dolphin"
+RUNTIME="$REPO/scripts/check-dolphin"
+
+fail() { printf '  [FAIL] %s\n' "$*" >&2; exit 1; }
+ok() { printf '  [OK]   %s\n' "$*"; }
+
+[[ -f "$HELPER" && -f "$CONFIG" && -f "$RUNTIME" ]] \
+    || fail "Dolphin global preview contract files missing"
+ok "Dolphin global preview contract files present"
+
+grep -Fq 'set-dolphin-global-view.py' "$CONFIG" \
+    || fail "configure-dolphin does not use the data-path writer"
+if grep -Fq 'kwriteconfig6 --file "$HOME/.local/share/dolphin/view_properties/global/.directory"' "$CONFIG"; then
+    fail "configure-dolphin still uses ineffective absolute-path kwriteconfig6"
+fi
+grep -Fq 'PreviewsShown=true' "$RUNTIME" \
+    || fail "runtime checker does not validate global previews"
+ok "configure/check wiring uses the explicit Dolphin data path"
+
+python3 - "$HELPER" <<'PY'
+import importlib.util
+import tempfile
+from pathlib import Path
+import sys
+
+helper = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("dolphin_global_view", helper)
+module = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory() as tmp_raw:
+    tmp = Path(tmp_raw)
+
+    # Reproduce the live-host failure: the global directory exists but the
+    # .directory file does not. The writer must create the real data file.
+    missing = tmp / "view_properties/global/.directory"
+    missing.parent.mkdir(parents=True)
+    module.merge_file(missing)
+    assert missing.read_text(encoding="utf-8") == "[Dolphin]\nPreviewsShown=true\n"
+
+    # Preserve unrelated sections, keys and comments while owning only the
+    # Dolphin preview flag. Collapse duplicate owned keys to one value.
+    custom = tmp / "custom.directory"
+    custom.write_text(
+        "# keep this comment\n"
+        "[Dolphin]\n"
+        "SortRole=modificationtime\n"
+        "PreviewsShown=false\n"
+        "PreviewsShown=false\n"
+        "\n"
+        "[Other]\n"
+        "UserKey=keep-me\n",
+        encoding="utf-8",
+    )
+    module.merge_file(custom)
+    text = custom.read_text(encoding="utf-8")
+    assert "# keep this comment" in text
+    assert "SortRole=modificationtime" in text
+    assert "[Other]\nUserKey=keep-me" in text
+    assert text.count("PreviewsShown=") == 1
+    assert "PreviewsShown=true" in text
+
+    # Preserve an existing symlink rather than replacing ownership of the path.
+    target = tmp / "target.directory"
+    target.write_text("[Other]\nKeep=yes\n", encoding="utf-8")
+    link = tmp / "linked.directory"
+    link.symlink_to(target)
+    module.merge_file(link)
+    assert link.is_symlink()
+    linked = target.read_text(encoding="utf-8")
+    assert "Keep=yes" in linked
+    assert "[Dolphin]" in linked
+    assert "PreviewsShown=true" in linked
+PY
+ok "writer creates missing file, preserves unrelated data/symlinks and is idempotent-safe"
+
+printf '\nRESULT: PASS\n'
