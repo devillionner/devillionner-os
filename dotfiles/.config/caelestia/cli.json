@@ -1,0 +1,16 @@
+{
+    "toggles": {
+        "music": {
+            "spotify": {
+                "enable": true,
+                "match": [
+                    { "class": "Spotify" },
+                    { "initial_title": "Spotify" },
+                    { "initial_title": "Spotify Free" }
+                ],
+                "command": ["devos-spotify"],
+                "move": true
+            }
+        }
+    }
+}

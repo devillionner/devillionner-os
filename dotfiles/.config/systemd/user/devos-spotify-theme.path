@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch Caelestia palette for Spotify theme changes
+
+[Path]
+PathChanged=%h/.config/hypr/scheme
+Unit=devos-spotify-theme.service
+
+[Install]
+WantedBy=default.target

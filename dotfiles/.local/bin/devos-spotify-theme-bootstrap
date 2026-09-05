@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PIN="3f55a3702bd6d87799dc97023e0fe2b11d88c704"
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-text"
+OVERRIDES="$CONFIG_HOME/spicetify/devillionner-overrides.css"
+REVISION="$THEME_DIR/upstream-revision"
+CSS="$THEME_DIR/user.css"
+URL="https://raw.githubusercontent.com/spicetify/spicetify-themes/$PIN/text/user.css"
+
+mkdir -p "$THEME_DIR"
+
+if [[ -f "$CSS" && -f "$REVISION" && "$(cat "$REVISION")" == "$PIN" ]]; then
+    exit 0
+fi
+
+[[ -f "$OVERRIDES" ]] || {
+    printf 'devos-spotify: missing overrides: %s\n' "$OVERRIDES" >&2
+    exit 1
+}
+command -v curl >/dev/null 2>&1 || {
+    printf 'devos-spotify: curl is required to bootstrap the theme\n' >&2
+    exit 1
+}
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$tmp.clean" "$tmp.final"' EXIT
+
+curl -fsSL "$URL" -o "$tmp"
+# The Blueprint already ships JetBrains Mono Nerd Font. Drop remote font imports
+# so the theme has no Google Fonts/CDN dependency at runtime.
+sed '/^[[:space:]]*@import url(/d' "$tmp" > "$tmp.clean"
+{
+    cat "$tmp.clean"
+    printf '\n\n/* devillionner-os overrides; upstream text theme pinned at %s */\n' "$PIN"
+    cat "$OVERRIDES"
+} > "$tmp.final"
+
+cat "$tmp.final" > "$CSS"
+printf '%s\n' "$PIN" > "$REVISION"

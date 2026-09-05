@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -u
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+SPOTIFY_ROOT="$DATA_HOME/spotify-launcher/install/usr/share/spotify"
+PREFS="$CONFIG_HOME/spotify/prefs"
+LOG_DIR="$STATE_HOME/devillionner-os"
+LOG="$LOG_DIR/spotify.log"
+mkdir -p "$LOG_DIR"
+
+notify() {
+    command -v notify-send >/dev/null 2>&1 && notify-send "Spotify" "$1" >/dev/null 2>&1 || true
+}
+
+if ! command -v spotify-launcher >/dev/null 2>&1; then
+    notify "spotify-launcher is not installed"
+    exit 127
+fi
+
+# spotify-launcher owns updates/downloads; Spicetify then operates on its
+# per-user Spotify tree.
+spotify-launcher --no-exec >>"$LOG" 2>&1 || true
+
+if ! "$HOME/.local/bin/devos-spotify-theme-bootstrap" >>"$LOG" 2>&1; then
+    notify "Adaptive theme bootstrap failed; opening Spotify without it"
+    exec spotify-launcher --skip-update
+fi
+"$HOME/.local/bin/devos-spotify-theme-sync" >>"$LOG" 2>&1 || true
+
+# Spicetify requires Spotify to have generated prefs first. Keep first launch
+# vanilla and functional, then the next launch becomes themed automatically.
+if [[ ! -f "$PREFS" ]]; then
+    notify "First launch: sign in and leave Spotify open about a minute, then reopen it for the adaptive theme"
+    exec spotify-launcher --skip-update
+fi
+
+if ! command -v spicetify >/dev/null 2>&1 || [[ ! -d "$SPOTIFY_ROOT" ]]; then
+    notify "Spicetify is not ready; opening Spotify normally"
+    exec spotify-launcher --skip-update
+fi
+
+spicetify config \
+    spotify_path "$SPOTIFY_ROOT" \
+    prefs_path "$PREFS" \
+    current_theme devillionner-text \
+    color_scheme Devillionner \
+    inject_css 1 \
+    replace_colors 1 \
+    overwrite_assets 0 \
+    spotify_launch_flags '--remote-debugging-port=9222|--remote-allow-origins=*' \
+    >>"$LOG" 2>&1 || {
+        notify "Spicetify configuration failed; opening Spotify normally"
+        exec spotify-launcher --skip-update
+    }
+
+# `auto` handles first backup, Spotify upgrades and applying the theme, then
+# starts Spotify. Remote debugging is enabled only so `watch -s` can hot-reload
+# color.ini when Caelestia changes the wallpaper palette.
+if ! spicetify -q auto >>"$LOG" 2>&1; then
+    notify "Spicetify apply failed; opening Spotify normally"
+    exec spotify-launcher --skip-update
+fi
+
+for _ in $(seq 1 100); do
+    pgrep -x spotify >/dev/null 2>&1 && break
+    sleep 0.1
+done
+
+if ! pgrep -x spotify >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Give the remote-debugging endpoint a moment to appear. If it is still late,
+# Spicetify watch can recover by restarting Spotify itself.
+for _ in $(seq 1 80); do
+    curl -fsS http://127.0.0.1:9222/json/version >/dev/null 2>&1 && break
+    sleep 0.1
+done
+
+spicetify watch -s >>"$LOG" 2>&1 &
+watch_pid=$!
+cleanup() {
+    kill "$watch_pid" >/dev/null 2>&1 || true
+    wait "$watch_pid" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+while pgrep -x spotify >/dev/null 2>&1; do
+    sleep 2
+done

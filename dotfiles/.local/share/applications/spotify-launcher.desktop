@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Spotify
+GenericName=Music Player
+Comment=Spotify with adaptive Caelestia theme
+Icon=spotify-launcher
+Exec=devos-spotify
+Terminal=false
+Categories=Audio;Music;Player;AudioVideo;
+StartupWMClass=Spotify

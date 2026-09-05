@@ -39,8 +39,10 @@ local todo_app_tag = "todo_app"
 ---- Window rules ----
 ----------------------
 
--- Apply default opacity to all windows except fullscreen
+-- Keep the desktop translucency consistent in normal and fullscreen states.
+-- Explicit opaque/game tags below restore 1.0 where transparency is unwanted.
 hl.window_rule({ match = { fullscreen = false }, opacity = vars.windowOpacity .. " override" })
+hl.window_rule({ match = { fullscreen = true }, opacity = vars.windowOpacity .. " override" })
 
 -- Center all floating windows except xwayland windows (xwayland popups count as windows)
 hl.window_rule({ match = { float = true, xwayland = false }, center = true })
@@ -133,10 +135,9 @@ tagged_rule(xwl_popup_tag, {
 -- Special workspaces
 tagged_rule(system_monitor_tag, { "btop" }, "class")
 tagged_rule(music_player_tag, {
-    "feishin|Supersonic|Plexamp",                                  -- Self hosted
-    "Spotify",                                                     -- Spotify
-    "Cider",                                                       -- Apple music
-    "com.github.th-ch.youtube-music|com-maxrave-simpmusic-MainKt", -- YouTube music
+    "feishin|Supersonic|Plexamp", -- Self hosted
+    "Spotify",                    -- Spotify
+    "Cider",                      -- Apple music
 }, "class")
 tagged_rule(music_player_tag, {
     "Spotify|Spotify Free" -- Spotify wayland, it has no class for some reason
@@ -176,12 +177,12 @@ tagged_rule(float_tag, {
 -------------------------
 -- These have to come after all uses of window tagging. Thank you Hyprland...
 
-create_tag(opaque_tag, { opaque = true })
+create_tag(opaque_tag, { opaque = true, opacity = "1.0 override" })
 create_tag(float_tag, { float = true })
 create_tag(float_50_60_tag, { float = true, size = "(monitor_w*0.5) (monitor_h*0.6)", center = true })
 create_tag(float_60_70_tag, { float = true, size = "(monitor_w*0.6) (monitor_h*0.7)", center = true })
 create_tag(float_70_80_tag, { float = true, size = "(monitor_w*0.7) (monitor_h*0.8)", center = true })
-create_tag(game_tag, { opaque = true, immediate = true, idle_inhibit = "always" })
+create_tag(game_tag, { opaque = true, opacity = "1.0 override", immediate = true, idle_inhibit = "always" })
 create_tag(xwl_popup_tag, {
     no_dim = true,
     no_shadow = true,

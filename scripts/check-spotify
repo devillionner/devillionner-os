@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -u
+
+OK=0; WARN=0; FAIL=0
+ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
+warn() { printf '  [WARN] %s\n' "$*"; WARN=$((WARN + 1)); }
+fail() { printf '  [FAIL] %s\n' "$*"; FAIL=$((FAIL + 1)); }
+
+printf '========================================\n'
+printf '       Spotify integration check\n'
+printf '========================================\n'
+
+for cmd in spotify-launcher spicetify devos-spotify; do
+    command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
+done
+
+for file in \
+    "$HOME/.local/bin/devos-spotify-theme-bootstrap" \
+    "$HOME/.local/bin/devos-spotify-theme-sync" \
+    "$HOME/.config/spicetify/devillionner-overrides.css" \
+    "$HOME/.config/systemd/user/devos-spotify-theme.path" \
+    "$HOME/.config/systemd/user/devos-spotify-theme.service" \
+    "$HOME/.local/share/applications/spotify-launcher.desktop"; do
+    [[ -f "$file" ]] && ok "${file#$HOME/}" || fail "missing: ${file#$HOME/}"
+done
+
+THEME="$HOME/.config/spicetify/Themes/devillionner-text"
+[[ -f "$THEME/user.css" ]] && ok "pinned text-theme CSS bootstrapped" || warn "theme CSS not bootstrapped yet"
+grep -q '^\[Devillionner\]$' "$THEME/color.ini" 2>/dev/null && ok "adaptive color scheme generated" || fail "adaptive color.ini missing"
+
+systemctl --user is-enabled devos-spotify-theme.path >/dev/null 2>&1 && ok "palette watcher enabled" || fail "palette watcher not enabled"
+
+if [[ -f "$HOME/.config/spotify/prefs" ]]; then
+    ok "Spotify prefs exist"
+    CFG="$HOME/.config/spicetify/config-xpui.ini"
+    grep -Eq '^current_theme[[:space:]]*=[[:space:]]*devillionner-text' "$CFG" 2>/dev/null && ok "Spicetify theme selected" || warn "theme will be selected on next devos-spotify launch"
+    grep -Eq '^color_scheme[[:space:]]*=[[:space:]]*Devillionner' "$CFG" 2>/dev/null && ok "adaptive scheme selected" || warn "scheme will be selected on next devos-spotify launch"
+else
+    warn "first Spotify login is still required before Spicetify can apply"
+fi
+
+printf '\n========================================\n'
+printf 'OK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then printf 'RESULT: PASS\n'; exit 0; fi
+printf 'RESULT: FAIL\n'; exit 1

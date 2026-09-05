@@ -54,6 +54,7 @@ rsync
 showtime
 snapper
 sof-firmware
+spotify-launcher
 starship
 sudo
 swappy

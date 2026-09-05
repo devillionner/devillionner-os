@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+SCHEME="$CONFIG_HOME/hypr/scheme/current.lua"
+FALLBACK_SCHEME="$CONFIG_HOME/hypr/scheme/default.lua"
+THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-text"
+COLOR_FILE="$THEME_DIR/color.ini"
+
+[[ -f "$SCHEME" ]] || SCHEME="$FALLBACK_SCHEME"
+[[ -f "$SCHEME" ]] || {
+    printf 'devos-spotify: Caelestia/Hypr palette not found\n' >&2
+    exit 1
+}
+mkdir -p "$THEME_DIR"
+
+get_colour() {
+    local key="$1" fallback="$2" value
+    value="$(awk -v key="$key" '$1 == key && $2 == "=" { gsub(/[\",]/, "", $3); print $3; exit }' "$SCHEME")"
+    if [[ "$value" =~ ^[[:xdigit:]]{6}$ ]]; then
+        printf '%s' "$value"
+    else
+        printf '%s' "$fallback"
+    fi
+}
+
+primary="$(get_colour primary c2c1ff)"
+surface="$(get_colour surface 131317)"
+surface_container="$(get_colour surfaceContainer 201f23)"
+surface_high="$(get_colour surfaceContainerHigh 2a292e)"
+on_surface="$(get_colour onSurface e5e1e7)"
+on_surface_variant="$(get_colour onSurfaceVariant c8c5d1)"
+outline_variant="$(get_colour outlineVariant 47464f)"
+secondary="$(get_colour secondary c6c4e0)"
+error="$(get_colour error ffb4ab)"
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+cat > "$tmp" <<EOF
+[Devillionner]
+accent             = $primary
+accent-active      = $primary
+accent-inactive    = $surface_high
+banner             = $primary
+border-active      = $primary
+border-inactive    = $outline_variant
+header             = $surface_container
+highlight          = $surface_high
+main               = $surface
+notification       = $secondary
+notification-error = $error
+subtext            = $on_surface_variant
+text               = $on_surface
+EOF
+
+if [[ -f "$COLOR_FILE" ]] && cmp -s "$tmp" "$COLOR_FILE"; then
+    exit 0
+fi
+
+# Preserve the inode when possible so Spicetify's watcher reliably sees writes.
+if [[ -f "$COLOR_FILE" ]]; then
+    cat "$tmp" > "$COLOR_FILE"
+else
+    install -m644 "$tmp" "$COLOR_FILE"
+fi

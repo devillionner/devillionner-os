@@ -1,0 +1,45 @@
+/* devillionner-os layer for the upstream Spicetify text theme.
+ * Color values intentionally live in generated color.ini; this file is layout only.
+ */
+
+:root {
+    --font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
+    --font-size: 14px;
+    --font-weight: 450;
+    --line-height: 1.25;
+    --font-size-lyrics: 15px;
+
+    --display-card-image: block;
+    --display-coverart-image: none;
+    --display-header-image: none;
+    --display-sidebar-image: block;
+    --display-tracklist-image: none;
+    --display-spicetify-banner-ascii: none;
+    --display-music-banner-ascii: none;
+
+    --border-radius: 12px;
+    --border-width: 1px;
+    --border-style: solid;
+    --border-transition: 0.16s ease;
+}
+
+/* Keep the text-theme character but make controls feel closer to Caelestia. */
+.main-card-card,
+.main-contextMenu-menu,
+.main-topBar-searchBar,
+.main-yourLibraryX-filterArea button,
+.encore-text-body-small-bold,
+button {
+    transition-duration: 160ms !important;
+}
+
+.main-card-card,
+.main-contextMenu-menu,
+.main-topBar-searchBar,
+.main-yourLibraryX-libraryItemContainer {
+    border-radius: var(--border-radius) !important;
+}
+
+/* Hyprland owns the actual 0.95 window transparency + blur. Avoid a second
+ * alpha layer here so Spotify visually matches Dolphin rather than becoming
+ * doubly transparent. */

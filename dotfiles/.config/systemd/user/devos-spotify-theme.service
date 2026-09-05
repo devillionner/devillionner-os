@@ -1,0 +1,6 @@
+[Unit]
+Description=Sync Spotify theme from Caelestia palette
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/devos-spotify-theme-sync
