@@ -108,6 +108,7 @@ required_paths=(
     scripts/configure-tv-cast
     scripts/check-tv-cast
     dotfiles/.config/caelestia/cli.json
+    dotfiles/.config/hypr/hyprland/rules.lua
     dotfiles/.config/spicetify/devillionner-overrides.css
     dotfiles/.local/bin/devos-spotify
     dotfiles/.local/bin/devos-spotify-theme-bootstrap
@@ -229,14 +230,25 @@ assert spotify.get("move") is True
 matches = spotify.get("match")
 assert isinstance(matches, list)
 assert {"class": "Spotify"} in matches
+assert {"class": "spotify"} in matches
 assert {"initialTitle": "Spotify"} in matches
 assert {"initialTitle": "Spotify Free"} in matches
 assert all("initial_title" not in match for match in matches if isinstance(match, dict))
 PY
 then
-    ok "Caelestia Spotify toggle uses current CLI camelCase match schema"
+    ok "Caelestia Spotify toggle uses current schema and both class aliases"
 else
-    fail "Caelestia Spotify toggle schema"
+    fail "Caelestia Spotify toggle schema/identity aliases"
+fi
+
+SPOTIFY_HYPR_RULES="$REPO/dotfiles/.config/hypr/hyprland/rules.lua"
+SPOTIFY_DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
+if grep -Fq '"Spotify|spotify"' "$SPOTIFY_HYPR_RULES" \
+    && grep -Fq '"Spotify|Spotify Free"' "$SPOTIFY_HYPR_RULES" \
+    && grep -Fqx 'StartupWMClass=spotify' "$SPOTIFY_DESKTOP"; then
+    ok "Spotify identity contract covers uppercase/lowercase class and title fallback"
+else
+    fail "Spotify identity contract differs across Hyprland/Caelestia/desktop entry"
 fi
 
 SPOTIFY_BOOTSTRAP="$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap"
@@ -282,7 +294,6 @@ else
     fail "Spotify Caelestia surface CSS validation"
 fi
 
-SPOTIFY_DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
 SPOTIFY_LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"
 SPOTIFY_CONFIG="$REPO/scripts/configure-spotify"
 if grep -Fqx 'TryExec=devos-spotify' "$SPOTIFY_DESKTOP" \
