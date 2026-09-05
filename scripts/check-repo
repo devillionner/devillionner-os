@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+FAIL=0
+OK=0
+
+ok() {
+    printf '  [OK]   %s\n' "$*"
+    OK=$((OK + 1))
+}
+
+fail() {
+    printf '  [FAIL] %s\n' "$*" >&2
+    FAIL=$((FAIL + 1))
+}
+
+printf '========================================\n'
+printf '       Blueprint repository check\n'
+printf '========================================\n'
+
+bash_checked=0
+while IFS= read -r -d '' file; do
+    first_line="$(head -n 1 "$file" 2>/dev/null || true)"
+    [[ "$first_line" == *bash* ]] || continue
+    if bash -n "$file"; then
+        bash_checked=$((bash_checked + 1))
+    else
+        fail "bash syntax: ${file#$REPO/}"
+    fi
+done < <(find "$REPO/scripts" "$REPO/dotfiles/.local/bin" "$REPO/components" -type f -print0 2>/dev/null)
+((bash_checked > 0)) && ok "bash syntax ($bash_checked files)" || fail "no Bash files discovered"
+
+if python3 - "$REPO" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+errors = []
+count = 0
+for path in sorted((root / "dotfiles").rglob("*.json")):
+    count += 1
+    try:
+        json.loads(path.read_text())
+    except Exception as exc:
+        errors.append(f"{path.relative_to(root)}: {exc}")
+
+if errors:
+    print("\n".join(errors), file=sys.stderr)
+    raise SystemExit(1)
+print(count)
+PY
+then
+    ok "JSON syntax"
+else
+    fail "JSON syntax"
+fi
+
+if python3 - "$REPO" <<'PY'
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+errors = []
+for path in sorted((root / "manifests").rglob("*.txt")):
+    seen = set()
+    for number, raw in enumerate(path.read_text().splitlines(), 1):
+        value = raw.split("#", 1)[0].strip()
+        if not value:
+            continue
+        if value in seen:
+            errors.append(f"{path.relative_to(root)}:{number}: duplicate entry: {value}")
+        seen.add(value)
+
+if errors:
+    print("\n".join(errors), file=sys.stderr)
+    raise SystemExit(1)
+PY
+then
+    ok "manifest entries are unique per file"
+else
+    fail "duplicate manifest entries"
+fi
+
+required_paths=(
+    scripts/configure-dolphin
+    scripts/check-dolphin
+    scripts/configure-spotify
+    scripts/check-spotify
+    scripts/configure-tv-cast
+    scripts/check-tv-cast
+    dotfiles/.local/bin/devos-spotify
+    dotfiles/.config/systemd/user/devos-spotify-theme.path
+)
+for path in "${required_paths[@]}"; do
+    [[ -e "$REPO/$path" ]] || fail "missing required path: $path"
+done
+[[ $FAIL -gt 0 ]] || ok "required integration files present"
+
+if grep -Fq '"$REPO/scripts/configure-spotify"' "$REPO/scripts/restore" \
+    && grep -Fq '"$REPO/scripts/check-spotify"' "$REPO/scripts/restore"; then
+    ok "Spotify is wired into restore + validation"
+else
+    fail "Spotify restore/check wiring is incomplete"
+fi
+
+if grep -Fq '"$REPO/scripts/configure-dolphin"' "$REPO/scripts/restore" \
+    && grep -Fq '"$REPO/scripts/check-dolphin"' "$REPO/scripts/restore"; then
+    ok "Dolphin is wired into restore + validation"
+else
+    fail "Dolphin restore/check wiring is incomplete"
+fi
+
+if grep -Fq 'FEATURES=("tvcast")' "$REPO/scripts/restore" \
+    && grep -Fq '"$REPO/scripts/check-tv-cast"' "$REPO/scripts/restore"; then
+    ok "TV Cast shared-feature wiring present"
+else
+    fail "TV Cast restore/check wiring is incomplete"
+fi
+
+printf '\n========================================\n'
+printf 'OK: %d   FAIL: %d\n' "$OK" "$FAIL"
+if ((FAIL == 0)); then
+    printf 'RESULT: PASS\n'
+    exit 0
+fi
+printf 'RESULT: FAIL\n'
+exit 1
