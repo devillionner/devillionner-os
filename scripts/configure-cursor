@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+THEME="Bibata-Modern-Ice"
+SIZE="24"
+THEME_DIR="/usr/share/icons/$THEME"
+
+[[ -d "$THEME_DIR/cursors" ]] \
+    || bp_die "$THEME cursor files are missing. Install bibata-cursor-theme-bin first."
+
+bp_info "Configuring $THEME cursor ($SIZE px)"
+
+mkdir -p \
+    "$HOME/.config/environment.d" \
+    "$HOME/.config/gtk-3.0" \
+    "$HOME/.config/gtk-4.0" \
+    "$HOME/.icons/default" \
+    "$HOME/.local/share/icons/default"
+
+# Bibata's official Arch package is an XCursor theme. Current Hyprland falls
+# back to XCursor when no HYPRCURSOR_THEME is selected, so keep only the XCursor
+# variables here instead of pointing HYPRCURSOR_THEME at an incompatible theme.
+cat > "$HOME/.config/environment.d/90-devillionner-cursor.conf" <<EOF
+XCURSOR_THEME=$THEME
+XCURSOR_SIZE=$SIZE
+EOF
+
+# Merge only the Blueprint-owned cursor keys into GTK settings and the default
+# XCursor inheritance files. Preserve unrelated user settings and comments.
+python3 - "$THEME" "$SIZE" <<'PY'
+from pathlib import Path
+import os
+import re
+import sys
+
+theme = sys.argv[1]
+size = sys.argv[2]
+home = Path.home()
+
+
+def set_ini_values(path: Path, section: str, values: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    lines = text.splitlines()
+    section_re = re.compile(r"^\s*\[([^]]+)\]\s*$")
+    key_res = {k: re.compile(rf"^\s*{re.escape(k)}\s*=") for k in values}
+
+    start = end = None
+    for i, line in enumerate(lines):
+        match = section_re.match(line)
+        if not match:
+            continue
+        if match.group(1) == section:
+            start = i
+            end = len(lines)
+            for j in range(i + 1, len(lines)):
+                if section_re.match(lines[j]):
+                    end = j
+                    break
+            break
+
+    if start is None:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.append(f"[{section}]")
+        for key, value in values.items():
+            lines.append(f"{key}={value}")
+    else:
+        seen: set[str] = set()
+        new_section = [lines[start]]
+        for line in lines[start + 1:end]:
+            matched_key = None
+            for key, regex in key_res.items():
+                if regex.match(line):
+                    matched_key = key
+                    break
+            if matched_key is None:
+                new_section.append(line)
+            elif matched_key not in seen:
+                new_section.append(f"{matched_key}={values[matched_key]}")
+                seen.add(matched_key)
+        for key, value in values.items():
+            if key not in seen:
+                new_section.append(f"{key}={value}")
+        lines = lines[:start] + new_section + lines[end:]
+
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+for gtk in (home / ".config/gtk-3.0/settings.ini", home / ".config/gtk-4.0/settings.ini"):
+    set_ini_values(gtk, "Settings", {
+        "gtk-cursor-theme-name": theme,
+        "gtk-cursor-theme-size": size,
+    })
+
+for index in (home / ".icons/default/index.theme", home / ".local/share/icons/default/index.theme"):
+    set_ini_values(index, "Icon Theme", {"Inherits": theme})
+PY
+
+# GTK reads this directly through GSettings on the current session. Keep the INI
+# files above as the compositor-independent fallback and for future sessions.
+if command -v gsettings >/dev/null 2>&1 \
+    && gsettings list-schemas 2>/dev/null | grep -qx 'org.gnome.desktop.interface'; then
+    gsettings set org.gnome.desktop.interface cursor-theme "$THEME" || true
+    gsettings set org.gnome.desktop.interface cursor-size "$SIZE" || true
+fi
+
+# Make newly D-Bus/systemd-activated apps see the cursor immediately. Hyprland
+# itself reads the persistent environment on session start, so an existing
+# compositor session may need one logout/login before every server-side cursor
+# switches from the previous theme.
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user set-environment \
+        XCURSOR_THEME="$THEME" \
+        XCURSOR_SIZE="$SIZE" >/dev/null 2>&1 || true
+fi
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    env XCURSOR_THEME="$THEME" XCURSOR_SIZE="$SIZE" \
+        dbus-update-activation-environment --systemd XCURSOR_THEME XCURSOR_SIZE \
+        >/dev/null 2>&1 || true
+fi
+
+bp_ok "$THEME configured for XCursor + GTK; full Hyprland refresh applies on next login"

@@ -145,6 +145,9 @@ bash "$REPO/scripts/configure-caelestia-cli"
 bp_info "Configuring keyboard"
 "$REPO/scripts/configure-keyboard" "$KEYBOARD"
 
+bp_info "Configuring Bibata Modern Ice cursor"
+"$REPO/scripts/configure-cursor"
+
 bp_info "Configuring hardware-specific behavior"
 "$REPO/scripts/configure-hardware"
 
@@ -245,7 +248,7 @@ if [[ "$VALIDATION_PASS" == true ]]; then
 else
     printf "\n========================================\n"
     printf "RESTORE COMPLETED WITH DIFFERENCES\n"
-    printf "Review validation output above.\n"
+printf "Review validation output above.\n"
     printf "========================================\n"
 fi
 

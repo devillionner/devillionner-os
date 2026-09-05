@@ -209,6 +209,7 @@ fi
 section "COMPONENT RUNTIME CHECKS"
 run_component_check "Quickshell" bash "$REPO/scripts/check-quickshell"
 run_component_check "Caelestia" bash "$REPO/scripts/check-caelestia"
+run_component_check "Cursor" bash "$REPO/scripts/check-cursor"
 run_component_check "Dolphin" bash "$REPO/scripts/check-dolphin"
 run_component_check "Spotify" bash "$REPO/scripts/check-spotify"
 if feature_enabled tvcast; then

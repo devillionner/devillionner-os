@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MAN="$REPO/manifests/profiles/common-aur.txt"
+CONFIG="$REPO/scripts/configure-cursor"
+CHECK="$REPO/scripts/check-cursor"
+RESTORE="$REPO/scripts/restore"
+AGG="$REPO/scripts/check"
+
+fail() { printf 'Cursor source contract: FAIL: %s\n' "$*" >&2; exit 1; }
+
+for file in "$MAN" "$CONFIG" "$CHECK" "$RESTORE" "$AGG"; do
+    [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
+done
+
+grep -Fqx 'bibata-cursor-theme-bin' "$MAN" \
+    || fail "bibata-cursor-theme-bin is not in the common AUR manifest"
+
+grep -Fq 'THEME="Bibata-Modern-Ice"' "$CONFIG" \
+    && grep -Fq 'XCURSOR_THEME=$THEME' "$CONFIG" \
+    && grep -Fq 'gtk-cursor-theme-name' "$CONFIG" \
+    && grep -Fq '.config/gtk-4.0/settings.ini' "$CONFIG" \
+    && grep -Fq '.icons/default/index.theme' "$CONFIG" \
+    || fail "cursor configurator does not own the complete XCursor/GTK contract"
+
+# Bibata's official Arch package is XCursor-only. Current Hyprland must fall
+# back through XCURSOR_THEME; do not actually configure a HYPRCURSOR theme or
+# call setcursor for this package. Ignore comments when enforcing this.
+if grep -Eq '^[[:space:]]*(export[[:space:]]+)?HYPRCURSOR_THEME=' "$CONFIG" \
+    || grep -Eq '^[[:space:]]*hyprctl[[:space:]]+setcursor([[:space:]]|$)' "$CONFIG"; then
+    fail "XCursor-only Bibata configurator incorrectly claims hyprcursor support"
+fi
+
+grep -Fq 'THEME="Bibata-Modern-Ice"' "$CHECK" \
+    && grep -Fq 'bibata-cursor-theme-bin installed' "$CHECK" \
+    && grep -Fq 'GSettings cursor theme' "$CHECK" \
+    || fail "cursor runtime validator does not cover the managed policy"
+
+grep -Fq '"$REPO/scripts/configure-cursor"' "$RESTORE" \
+    || fail "restore does not apply cursor policy"
+grep -Fq '$REPO/scripts/check-cursor' "$AGG" \
+    || fail "aggregate runtime check does not include cursor validation"
+
+printf 'Cursor source contract: PASS\n'

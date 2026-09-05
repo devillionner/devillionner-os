@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -u
+
+THEME="Bibata-Modern-Ice"
+SIZE="24"
+OK=0; WARN=0; FAIL=0
+ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
+warn() { printf '  [WARN] %s\n' "$*"; WARN=$((WARN + 1)); }
+fail() { printf '  [FAIL] %s\n' "$*"; FAIL=$((FAIL + 1)); }
+
+printf '========================================\n'
+printf '       Cursor theme validation\n'
+printf '========================================\n'
+
+pacman -Qq bibata-cursor-theme-bin >/dev/null 2>&1 \
+    && ok "bibata-cursor-theme-bin installed" \
+    || fail "bibata-cursor-theme-bin missing"
+
+[[ -d "/usr/share/icons/$THEME/cursors" ]] \
+    && ok "$THEME cursor files present" \
+    || fail "$THEME cursor files missing"
+
+ENV_FILE="$HOME/.config/environment.d/90-devillionner-cursor.conf"
+grep -qx "XCURSOR_THEME=$THEME" "$ENV_FILE" 2>/dev/null \
+    && ok "XCURSOR_THEME=$THEME" \
+    || fail "persistent XCURSOR_THEME differs"
+grep -qx "XCURSOR_SIZE=$SIZE" "$ENV_FILE" 2>/dev/null \
+    && ok "XCURSOR_SIZE=$SIZE" \
+    || fail "persistent XCURSOR_SIZE differs"
+
+for gtk in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
+    label="${gtk#$HOME/}"
+    grep -qx "gtk-cursor-theme-name=$THEME" "$gtk" 2>/dev/null \
+        && grep -qx "gtk-cursor-theme-size=$SIZE" "$gtk" 2>/dev/null \
+        && ok "$label uses $THEME ($SIZE)" \
+        || fail "$label cursor settings differ"
+done
+
+for index in "$HOME/.icons/default/index.theme" "$HOME/.local/share/icons/default/index.theme"; do
+    label="${index#$HOME/}"
+    grep -qx "Inherits=$THEME" "$index" 2>/dev/null \
+        && ok "$label inherits $THEME" \
+        || fail "$label cursor fallback differs"
+done
+
+if command -v gsettings >/dev/null 2>&1 \
+    && gsettings list-schemas 2>/dev/null | grep -qx 'org.gnome.desktop.interface'; then
+    GTK_THEME="$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null | tr -d "'" || true)"
+    GTK_SIZE="$(gsettings get org.gnome.desktop.interface cursor-size 2>/dev/null | grep -oE '[0-9]+' | tail -n1 || true)"
+    [[ "$GTK_THEME" == "$THEME" ]] && ok "GSettings cursor theme: $THEME" || fail "GSettings cursor theme differs (${GTK_THEME:-unset})"
+    [[ "$GTK_SIZE" == "$SIZE" ]] && ok "GSettings cursor size: $SIZE" || fail "GSettings cursor size differs (${GTK_SIZE:-unset})"
+else
+    warn "GSettings schema unavailable; GTK INI fallback validated instead"
+fi
+
+if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    warn "existing Hyprland session may need logout/login for compositor-side XCursor refresh"
+fi
+
+printf '\nOK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then
+    printf 'RESULT: PASS\n'
+    exit 0
+fi
+printf 'RESULT: FAIL\n'
+exit 1
