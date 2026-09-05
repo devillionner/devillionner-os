@@ -21,23 +21,115 @@
     --border-width: 1px;
     --border-style: solid;
     --border-transition: 0.16s ease;
+
+    /* Caelestia-style semantic surfaces. The actual colors come from the
+     * generated Spicetify scheme, which mirrors the current wallpaper palette. */
+    --devos-radius-panel: 14px;
+    --devos-radius-control: 10px;
+    --devos-panel-gap: 10px;
+    --devos-motion: 160ms ease;
+    --devos-surface: var(--spice-header);
+    --devos-surface-high: var(--spice-highlight);
+    --devos-outline: var(--spice-border-inactive);
+    --devos-outline-active: var(--spice-border-active);
+    --devos-accent: var(--spice-accent);
 }
 
-/* Keep the text-theme character but make controls feel closer to Caelestia. */
-.main-card-card,
-.main-contextMenu-menu,
+/* Keep the upstream text-theme pane structure, but tighten it to the same
+ * rounded, compact spacing language used by the rest of the Blueprint UI. */
+.Root__top-container {
+    --panel-gap: var(--devos-panel-gap) !important;
+}
+
+.Root__globalNav,
+.main-yourLibraryX-entryPoints,
+.Root__main-view,
+.main-nowPlayingBar-container,
+.Root__right-sidebar:has(aside:not(:empty)) {
+    border-radius: var(--devos-radius-panel) !important;
+    box-shadow: none !important;
+}
+
+.Root__globalNav::before,
+.Root__nav-bar .main-yourLibraryX-entryPoints::before,
+.Root__main-view::before,
+.main-nowPlayingBar-container::before,
+.Root__right-sidebar:has(aside:not(:empty))::before {
+    border-radius: var(--devos-radius-control) !important;
+}
+
+/* Elevated controls use surfaceContainer / surfaceContainerHigh from the
+ * Caelestia palette instead of adding another translucent layer. */
 .main-topBar-searchBar,
+.main-contextMenu-menu,
 .main-yourLibraryX-filterArea button,
-.encore-text-body-small-bold,
-button {
-    transition-duration: 160ms !important;
+.main-card-card,
+.main-globalNav-navLink {
+    background-color: var(--devos-surface) !important;
+    border: var(--border-width) solid var(--devos-outline) !important;
+    border-radius: var(--devos-radius-control) !important;
+    box-shadow: none !important;
+    transition:
+        background-color var(--devos-motion),
+        border-color var(--devos-motion),
+        color var(--devos-motion),
+        transform var(--devos-motion) !important;
 }
 
-.main-card-card,
-.main-contextMenu-menu,
-.main-topBar-searchBar,
-.main-yourLibraryX-libraryItemContainer {
-    border-radius: var(--border-radius) !important;
+.main-topBar-searchBar:focus-within,
+.main-yourLibraryX-filterArea button:hover,
+.main-yourLibraryX-filterArea button:focus-visible,
+.main-card-card:hover,
+.main-card-card[data-context-menu-open="true"],
+.main-globalNav-navLink:hover,
+.main-globalNav-navLink:focus-visible {
+    background-color: var(--devos-surface-high) !important;
+    border-color: var(--devos-outline-active) !important;
+}
+
+/* Library and track rows stay visually lighter than cards, but gain the same
+ * rounded hover/selection shape so the UI feels like one system. */
+.main-yourLibraryX-libraryItemContainer,
+.main-trackList-trackListRow,
+[class*="listRow-isInteractive"] {
+    border-radius: var(--devos-radius-control) !important;
+    transition:
+        background-color var(--devos-motion),
+        color var(--devos-motion) !important;
+}
+
+.main-yourLibraryX-libraryItemContainer:hover,
+.main-trackList-trackListRow:focus-within,
+.main-trackList-trackListRow:hover,
+[class*="listRow-isInteractive"]:hover,
+[class*="listRow-isInteractive"]:hover::after {
+    background-color: var(--devos-surface) !important;
+}
+
+.main-trackList-trackListRow.main-trackList-selected,
+.main-trackList-trackListRow.main-trackList-selected:hover,
+[class*="listRow-isInteractive"][aria-selected="true"] {
+    background-color: var(--devos-surface-high) !important;
+}
+
+/* Preserve keyboard focus visibility instead of relying on browser-default
+ * outlines that can clash with a wallpaper-derived dark/light accent. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible {
+    outline: 2px solid var(--devos-accent) !important;
+    outline-offset: 2px !important;
+}
+
+/* Keep all media corners aligned with the control radius. */
+.main-cardImage-imageWrapper,
+.main-image-image,
+.main-avatar-image,
+.x-entityImage-xsmall,
+.main-coverSlotCollapsed-navAltContainer,
+.main-nowPlayingView-coverArt {
+    border-radius: var(--devos-radius-control) !important;
 }
 
 /* Hyprland owns the actual 0.95 window transparency + blur. Avoid a second
