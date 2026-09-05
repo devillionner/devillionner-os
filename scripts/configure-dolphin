@@ -85,30 +85,15 @@ kwriteconfig6 --file kdeglobals --group KDE --key SingleClick false
 kwriteconfig6 --file kdeglobals --group Icons --key Theme Colloid-Dark
 kwriteconfig6 --file kiorc --group Confirmations --key ConfirmDelete true
 
-# Keep Caelestia/qtengine on the tested global setup: Darkly is the global
-# widget style and Colloid-Dark is the active icon theme. Folder colour remains
-# adaptive because the normal Colloid install is used (no --notint).
+# Caelestia cli.json (including Colloid-Dark) is owned centrally by
+# configure-caelestia-cli. Dolphin only maintains its qtengine companion state
+# here. Folder colour remains adaptive because the normal Colloid install is
+# used (no --notint).
 python3 - <<'PY'
 import json
 from pathlib import Path
 
 home = Path.home()
-
-cli = home / ".config/caelestia/cli.json"
-cli.parent.mkdir(parents=True, exist_ok=True)
-try:
-    data = json.loads(cli.read_text()) if cli.exists() else {}
-except (json.JSONDecodeError, OSError):
-    data = {}
-if not isinstance(data, dict):
-    data = {}
-theme = data.setdefault("theme", {})
-if not isinstance(theme, dict):
-    theme = {}
-    data["theme"] = theme
-theme["iconTheme"] = "Colloid-Dark"
-cli.write_text(json.dumps(data, indent=4, ensure_ascii=False) + "\n")
-
 qtengine = home / ".config/qtengine/config.json"
 if qtengine.exists():
     try:
