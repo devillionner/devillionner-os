@@ -14,6 +14,20 @@ for cmd in spotify-launcher spicetify devos-spotify flock; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
 
+SYSTEM_LAUNCHER="/usr/local/bin/devos-spotify"
+USER_LAUNCHER="$HOME/.local/bin/devos-spotify"
+if [[ -x "$SYSTEM_LAUNCHER" ]]; then
+    ok "system Spotify wrapper installed"
+else
+    fail "system Spotify wrapper missing"
+fi
+if [[ -L "$USER_LAUNCHER" ]] \
+    && [[ "$(readlink -f "$USER_LAUNCHER" 2>/dev/null || true)" == "$SYSTEM_LAUNCHER" ]]; then
+    ok "user-local Spotify shim points to system wrapper"
+else
+    fail "user-local Spotify wrapper may shadow the system launcher"
+fi
+
 for file in \
     "$HOME/.local/bin/devos-spotify-theme-bootstrap" \
     "$HOME/.local/bin/devos-spotify-theme-sync" \
@@ -75,7 +89,7 @@ else
     fail "spotify: protocol default handler is not managed"
 fi
 
-LAUNCHER="$HOME/.local/bin/devos-spotify"
+LAUNCHER="$SYSTEM_LAUNCHER"
 if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" 2>/dev/null \
     && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$LAUNCHER" 2>/dev/null \
     && grep -Fq 'spotify-launcher --skip-update "$SPOTIFY_URI"' "$LAUNCHER" 2>/dev/null; then
