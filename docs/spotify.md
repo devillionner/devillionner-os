@@ -28,6 +28,8 @@ Mapping:
 
 `devos-spotify-theme.path` watches the Caelestia/Hypr scheme directory. When wallpaper-derived colors change, it rewrites `color.ini`. Spotify is launched through `devos-spotify`, which keeps `spicetify watch -s` attached while Spotify is running, so the active client hot-reloads the new palette.
 
+The restore rsync excludes `~/.config/caelestia/cli.json` from blind copying. `configure-dolphin` and `configure-spotify` then merge only their owned keys into the existing file, so unrelated Caelestia toggles survive a full Blueprint restore.
+
 ## Transparency
 
 Actual window transparency belongs to Hyprland, not the Spotify CSS. Spotify therefore uses the same Blueprint `windowOpacity = 0.95` as Dolphin. The fullscreen rule keeps the same 0.95 value instead of jumping to 1.0. Apps explicitly tagged `opaque` and games still opt out at 1.0.
