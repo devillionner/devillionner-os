@@ -33,6 +33,9 @@ jobs:
       - name: Validate Spotify wrapper path contract
         run: bash scripts/check-spotify-wrapper-source
 
+      - name: Validate Bibata cursor contract
+        run: bash scripts/check-cursor-source
+
       - name: Validate Caelestia patch contract
         run: bash scripts/check-caelestia-patch-source
 
