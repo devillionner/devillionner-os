@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+HELPER="$REPO/scripts/lib/set-caelestia-file-explorer.py"
+CHECKER="$REPO/scripts/check-dolphin"
+
+[[ -f "$HELPER" ]] || { echo "missing fileExplorer helper" >&2; exit 1; }
+[[ -f "$CHECKER" ]] || { echo "missing Dolphin checker" >&2; exit 1; }
+
+python3 - "$HELPER" <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+helper = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("caelestia_vars", helper)
+module = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(module)
+
+desired = '/usr/local/bin/devos-dolphin'
+
+# Real live-host shape discovered on 2026-09-05: Caelestia/user config may keep
+# the table's closing brace on the same line as the final string assignment.
+compact = 'return {\n    fileExplorer = "dolphin",}\n'
+updated = module.update_text(compact)
+assert updated == f'return {{\n    fileExplorer = "{desired}",}}\n'
+assert updated.count('fileExplorer') == 1
+
+compact_no_comma = "return {\n    fileExplorer = 'thunar'}\n"
+updated_no_comma = module.update_text(compact_no_comma)
+assert updated_no_comma == f'return {{\n    fileExplorer = "{desired}"}}\n'
+
+commented = 'return {\n    fileExplorer = "thunar",} -- keep me\n'
+updated_commented = module.update_text(commented)
+assert updated_commented == f'return {{\n    fileExplorer = "{desired}",}} -- keep me\n'
+
+# Expressions/functions remain deliberately unsupported: the helper must fail
+# closed instead of guessing at arbitrary Lua and creating duplicate ownership.
+unsafe = 'return {\n    fileExplorer = function() return "dolphin" end,\n}\n'
+try:
+    module.update_text(unsafe)
+except ValueError:
+    pass
+else:
+    raise AssertionError('unsafe fileExplorer expression was accepted')
+PY
+
+# Keep runtime validation aligned with the updater: a compact closing brace is
+# a valid one-entry override and must not be reported as a false negative.
+compact_runtime='    fileExplorer = "/usr/local/bin/devos-dolphin",}'
+if ! grep -Eq '^[[:space:]]*fileExplorer[[:space:]]*=[[:space:]]*"/usr/local/bin/devos-dolphin"[[:space:]]*,?[[:space:]]*[}]?[[:space:]]*(--.*)?$' <<< "$compact_runtime"; then
+    echo "compact runtime matcher contract failed" >&2
+    exit 1
+fi
+grep -Fq '[}]?' "$CHECKER" || {
+    echo "Dolphin runtime checker does not allow compact table closing brace" >&2
+    exit 1
+}
+
+echo "Dolphin compact fileExplorer contract: PASS"

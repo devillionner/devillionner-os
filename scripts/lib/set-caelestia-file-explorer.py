@@ -15,7 +15,11 @@ from pathlib import Path
 DESIRED = "/usr/local/bin/devos-dolphin"
 STRING_ASSIGNMENT = re.compile(
     r'(?m)^(?P<indent>\s*)fileExplorer\s*=\s*["\'][^"\']*["\']'
-    r'(?P<tail>\s*,?\s*(?:--.*)?)$'
+    # Caelestia may compact the final table entry so the closing brace lives on
+    # the same line: fileExplorer = "dolphin",}. Treat that as a normal string
+    # assignment while still refusing function/expression values we do not know
+    # how to rewrite safely.
+    r'(?P<tail>\s*,?\s*\}?\s*(?:--.*)?)$'
 )
 ANY_ASSIGNMENT = re.compile(r"(?m)^\s*fileExplorer\s*=")
 RETURN_TABLE = re.compile(r"(?m)^\s*return\s*\{\s*$")
@@ -27,10 +31,9 @@ def update_text(current: str, desired: str = DESIRED) -> str:
     if match:
         indent = match.group("indent")
         tail = match.group("tail")
-        comment = ""
-        if "--" in tail:
-            comment = " " + tail[tail.index("--") :].strip()
-        replacement = f'{indent}fileExplorer = "{desired}",{comment}'
+        # Preserve the exact supported suffix (comma, compact closing brace and
+        # comment) instead of reformatting the surrounding user/Caelestia Lua.
+        replacement = f'{indent}fileExplorer = "{desired}"{tail}'
         return current[: match.start()] + replacement + current[match.end() :]
 
     if ANY_ASSIGNMENT.search(current):
