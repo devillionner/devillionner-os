@@ -14,10 +14,24 @@ The configuration was captured from the tested host and deliberately reduced to 
 - Places icons use a fixed 16 px size.
 - The menu bar is hidden.
 - The Information panel is enabled on the first Blueprint configuration through Dolphin's own D-Bus action API.
+- File thumbnails/previews are enabled globally and small previews may be enlarged.
 - JPEG, PNG and WEBP open in Swappy, matching the tested host.
 - Delete confirmation remains enabled.
 
 Caelestia's CLI theme config is pinned to `Colloid-Dark` so a wallpaper/theme refresh does not silently restore the old Papirus icon theme.
+
+## Preview stack
+
+The Blueprint treats previews as part of the file-manager experience rather than an accidental dependency of another application. The common profile therefore installs:
+
+- `ffmpegthumbs` for video thumbnails;
+- `kdegraphics-thumbnailers` for additional graphics/document thumbnailers;
+- `kimageformats` for KDE/Qt 6 image formats such as HEIF/AVIF when their codec libraries are available;
+- `qt6-imageformats` for additional Qt image formats such as TIFF/TGA/JP2/WebP support.
+
+Dolphin's current upstream default for `PreviewsShown` is `true`, but Blueprint writes a global view property explicitly so an old per-machine state cannot silently disable previews after restore. `GlobalViewProps=true` and `EnlargeSmallPreviews=true` are also explicit Blueprint settings.
+
+The global view file lives under `~/.local/share/dolphin/view_properties/global/.directory`, matching Dolphin's current `QStandardPaths::AppDataLocation/view_properties/global` storage model. The Information panel remains a separate main-window state and is initialized through Dolphin's own action API.
 
 ## Dolphin-only Qt style override
 
@@ -61,4 +75,4 @@ Likewise, `dolphinstaterc` contains screen-size keys and a serialized Qt main-wi
 
 ## Validation
 
-`scripts/check-dolphin` verifies the exact three-theme Colloid set, active Colloid-Dark theme, Dolphin-only qtengine wrapper, launcher/default-directory routing, double-click behavior, Swappy image handlers and the `Super+E` target. A missing first-run Information-panel marker is a warning rather than a fatal error when restore was performed without a user D-Bus session.
+`scripts/check-dolphin` verifies the preview backend packages, global preview state, exact three-theme Colloid set, active Colloid-Dark theme, Dolphin-only qtengine wrapper, launcher/default-directory routing, double-click behavior, Swappy image handlers and the `Super+E` target. A missing first-run Information-panel marker is a warning rather than a fatal error when restore was performed without a user D-Bus session.

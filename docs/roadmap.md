@@ -22,6 +22,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [ ] Fix the “5 строчками” issue after reproducing it on the clean profile.
 - [ ] Replace/customize the login screen.
 - [x] Standardize music on Spotify + Spicetify with a Caelestia-adaptive theme and managed launcher.
+- [x] Complete Dolphin preview UX: Information panel, global thumbnails and image/video/document preview backends.
 - [ ] Replace cursor and possibly icon theme after checking consistency with Caelestia/Darkly.
 - [ ] Add an OCR region hotkey: select area → OCR → clipboard (ukr/eng/rus).
 - [ ] Add explicit validation for every Caelestia UI patch after upstream updates.

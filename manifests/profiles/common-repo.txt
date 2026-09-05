@@ -12,6 +12,7 @@ curl
 dolphin
 easyeffects
 fastfetch
+ffmpegthumbs
 file-roller
 fish
 frameworkintegration
@@ -25,6 +26,8 @@ hyprpicker
 intel-media-driver
 intel-ucode
 jq
+kdegraphics-thumbnailers
+kimageformats
 kio-extras
 kitty
 less
@@ -48,6 +51,7 @@ playerctl
 polkit-gnome
 power-profiles-daemon
 python
+qt6-imageformats
 rebuild-detector
 ripgrep
 rsync

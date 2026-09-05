@@ -11,7 +11,8 @@ mkdir -p \
     "$HOME/.config" \
     "$HOME/.local/state" \
     "$HOME/.config/caelestia" \
-    "$HOME/.local/share/applications"
+    "$HOME/.local/share/applications" \
+    "$HOME/.local/share/dolphin/view_properties/global"
 CONFIG_DIR="$(bp_config_dir)"
 mkdir -p "$CONFIG_DIR"
 
@@ -73,10 +74,13 @@ PY
 # Reproduce the tested local Dolphin/KDE settings without copying transient
 # timestamps, machine-specific disk UUIDs or absolute home paths.
 kwriteconfig6 --file dolphinrc --group KDE --key SingleClick false
+kwriteconfig6 --file dolphinrc --group General --key GlobalViewProps true
+kwriteconfig6 --file dolphinrc --group General --key EnlargeSmallPreviews true
 kwriteconfig6 --file dolphinrc --group "KFileDialog Settings" --key "Places Icons Auto-resize" false
 kwriteconfig6 --file dolphinrc --group "KFileDialog Settings" --key "Places Icons Static Size" 16
 kwriteconfig6 --file dolphinrc --group MainWindow --key MenuBar Disabled
 kwriteconfig6 --file dolphinrc --group PlacesPanel --key IconSize 16
+kwriteconfig6 --file "$HOME/.local/share/dolphin/view_properties/global/.directory" --group Dolphin --key PreviewsShown true
 kwriteconfig6 --file kdeglobals --group KDE --key SingleClick false
 kwriteconfig6 --file kdeglobals --group Icons --key Theme Colloid-Dark
 kwriteconfig6 --file kiorc --group Confirmations --key ConfirmDelete true
@@ -211,4 +215,4 @@ else
     bp_ok "Dolphin Information panel already initialized"
 fi
 
-bp_ok "Dolphin configured: Colloid-Dark, adaptive folders, qtengine-only Dolphin style"
+bp_ok "Dolphin configured: Colloid-Dark, adaptive folders, previews, qtengine-only Dolphin style"
