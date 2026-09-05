@@ -24,6 +24,31 @@ for file in \
     [[ -f "$file" ]] && ok "${file#$HOME/}" || fail "missing: ${file#$HOME/}"
 done
 
+CAELESTIA_CLI="$HOME/.config/caelestia/cli.json"
+if python3 - "$CAELESTIA_CLI" <<'PY' >/dev/null 2>&1
+import json
+import sys
+from pathlib import Path
+
+p = Path(sys.argv[1])
+data = json.loads(p.read_text())
+spotify = data["toggles"]["music"]["spotify"]
+assert spotify.get("enable") is True
+assert spotify.get("command") == ["devos-spotify"]
+assert spotify.get("move") is True
+matches = spotify.get("match")
+assert isinstance(matches, list)
+assert {"class": "Spotify"} in matches
+assert {"initialTitle": "Spotify"} in matches
+assert {"initialTitle": "Spotify Free"} in matches
+assert all("initial_title" not in match for match in matches if isinstance(match, dict))
+PY
+then
+    ok "Caelestia music toggle uses current initialTitle schema"
+else
+    fail "Caelestia Spotify toggle schema or managed command differs"
+fi
+
 DESKTOP="$HOME/.local/share/applications/spotify-launcher.desktop"
 if grep -qx 'TryExec=devos-spotify' "$DESKTOP" 2>/dev/null \
     && grep -qx 'Exec=devos-spotify %U' "$DESKTOP" 2>/dev/null \
