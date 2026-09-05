@@ -10,7 +10,7 @@ printf '========================================\n'
 printf '       Spotify integration check\n'
 printf '========================================\n'
 
-for cmd in spotify-launcher spicetify devos-spotify; do
+for cmd in spotify-launcher spicetify devos-spotify flock; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
 
@@ -33,6 +33,13 @@ else
     fail "Spotify desktop entry is missing themed URI routing"
 fi
 
+MIME="$HOME/.config/mimeapps.list"
+if grep -qx 'x-scheme-handler/spotify=spotify-launcher.desktop' "$MIME" 2>/dev/null; then
+    ok "spotify: protocol defaults to managed themed launcher"
+else
+    fail "spotify: protocol default handler is not managed"
+fi
+
 LAUNCHER="$HOME/.local/bin/devos-spotify"
 if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" 2>/dev/null \
     && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$LAUNCHER" 2>/dev/null \
@@ -40,6 +47,14 @@ if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" 2>/dev/null \
     ok "themed launcher supports MPRIS + spotify-launcher URI fallback"
 else
     fail "themed launcher URI forwarding is incomplete"
+fi
+
+if grep -Fq 'spotify-wrapper.lock' "$LAUNCHER" 2>/dev/null \
+    && grep -Fq 'exec 9>"$LOCK"' "$LAUNCHER" 2>/dev/null \
+    && grep -Fq 'flock -n 9' "$LAUNCHER" 2>/dev/null; then
+    ok "single managed Spotify wrapper/watch process enforced"
+else
+    fail "Spotify single-instance watcher guard is incomplete"
 fi
 
 THEME="$HOME/.config/spicetify/Themes/devillionner-text"
