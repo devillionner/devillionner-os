@@ -131,6 +131,14 @@ else
     fail "Dolphin restore/check wiring is incomplete"
 fi
 
+RESTORE="$REPO/scripts/restore"
+if grep -Fq -- "--exclude='caelestia/hypr-vars.lua'" "$RESTORE" \
+    && grep -Fq -- "--exclude='caelestia/cli.json'" "$RESTORE"; then
+    ok "restore preserves merge-managed Caelestia overrides before configurators run"
+else
+    fail "restore may overwrite merge-managed Caelestia overrides"
+fi
+
 if python3 - "$REPO/scripts/lib/set-caelestia-file-explorer.py" <<'PY'
 import importlib.util
 import sys
