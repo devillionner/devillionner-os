@@ -11,6 +11,9 @@ msgstr "30 FPS — 1080p"
 msgid "60 FPS — 720p"
 msgstr "60 FPS — 720p"
 
+msgid "Low Latency — 720p 30 FPS / 5 Mbps"
+msgstr "低延遲 — 720p 30 FPS / 5 Mbps"
+
 msgid "Casting stopped"
 msgstr "投放已停止"
 
@@ -22,6 +25,9 @@ msgstr "正在連線至電視… • 1080p 30 FPS"
 
 msgid "Connecting to TV… • 720p 60 FPS"
 msgstr "正在連線至電視… • 720p 60 FPS"
+
+msgid "Connecting to TV… • Low Latency • 720p 30 FPS / 5 Mbps"
+msgstr "正在連線至電視… • 低延遲 • 720p 30 FPS / 5 Mbps"
 
 msgid "Off"
 msgstr "已關閉"
