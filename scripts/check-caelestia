@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -u
 
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
 OK=0; WARN=0; FAIL=0
 ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
 warn() { printf '  [WARN] %s\n' "$*"; WARN=$((WARN + 1)); }
@@ -64,7 +66,15 @@ else
     warn "caelestia CLI not found in PATH"
 fi
 
-printf '\nOK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
+printf '\n'
+if bash "$REPO/scripts/check-caelestia-patches"; then
+    ok "installed Caelestia package patches match Blueprint"
+else
+    fail "installed Caelestia package patches differ or upstream changed"
+fi
+
+printf '\n========================================\n'
+printf 'Caelestia summary: OK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
 if ((FAIL == 0)); then
     printf 'RESULT: PASS\n'
     exit 0
