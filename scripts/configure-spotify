@@ -41,18 +41,9 @@ dst.parent.mkdir(parents=True, exist_ok=True)
 dst.write_text(json.dumps(current, indent=4) + "\n")
 PY
 
-# Set Caelestia's media preference without replacing unrelated shell settings.
-python - "$HOME/.config/caelestia/shell.json" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-p = Path(sys.argv[1])
-if p.exists():
-    data = json.loads(p.read_text())
-    data.setdefault("services", {})["defaultPlayer"] = "Spotify"
-    p.write_text(json.dumps(data, indent=4) + "\n")
-PY
+# `services.defaultPlayer=Spotify` is part of the canonical Caelestia shell
+# policy and is now owned by scripts/configure-caelestia. Keep this integration
+# focused on Spotify-specific runtime/launcher state.
 
 # Make the managed desktop entry the actual spotify: protocol handler while
 # preserving every unrelated MIME/browser association already present.

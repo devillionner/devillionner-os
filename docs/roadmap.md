@@ -5,6 +5,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 ## P0 — validate the new installer
 
 - [x] Add repository-level CI for Bash syntax, JSON syntax, manifest duplicates and core restore/check wiring.
+- [x] Merge-manage Caelestia `shell.json` and validate the common idle/app policy without overwriting unrelated local settings.
 - [ ] Fresh **Gaming** install in KVM.
 - [ ] Fresh **Work** install in KVM.
 - [ ] Fresh **Laboratory** install in KVM (virtualization enabled by default).
@@ -70,6 +71,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [x] Recovery-point behavior documented.
 - [x] Hardware-aware audio behavior documented.
 - [x] Helper commands documented.
+- [x] Caelestia shell policy documented.
 - [x] Adaptive Spotify integration documented.
 - [x] Repository CI / source-integrity validation documented.
 - [ ] Add screenshots only after the clean-install UI is stable.

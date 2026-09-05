@@ -26,6 +26,8 @@ All three profiles use **Dolphin** as the single file manager with the **Colloid
 
 All three profiles also include **Spotify + Spicetify** with the `devillionner-text` theme. Its colors are generated from the active Caelestia/Hypr Material palette, update when the wallpaper palette changes, and use the same `0.95` compositor opacity as Dolphin in normal and fullscreen modes. `Super+M` opens the managed Spotify launcher.
 
+Caelestia's `shell.json` is merge-managed rather than blindly replaced. Blueprint owns the common app defaults and idle policy (lock at 30 min, display off at 35 min, suspend/hibernate at 60 min) while preserving unrelated local Caelestia settings.
+
 Virtualization is a reusable feature, not hard-wired to one profile. Work or Gaming can enable the same KVM/libvirt/virt-manager stack during install or with:
 
 ```bash
@@ -45,6 +47,7 @@ On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbo
 - A pre-restore Btrfs/Snapper recovery point is created before package/system changes.
 - The scripts never repartition disks or touch Windows partitions.
 - GitHub pull requests run a repository-integrity check before changes reach `main`.
+- Merge-managed Caelestia config refuses malformed existing JSON instead of silently overwriting it.
 
 Recommended validation order:
 
@@ -58,6 +61,8 @@ Recommended validation order:
 ```bash
 bash scripts/check-repo
 bash scripts/check
+bash scripts/configure-caelestia
+bash scripts/check-caelestia
 bash scripts/check-dolphin
 bash scripts/check-spotify
 bash scripts/check-tv-cast
@@ -68,6 +73,7 @@ devos-vm
 See:
 
 - [Profiles and hardware behavior](docs/profiles.md)
+- [Caelestia shell policy](docs/caelestia.md)
 - [Dolphin file manager](docs/dolphin.md)
 - [Adaptive Spotify](docs/spotify.md)
 - [TV Cast / Miracast](docs/tv-cast.md)
@@ -80,6 +86,7 @@ See:
 
 - Kitty is the single default terminal. Alacritty/Ptyxis are not part of the active profile manifests.
 - Dolphin is the single default file manager; Thunar is not part of the active manifests.
+- Caelestia `shell.json` is merge-managed so Blueprint-owned defaults can be updated without deleting unrelated user settings.
 - Spotify uses the official Arch `spotify-launcher` plus Spicetify, with a pinned upstream `text` layout and Blueprint-owned adaptive Caelestia colors.
 - Normal desktop translucency remains `0.95` in fullscreen; explicitly opaque apps and games opt out at `1.0`.
 - Colloid-Dark is the common icon theme. Papirus is no longer declared by the Blueprint just to theme the file manager.

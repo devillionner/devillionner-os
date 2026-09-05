@@ -10,15 +10,40 @@
         "showOnHover": true
     },
     "general": {
-        "showOverFullscreen": true,
+        "idle": {
+            "lockBeforeSleep": true,
+            "inhibitWhenAudio": true,
+            "inhibitWhenCharging": false,
+            "timeouts": [
+                {
+                    "timeout": 1800,
+                    "idleAction": "lock"
+                },
+                {
+                    "timeout": 2100,
+                    "idleAction": "dpms off",
+                    "returnAction": "dpms on"
+                },
+                {
+                    "timeout": 3600,
+                    "idleAction": [
+                        "suspendThenHibernate"
+                    ]
+                }
+            ]
+        },
         "apps": {
+            "explorer": [
+                "dolphin"
+            ],
             "playback": [
                 "clapper"
             ],
             "terminal": [
                 "kitty"
             ]
-        }
+        },
+        "showOverFullscreen": true
     },
     "services": {
         "brightnessIncrement": 0.05,
