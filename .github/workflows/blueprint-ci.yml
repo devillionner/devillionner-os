@@ -24,6 +24,9 @@ jobs:
       - name: Validate runtime aggregate contract
         run: bash scripts/check-runtime-aggregate-source
 
+      - name: Validate Dolphin compact fileExplorer contract
+        run: bash scripts/check-dolphin-file-explorer-source
+
       - name: Validate Caelestia patch contract
         run: bash scripts/check-caelestia-patch-source
 
