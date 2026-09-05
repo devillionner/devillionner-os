@@ -26,6 +26,8 @@ All three profiles use **Dolphin** as the single file manager with the **Colloid
 
 All three profiles also include **Spotify + Spicetify** with the `devillionner-text` theme. Its colors are generated from the active Caelestia/Hypr Material palette, update when the wallpaper palette changes, and use the same `0.95` compositor opacity as Dolphin in normal and fullscreen modes. `Super+M` opens the managed Spotify launcher.
 
+The common cursor is **Bibata Modern Ice** at 24 px, managed across XCursor, GTK and session environment with an XCursor fallback for Hyprland/XWayland consumers.
+
 Caelestia's `shell.json` and `cli.json` are merge-managed rather than blindly replaced. Blueprint owns the common app/idle policy, Colloid-Dark CLI theme setting and Spotify toggle while preserving unrelated local Caelestia settings. The idle policy locks at 30 min, turns the display off at 35 min and suspends/hibernates at 60 min.
 
 Quickshell is ABI-checked after package reconciliation and restore. If `qs --version` fails or `rebuild-detector` flags `quickshell-git` after a Qt library update, Blueprint performs an intentional same-version-capable rebuild and validates the result before reporting success.
@@ -59,6 +61,8 @@ Recommended validation order:
 3. reserved physical test partition;
 4. only after all three pass, consider production use.
 
+The current evidence at each validation level is tracked explicitly in [Validation status](docs/validation-status.md).
+
 ## Useful commands
 
 ```bash
@@ -70,6 +74,7 @@ bash scripts/configure-caelestia-cli
 bash scripts/check-caelestia
 bash scripts/check-dolphin
 bash scripts/check-spotify
+bash scripts/check-cursor
 bash scripts/check-tv-cast
 bash scripts/audit-disk
 devos-vm
@@ -86,6 +91,7 @@ See:
 - [Virtual machines](docs/virtualization.md)
 - [Recovery points](docs/recovery.md)
 - [Tools and helper commands](docs/tools.md)
+- [Validation status](docs/validation-status.md)
 - [Roadmap](docs/roadmap.md)
 
 ## Current design decisions
@@ -95,7 +101,7 @@ See:
 - Caelestia `shell.json` and `cli.json` are merge-managed so Blueprint-owned defaults can be updated without deleting unrelated user settings.
 - Spotify uses the official Arch `spotify-launcher` plus Spicetify, with a pinned upstream `text` layout and Blueprint-owned adaptive Caelestia colors.
 - Normal desktop translucency remains `0.95` in fullscreen; explicitly opaque apps and games opt out at `1.0`.
-- Colloid-Dark is the common icon theme. Papirus is no longer declared by the Blueprint just to theme the file manager.
+- Bibata Modern Ice at 24 px is the common cursor; Colloid-Dark remains the common icon theme.
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
 - Quickshell runtime + shared-library ABI state are validated; stale Qt-linked builds are rebuilt without `--needed` and checked again afterward.
 - Caelestia fullscreen and `Env` compatibility patches are applied during restore and validated afterward.
