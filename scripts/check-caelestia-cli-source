@@ -69,7 +69,7 @@ with tempfile.TemporaryDirectory() as tmp_raw:
                 "spotify": {
                     "enable": False,
                     "command": ["spotify-launcher"],
-                    "customUserFlag": "replaced-with-managed-object",
+                    "customUserFlag": "keep",
                 }
             },
         },
@@ -86,7 +86,7 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     assert spotify["enable"] is True
     assert spotify["command"] == ["devos-spotify"]
     assert spotify["move"] is True
-    assert "customUserFlag" in spotify
+    assert spotify["customUserFlag"] == "keep"
 
     target = tmp / "managed-target.json"
     target.write_text('{"custom": 1}\n', encoding="utf-8")
@@ -119,14 +119,15 @@ grep -Fq -- "--exclude='caelestia/cli.json'" "$RESTORE" \
     || fail "restore does not exclude merge-managed cli.json from broad rsync"
 ok "restore routes cli.json through the safe single owner"
 
-# Dolphin and Spotify may mention the owner in comments, but must never write or
-# parse ~/.config/caelestia/cli.json themselves again.
-if grep -Fq '.config/caelestia/cli.json' "$DOLPHIN"; then
-    fail "configure-dolphin still directly accesses Caelestia cli.json"
-fi
-if grep -Fq '.config/caelestia/cli.json' "$SPOTIFY"; then
-    fail "configure-spotify still directly accesses Caelestia cli.json"
-fi
-ok "Dolphin and Spotify no longer mutate cli.json independently"
+# Dolphin and Spotify must use the central configurator when run standalone,
+# but must never parse or write ~/.config/caelestia/cli.json themselves.
+for component in "$DOLPHIN" "$SPOTIFY"; do
+    grep -Fq 'configure-caelestia-cli' "$component" \
+        || fail "${component#$REPO/} does not invoke the shared CLI owner"
+    if grep -Fq '.config/caelestia/cli.json' "$component"; then
+        fail "${component#$REPO/} still directly accesses Caelestia cli.json"
+    fi
+done
+ok "Dolphin and Spotify delegate cli.json ownership to the central configurator"
 
 printf '\nRESULT: PASS\n'
