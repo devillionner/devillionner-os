@@ -44,16 +44,19 @@ On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbo
 - Physical restore is currently allowed only on the reserved Blueprint test partition.
 - A pre-restore Btrfs/Snapper recovery point is created before package/system changes.
 - The scripts never repartition disks or touch Windows partitions.
+- GitHub pull requests run a repository-integrity check before changes reach `main`.
 
 Recommended validation order:
 
-1. fresh KVM VM;
-2. reserved physical test partition;
-3. only after both pass, consider production use.
+1. repository CI / `bash scripts/check-repo`;
+2. fresh KVM VM;
+3. reserved physical test partition;
+4. only after all three pass, consider production use.
 
 ## Useful commands
 
 ```bash
+bash scripts/check-repo
 bash scripts/check
 bash scripts/check-dolphin
 bash scripts/check-spotify
