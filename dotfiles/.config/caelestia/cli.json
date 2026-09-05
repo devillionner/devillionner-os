@@ -5,6 +5,7 @@
                 "enable": true,
                 "match": [
                     { "class": "Spotify" },
+                    { "class": "spotify" },
                     { "initialTitle": "Spotify" },
                     { "initialTitle": "Spotify Free" }
                 ],
