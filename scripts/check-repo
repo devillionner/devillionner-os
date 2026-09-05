@@ -31,6 +31,22 @@ while IFS= read -r -d '' file; do
 done < <(find "$REPO/scripts" "$REPO/dotfiles/.local/bin" "$REPO/components" -type f -print0 2>/dev/null)
 ((bash_checked > 0)) && ok "bash syntax ($bash_checked files)" || fail "no Bash files discovered"
 
+python_checked=0
+while IFS= read -r -d '' file; do
+    if python3 - "$file" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+compile(path.read_text(encoding="utf-8"), str(path), "exec")
+PY
+    then
+        python_checked=$((python_checked + 1))
+    else
+        fail "Python syntax: ${file#$REPO/}"
+    fi
+done < <(find "$REPO/scripts" -type f -name '*.py' -print0 2>/dev/null)
+((python_checked > 0)) && ok "Python syntax ($python_checked files)" || fail "no Python helper files discovered"
+
 if python3 - "$REPO" <<'PY'
 import json
 import sys
@@ -86,6 +102,7 @@ fi
 required_paths=(
     scripts/configure-dolphin
     scripts/check-dolphin
+    scripts/lib/set-caelestia-file-explorer.py
     scripts/configure-spotify
     scripts/check-spotify
     scripts/configure-tv-cast
@@ -113,12 +130,65 @@ else
     fail "Dolphin restore/check wiring is incomplete"
 fi
 
-DOLPHIN_CONFIG="$REPO/scripts/configure-dolphin"
-if grep -Fq 'dst.write_text(updated' "$DOLPHIN_CONFIG" \
-    && ! grep -Fq 'rm -f -- "$HYPR_VARS_DST"' "$DOLPHIN_CONFIG"; then
-    ok "Dolphin preserves unrelated Caelestia hypr-vars overrides"
+if python3 - "$REPO/scripts/lib/set-caelestia-file-explorer.py" <<'PY'
+import importlib.util
+import sys
+import tempfile
+from pathlib import Path
+
+helper = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("caelestia_vars", helper)
+module = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory() as tmp_raw:
+    tmp = Path(tmp_raw)
+    canonical = tmp / "canonical.lua"
+    canonical.write_text('return {\n    fileExplorer = "/usr/local/bin/devos-dolphin",\n}\n')
+
+    # Existing unrelated overrides survive while an old file manager is replaced.
+    custom = tmp / "custom.lua"
+    custom.write_text(
+        'return {\n'
+        '    browser = "helium",\n'
+        '    fileExplorer = "thunar", -- user comment\n'
+        '    windowRounding = 17,\n'
+        '}\n'
+    )
+    module.update_file(canonical, custom)
+    text = custom.read_text()
+    assert 'browser = "helium"' in text
+    assert 'windowRounding = 17' in text
+    assert '-- user comment' in text
+    assert text.count("fileExplorer") == 1
+    assert 'fileExplorer = "/usr/local/bin/devos-dolphin"' in text
+
+    # Existing symlinks are followed, not replaced.
+    target = tmp / "managed-target.lua"
+    target.write_text('return {\n    terminal = "kitty",\n}\n')
+    link = tmp / "hypr-vars.lua"
+    link.symlink_to(target)
+    module.update_file(canonical, link)
+    assert link.is_symlink()
+    target_text = target.read_text()
+    assert 'terminal = "kitty"' in target_text
+    assert target_text.count("fileExplorer") == 1
+    assert 'fileExplorer = "/usr/local/bin/devos-dolphin"' in target_text
+
+    # An upstream format change must fail safely instead of creating duplicates.
+    unfamiliar = 'return {\n    fileExplorer = function() return "dolphin" end,\n}\n'
+    try:
+        module.update_text(unfamiliar)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unfamiliar fileExplorer format was not rejected")
+PY
+then
+    ok "Dolphin Caelestia override updater preserves custom data and symlinks"
 else
-    fail "Dolphin Caelestia override handling became destructive"
+    fail "Dolphin Caelestia override updater behavior"
 fi
 
 SPOTIFY_BOOTSTRAP="$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap"
