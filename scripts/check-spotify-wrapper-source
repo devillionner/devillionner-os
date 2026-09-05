@@ -6,6 +6,7 @@ CONFIG="$REPO/scripts/configure-spotify"
 CHECK="$REPO/scripts/check-spotify"
 DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
 CLI="$REPO/dotfiles/.config/caelestia/cli.json"
+SYNC="$REPO/dotfiles/.local/bin/devos-spotify-theme-sync"
 
 FAIL=0
 OK=0
@@ -46,6 +47,35 @@ data = json.loads(p.read_text(encoding="utf-8"))
 assert data["toggles"]["music"]["spotify"]["command"] == ["devos-spotify"]
 PY
 ok "Caelestia toggle uses the same PATH-resolved command"
+
+# Reproduce the physical-host palette format with GNU awk and require a silent
+# parse. The old /[\",]/ expression produced one warning per palette key even
+# though the generated colors were otherwise correct.
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$TMP/hypr/scheme"
+cat > "$TMP/hypr/scheme/current.lua" <<'EOF'
+primary = "112233",
+surface = "223344",
+surfaceContainer = "334455",
+surfaceContainerHigh = "445566",
+onSurface = "556677",
+onSurfaceVariant = "667788",
+outlineVariant = "778899",
+secondary = "8899aa",
+error = "99aabb",
+EOF
+ERR="$TMP/stderr"
+if XDG_CONFIG_HOME="$TMP" bash "$SYNC" 2>"$ERR" \
+    && [[ ! -s "$ERR" ]] \
+    && grep -Fqx 'accent             = 112233' "$TMP/spicetify/Themes/devillionner-text/color.ini" \
+    && grep -Fqx 'main               = 223344' "$TMP/spicetify/Themes/devillionner-text/color.ini" \
+    && grep -Fqx 'notification-error = 99aabb' "$TMP/spicetify/Themes/devillionner-text/color.ini"; then
+    ok "palette parser is warning-free and preserves Caelestia colors"
+else
+    [[ -s "$ERR" ]] && cat "$ERR" >&2
+    fail "Spotify palette parser emitted warnings or generated wrong colors"
+fi
 
 printf '\nOK: %d   FAIL: %d\n' "$OK" "$FAIL"
 if ((FAIL == 0)); then
