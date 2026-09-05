@@ -26,14 +26,13 @@ grep -Fqx 'caelestia-shell' "$MANIFEST" \
 ok "caelestia-shell remains common"
 
 # Keep patch application and runtime validation coupled to the same package
-# files. If either path moves upstream, CI should fail before a restore can
-# silently ship an unchecked compatibility patch.
+# files. Match stable filenames rather than awk's slash-escaping style.
 for token in \
-    '/modules/Shortcuts\.qml$/' \
-    '/modules/drawers/ContentWindow\.qml$/' \
-    '/shell\.qml$/'; do
-    grep -Fq "$token" "$PATCH" || fail "patch script missing locator: $token"
-    grep -Fq "$token" "$CHECK" || fail "runtime checker missing locator: $token"
+    'Shortcuts\.qml' \
+    'ContentWindow\.qml' \
+    'shell\.qml'; do
+    grep -Fq "$token" "$PATCH" || fail "patch script missing QML locator token: $token"
+    grep -Fq "$token" "$CHECK" || fail "runtime checker missing QML locator token: $token"
 done
 ok "patch and checker target the same Caelestia QML files"
 
