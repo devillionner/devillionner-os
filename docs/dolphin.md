@@ -29,6 +29,8 @@ The Blueprint therefore installs `/usr/local/bin/devos-dolphin`, which sets `QT_
 
 `configure-dolphin` owns only the `fileExplorer` key in `~/.config/caelestia/hypr-vars.lua`. It preserves unrelated Caelestia/user overrides and follows an existing symlink instead of deleting the whole override file. Validation requires exactly one `fileExplorer` entry and that entry must target the Blueprint wrapper.
 
+The restore rsync deliberately excludes `caelestia/hypr-vars.lua` and `caelestia/cli.json`. Those files are merge-managed by the Dolphin/Spotify configurators, so an existing custom override survives a full restore instead of being overwritten before the safe merge runs.
+
 No fixed selection colour is written. The adaptive Caelestia palette remains the source of colours, so changing wallpaper can continue to retint Colloid folders normally.
 
 Upstream context: Darkly issue #316 documents the Dolphin/QStyle focus/highlight compatibility problem.

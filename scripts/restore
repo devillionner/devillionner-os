@@ -125,7 +125,14 @@ done
 
 bp_info "Restoring dotfiles"
 mkdir -p "$HOME/.config" "$HOME/.local"
-rsync -a "$REPO/dotfiles/.config/" "$HOME/.config/"
+# These two Caelestia files are merge-managed by the Dolphin/Spotify
+# configurators. Copying them blindly here would destroy unrelated user or
+# upstream overrides before those configurators had a chance to preserve them.
+CONFIG_RSYNC_EXCLUDES=(
+    --exclude='caelestia/hypr-vars.lua'
+    --exclude='caelestia/cli.json'
+)
+rsync -a "${CONFIG_RSYNC_EXCLUDES[@]}" "$REPO/dotfiles/.config/" "$HOME/.config/"
 rsync -a "$REPO/dotfiles/.local/" "$HOME/.local/"
 find "$HOME/.local/bin" -maxdepth 1 -type f -exec chmod +x {} + 2>/dev/null || true
 
@@ -238,7 +245,7 @@ if [[ "$VALIDATION_PASS" == true ]]; then
     printf "\n========================================\n"
     printf "RESTORE COMPLETED\n"
     printf "Profile: %s\n" "$PROFILE"
-    printf "Features: %s\n" "${FEATURES[*]:-none}"
+printf "Features: %s\n" "${FEATURES[*]:-none}"
     printf "Validation: PASS\n"
     printf "========================================\n"
 else
