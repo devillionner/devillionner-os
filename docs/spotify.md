@@ -8,6 +8,8 @@ The UI starts from Spicetify's upstream `text` theme, pinned to commit `3f55a370
 
 The Blueprint does not copy 43PR's static Monochrome palette. Only the text-theme layout language is retained.
 
+The generated theme cache tracks two revisions independently: the pinned upstream commit and the SHA-256 fingerprint of Blueprint-owned `devillionner-overrides.css`. If either changes, `user.css` is rebuilt automatically. This prevents a Blueprint UI update from being skipped merely because the upstream Spicetify theme pin stayed the same.
+
 ## Caelestia colors
 
 `devos-spotify-theme-sync` reads `~/.config/hypr/scheme/current.lua`, the same Material palette consumed by the Hyprland/Caelestia configuration, and generates `[Devillionner]` in Spicetify `color.ini`.
@@ -37,6 +39,8 @@ This avoids stacking CSS alpha on top of compositor alpha, which would make Spot
 Spicetify requires Spotify to create `~/.config/spotify/prefs`. On a fresh system, the first `devos-spotify` launch opens vanilla Spotify. Sign in and leave it open for about a minute, then close and reopen. From the second launch onward `spicetify auto` handles backup/re-apply after Spotify updates and launches the adaptive theme.
 
 `Super+M` uses `devos-spotify` through Caelestia's music toggle configuration. The user desktop entry also shadows the stock `spotify-launcher.desktop`, so normal app-launcher starts use the same path.
+
+`check-spotify` verifies both generated-theme revision markers, so a stale Blueprint CSS layer is reported as a failure rather than silently looking different from the repository state.
 
 Validate with:
 

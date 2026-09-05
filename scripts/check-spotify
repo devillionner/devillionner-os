@@ -25,8 +25,34 @@ for file in \
 done
 
 THEME="$HOME/.config/spicetify/Themes/devillionner-text"
-[[ -f "$THEME/user.css" ]] && ok "pinned text-theme CSS bootstrapped" || warn "theme CSS not bootstrapped yet"
+OVERRIDES="$HOME/.config/spicetify/devillionner-overrides.css"
+if [[ -f "$THEME/user.css" ]]; then
+    ok "pinned text-theme CSS bootstrapped"
+else
+    fail "theme CSS not bootstrapped"
+fi
+
 grep -q '^\[Devillionner\]$' "$THEME/color.ini" 2>/dev/null && ok "adaptive color scheme generated" || fail "adaptive color.ini missing"
+
+if command -v sha256sum >/dev/null 2>&1 \
+    && [[ -f "$OVERRIDES" && -f "$THEME/overrides-sha256" ]]; then
+    EXPECTED_HASH="$(sha256sum "$OVERRIDES" | awk '{print $1}')"
+    STORED_HASH="$(cat "$THEME/overrides-sha256" 2>/dev/null || true)"
+    if [[ "$EXPECTED_HASH" == "$STORED_HASH" ]]; then
+        ok "latest Blueprint Spotify overrides are applied"
+    else
+        fail "generated Spotify CSS is stale; rerun configure-spotify or devos-spotify"
+    fi
+else
+    fail "Spotify override fingerprint missing"
+fi
+
+if [[ -f "$THEME/upstream-revision" ]] \
+    && grep -qx '3f55a3702bd6d87799dc97023e0fe2b11d88c704' "$THEME/upstream-revision"; then
+    ok "pinned upstream text-theme revision recorded"
+else
+    fail "upstream Spotify theme revision marker missing or unexpected"
+fi
 
 systemctl --user is-enabled devos-spotify-theme.path >/dev/null 2>&1 && ok "palette watcher enabled" || fail "palette watcher not enabled"
 

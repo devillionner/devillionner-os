@@ -27,18 +27,13 @@ sudo install -Dm755 \
     /usr/local/bin/devos-dolphin
 
 # Keep the standalone configurator useful after an incremental git pull too.
-# A full restore already rsyncs this file, but configure-dolphin may be run on
-# its own while validating an existing Blueprint installation. Caelestia may
-# replace this managed file with a symlink, so remove a file/symlink first;
-# never recursively delete an unexpected directory at this path.
-HYPR_VARS_DST="$HOME/.config/caelestia/hypr-vars.lua"
-if [[ -d "$HYPR_VARS_DST" && ! -L "$HYPR_VARS_DST" ]]; then
-    bp_die "Expected a file at $HYPR_VARS_DST, found a directory"
-fi
-rm -f -- "$HYPR_VARS_DST"
-install -Dm644 \
+# A full restore already rsyncs the canonical file, while an existing Caelestia
+# installation may turn hypr-vars.lua into a symlink or add unrelated user
+# overrides. Own only fileExplorer and preserve everything else.
+python3 \
+    "$REPO/scripts/lib/set-caelestia-file-explorer.py" \
     "$REPO/dotfiles/.config/caelestia/hypr-vars.lua" \
-    "$HYPR_VARS_DST"
+    "$HOME/.config/caelestia/hypr-vars.lua"
 
 # Shadow Dolphin's system desktop file so application-menu launches and folder
 # opens also use the Dolphin-only qtengine wrapper. Preserve upstream actions

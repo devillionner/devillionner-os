@@ -6,14 +6,11 @@ CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-text"
 OVERRIDES="$CONFIG_HOME/spicetify/devillionner-overrides.css"
 REVISION="$THEME_DIR/upstream-revision"
+OVERRIDES_REVISION="$THEME_DIR/overrides-sha256"
 CSS="$THEME_DIR/user.css"
 URL="https://raw.githubusercontent.com/spicetify/spicetify-themes/$PIN/text/user.css"
 
 mkdir -p "$THEME_DIR"
-
-if [[ -f "$CSS" && -f "$REVISION" && "$(cat "$REVISION")" == "$PIN" ]]; then
-    exit 0
-fi
 
 [[ -f "$OVERRIDES" ]] || {
     printf 'devos-spotify: missing overrides: %s\n' "$OVERRIDES" >&2
@@ -23,6 +20,19 @@ command -v curl >/dev/null 2>&1 || {
     printf 'devos-spotify: curl is required to bootstrap the theme\n' >&2
     exit 1
 }
+command -v sha256sum >/dev/null 2>&1 || {
+    printf 'devos-spotify: sha256sum is required to track Blueprint theme changes\n' >&2
+    exit 1
+}
+
+overrides_hash="$(sha256sum "$OVERRIDES" | awk '{print $1}')"
+if [[ -f "$CSS" \
+    && -f "$REVISION" \
+    && -f "$OVERRIDES_REVISION" \
+    && "$(cat "$REVISION")" == "$PIN" \
+    && "$(cat "$OVERRIDES_REVISION")" == "$overrides_hash" ]]; then
+    exit 0
+fi
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp" "$tmp.clean" "$tmp.final"' EXIT
@@ -37,5 +47,9 @@ sed '/^[[:space:]]*@import url(/d' "$tmp" > "$tmp.clean"
     cat "$OVERRIDES"
 } > "$tmp.final"
 
+# Build completely in temporary files first, then replace the generated CSS.
+# The two revision markers make both upstream changes and Blueprint-owned CSS
+# changes invalidate the cache independently.
 cat "$tmp.final" > "$CSS"
 printf '%s\n' "$PIN" > "$REVISION"
+printf '%s\n' "$overrides_hash" > "$OVERRIDES_REVISION"

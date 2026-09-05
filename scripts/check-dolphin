@@ -98,10 +98,14 @@ for mime in image/jpeg image/png image/webp; do
         || fail "$mime is not assigned to Swappy"
 done
 
-grep -Eq 'fileExplorer[[:space:]]*=[[:space:]]*"/usr/local/bin/devos-dolphin"' \
-    "$HOME/.config/caelestia/hypr-vars.lua" 2>/dev/null \
-    && ok "Super+E application target: Dolphin qtengine wrapper" \
-    || fail "Hyprland fileExplorer override is not the Dolphin wrapper"
+HYPR_VARS="$HOME/.config/caelestia/hypr-vars.lua"
+FILE_EXPLORER_COUNT="$(grep -Ec '^[[:space:]]*fileExplorer[[:space:]]*=' "$HYPR_VARS" 2>/dev/null || true)"
+if [[ "$FILE_EXPLORER_COUNT" == "1" ]] \
+    && grep -Eq '^[[:space:]]*fileExplorer[[:space:]]*=[[:space:]]*"/usr/local/bin/devos-dolphin"[[:space:]]*,?[[:space:]]*(--.*)?$' "$HYPR_VARS" 2>/dev/null; then
+    ok "Super+E application target: one Dolphin qtengine wrapper override"
+else
+    fail "Hyprland fileExplorer must be exactly one Dolphin wrapper override (found: ${FILE_EXPLORER_COUNT:-0})"
+fi
 
 python3 - <<'PY' >/dev/null 2>&1
 import json
