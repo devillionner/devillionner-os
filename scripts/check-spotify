@@ -39,23 +39,33 @@ assert spotify.get("move") is True
 matches = spotify.get("match")
 assert isinstance(matches, list)
 assert {"class": "Spotify"} in matches
+assert {"class": "spotify"} in matches
 assert {"initialTitle": "Spotify"} in matches
 assert {"initialTitle": "Spotify Free"} in matches
 assert all("initial_title" not in match for match in matches if isinstance(match, dict))
 PY
 then
-    ok "Caelestia music toggle uses current initialTitle schema"
+    ok "Caelestia music toggle matches Spotify class/title variants"
 else
-    fail "Caelestia Spotify toggle schema or managed command differs"
+    fail "Caelestia Spotify toggle schema, identity aliases or managed command differs"
+fi
+
+HYPR_RULES="$HOME/.config/hypr/hyprland/rules.lua"
+if grep -Fq '"Spotify|spotify"' "$HYPR_RULES" 2>/dev/null \
+    && grep -Fq '"Spotify|Spotify Free"' "$HYPR_RULES" 2>/dev/null; then
+    ok "Hyprland music workspace matches Spotify class/title variants"
+else
+    fail "Hyprland Spotify music-workspace identity rules differ"
 fi
 
 DESKTOP="$HOME/.local/share/applications/spotify-launcher.desktop"
 if grep -qx 'TryExec=devos-spotify' "$DESKTOP" 2>/dev/null \
     && grep -qx 'Exec=devos-spotify %U' "$DESKTOP" 2>/dev/null \
-    && grep -qx 'MimeType=x-scheme-handler/spotify;' "$DESKTOP" 2>/dev/null; then
-    ok "Spotify desktop entry preserves spotify: URI handling"
+    && grep -qx 'MimeType=x-scheme-handler/spotify;' "$DESKTOP" 2>/dev/null \
+    && grep -qx 'StartupWMClass=spotify' "$DESKTOP" 2>/dev/null; then
+    ok "Spotify desktop entry preserves URI and lowercase WM class identity"
 else
-    fail "Spotify desktop entry is missing themed URI routing"
+    fail "Spotify desktop entry is missing themed URI/WM-class routing"
 fi
 
 MIME="$HOME/.config/mimeapps.list"
