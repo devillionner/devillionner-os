@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -u
+
+OK=0; WARN=0; FAIL=0
+ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
+warn() { printf '  [WARN] %s\n' "$*"; WARN=$((WARN + 1)); }
+fail() { printf '  [FAIL] %s\n' "$*"; FAIL=$((FAIL + 1)); }
+
+printf '========================================\n'
+printf '       Caelestia shell check\n'
+printf '========================================\n'
+
+SHELL_JSON="$HOME/.config/caelestia/shell.json"
+
+if [[ -f "$SHELL_JSON" ]]; then
+    ok "shell.json exists"
+else
+    fail "shell.json missing"
+fi
+
+if python3 - "$SHELL_JSON" <<'PY' >/dev/null 2>&1
+import json
+import sys
+from pathlib import Path
+
+p = Path(sys.argv[1])
+data = json.loads(p.read_text(encoding="utf-8"))
+
+assert data["appearance"]["transparency"]["enabled"] is True
+assert data["dashboard"]["enabled"] is True
+assert data["dashboard"]["showDashboard"] is True
+assert data["dashboard"]["showOnHover"] is True
+
+general = data["general"]
+assert general["showOverFullscreen"] is True
+assert general["apps"]["explorer"] == ["dolphin"]
+assert general["apps"]["playback"] == ["clapper"]
+assert general["apps"]["terminal"] == ["kitty"]
+
+idle = general["idle"]
+assert idle["lockBeforeSleep"] is True
+assert idle["inhibitWhenAudio"] is True
+assert idle["inhibitWhenCharging"] is False
+assert idle["timeouts"] == [
+    {"timeout": 1800, "idleAction": "lock"},
+    {"timeout": 2100, "idleAction": "dpms off", "returnAction": "dpms on"},
+    {"timeout": 3600, "idleAction": ["suspendThenHibernate"]},
+]
+
+assert data["services"]["brightnessIncrement"] == 0.05
+assert data["services"]["defaultPlayer"] == "Spotify"
+assert data["utilities"]["toasts"]["nowPlaying"] is False
+assert data["utilities"]["toasts"]["fullscreen"] == "all"
+PY
+then
+    ok "managed Caelestia shell settings match Blueprint"
+else
+    fail "shell.json is invalid or managed values differ"
+fi
+
+if command -v caelestia >/dev/null 2>&1; then
+    ok "caelestia CLI available"
+else
+    warn "caelestia CLI not found in PATH"
+fi
+
+printf '\nOK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then
+    printf 'RESULT: PASS\n'
+    exit 0
+fi
+printf 'RESULT: FAIL\n'
+exit 1
