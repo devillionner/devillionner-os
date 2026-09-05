@@ -174,7 +174,9 @@ done
 
 quickshell_needs_abi_rebuild() {
     command -v checkrebuild >/dev/null 2>&1 || return 1
-    checkrebuild 2>/dev/null | awk '$NF == "quickshell-git" { found = 1 } END { exit !found }'
+    local output
+    output="$(checkrebuild 2>/dev/null || true)"
+    grep -Eq '(^|[[:space:]])quickshell-git([[:space:]]|$)' <<< "$output"
 }
 
 if [[ "$NEED_QS" == true ]]; then
