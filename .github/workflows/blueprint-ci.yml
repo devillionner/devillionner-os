@@ -21,6 +21,9 @@ jobs:
       - name: Validate documentation links
         run: bash scripts/check-doc-links
 
+      - name: Validate runtime aggregate contract
+        run: bash scripts/check-runtime-aggregate-source
+
       - name: Validate Caelestia patch contract
         run: bash scripts/check-caelestia-patch-source
 

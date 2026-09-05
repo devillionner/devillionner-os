@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+CHECK="$REPO/scripts/check"
+RESTORE="$REPO/scripts/restore"
+
+fail() {
+    printf 'Runtime aggregate contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+[[ -f "$CHECK" ]] || fail "scripts/check missing"
+[[ -f "$RESTORE" ]] || fail "scripts/restore missing"
+
+grep -Fq 'FEATURES=("tvcast")' "$CHECK" \
+    || fail "scripts/check must treat TV Cast as a mandatory shared feature"
+grep -Fq 'tvcast|virtualization)' "$CHECK" \
+    || fail "scripts/check must restore known feature state"
+
+for component in check-quickshell check-caelestia check-dolphin check-spotify check-tv-cast; do
+    grep -Fq "\$REPO/scripts/$component" "$CHECK" \
+        || fail "scripts/check does not aggregate $component"
+done
+
+grep -Fq '"$REPO/scripts/check" --profile "$PROFILE"' "$RESTORE" \
+    || fail "restore does not use the aggregate runtime check"
+
+for component in check-quickshell check-caelestia check-dolphin check-spotify check-tv-cast; do
+    if grep -Fq "\$REPO/scripts/$component" "$RESTORE"; then
+        fail "restore still duplicates $component instead of delegating to scripts/check"
+    fi
+done
+
+printf 'Runtime aggregate contract: PASS\n'

@@ -4,6 +4,7 @@ set -Eeuo pipefail
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 RECONCILE="$REPO/scripts/reconcile-packages"
 RUNTIME_CHECK="$REPO/scripts/check-quickshell"
+MAIN_CHECK="$REPO/scripts/check"
 RESTORE="$REPO/scripts/restore"
 REPO_MANIFEST="$REPO/manifests/profiles/common-repo.txt"
 AUR_MANIFEST="$REPO/manifests/profiles/common-aur.txt"
@@ -17,7 +18,7 @@ ok() {
     printf '  [OK]   %s\n' "$*"
 }
 
-for file in "$RECONCILE" "$RUNTIME_CHECK" "$RESTORE" "$REPO_MANIFEST" "$AUR_MANIFEST"; do
+for file in "$RECONCILE" "$RUNTIME_CHECK" "$MAIN_CHECK" "$RESTORE" "$REPO_MANIFEST" "$AUR_MANIFEST"; do
     [[ -f "$file" ]] || fail "missing required file: ${file#$REPO/}"
 done
 ok "Quickshell rebuild contract files present"
@@ -58,8 +59,10 @@ for token in \
 done
 ok "runtime checker validates package, executable and ABI state"
 
-grep -Fq 'check-quickshell' "$RESTORE" \
-    || fail "restore does not include Quickshell runtime/ABI validation"
-ok "restore includes Quickshell runtime/ABI validation"
+grep -Fq '$REPO/scripts/check-quickshell' "$MAIN_CHECK" \
+    || fail "aggregate runtime check does not include Quickshell ABI validation"
+grep -Fq '"$REPO/scripts/check" --profile "$PROFILE"' "$RESTORE" \
+    || fail "restore does not delegate to aggregate runtime validation"
+ok "restore reaches Quickshell runtime/ABI validation through scripts/check"
 
 printf '\nRESULT: PASS\n'

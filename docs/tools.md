@@ -4,11 +4,21 @@
 
 ```bash
 bash scripts/check
-bash scripts/check-quickshell
-bash scripts/check-tv-cast
 ```
 
-The main check validates the selected profile, enabled features, core binaries, Quickshell runtime, Caelestia compatibility patches, keyboard mode, hardware/audio helper selection, services and Git state.
+This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, services and Git state. It then runs the dedicated Quickshell, Caelestia, Dolphin, Spotify and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
+
+Restore uses this exact same aggregate command, so the validation contract does not change between the end of installation and the recommended post-reboot check.
+
+For focused troubleshooting, the component validators remain available individually:
+
+```bash
+bash scripts/check-quickshell
+bash scripts/check-caelestia
+bash scripts/check-dolphin
+bash scripts/check-spotify
+bash scripts/check-tv-cast
+```
 
 The dedicated Quickshell check validates that `quickshell-git` is installed, `qs --version` succeeds and `rebuild-detector` does not report the package as linked against stale libraries.
 

@@ -15,13 +15,10 @@ if [[ -z "$PROFILE" ]]; then
 fi
 PROFILE="$(bp_normalize_profile "$PROFILE" 2>/dev/null || printf '%s' work)"
 
-FEATURES=()
-if [[ -f "$(bp_config_dir)/features" ]]; then
-    while IFS= read -r feature; do
-        case "$feature" in virtualization) FEATURES+=("$feature") ;; esac
-    done < "$(bp_config_dir)/features"
-fi
-
+# TV Cast is part of every Blueprint profile, not an optional state-derived
+# add-on. Keep the final validator aligned with restore even on older installs
+# whose feature-state file predates the shared-feature migration.
+FEATURES=("tvcast")
 feature_enabled() {
     local wanted="$1" feature
     for feature in "${FEATURES[@]}"; do
@@ -29,6 +26,21 @@ feature_enabled() {
     done
     return 1
 }
+add_feature() {
+    feature_enabled "$1" || FEATURES+=("$1")
+}
+
+FEATURE_STATE="$(bp_config_dir)/features"
+UNKNOWN_FEATURES=()
+if [[ -f "$FEATURE_STATE" ]]; then
+    while IFS= read -r feature; do
+        [[ -n "$feature" ]] || continue
+        case "$feature" in
+            tvcast|virtualization) add_feature "$feature" ;;
+            *) UNKNOWN_FEATURES+=("$feature") ;;
+        esac
+    done < "$FEATURE_STATE"
+fi
 
 VIRT="$(systemd-detect-virt 2>/dev/null || true)"
 IS_VM=false
@@ -39,6 +51,17 @@ ok() { printf "  [OK]   %s\n" "$*"; OK=$((OK + 1)); }
 warn() { printf "  [WARN] %s\n" "$*"; WARN=$((WARN + 1)); }
 fail() { printf "  [FAIL] %s\n" "$*"; FAIL=$((FAIL + 1)); }
 section() { printf "\n%s\n" "$1"; }
+
+run_component_check() {
+    local name="$1"
+    shift
+    printf "\n---- %s ----\n" "$name"
+    if "$@"; then
+        ok "$name runtime validation"
+    else
+        fail "$name runtime validation"
+    fi
+}
 
 printf "========================================\n"
 printf "       devillionner-os validation\n"
@@ -53,16 +76,22 @@ if bp_is_zenbook; then ok "ASUS UX3405CA"; elif [[ "$IS_VM" == true ]]; then ok 
 CHECKPOINT="$(cat "$(bp_state_dir)/last-checkpoint" 2>/dev/null || true)"
 [[ -n "$CHECKPOINT" ]] && ok "pre-restore recovery point recorded" || warn "no Blueprint recovery point record found"
 
-section "PROFILE"
+section "PROFILE / FEATURES"
 CONFIGURED="$(cat "$(bp_config_dir)/profile" 2>/dev/null || true)"
 [[ "$CONFIGURED" == "$PROFILE" ]] && ok "profile state: $PROFILE" || warn "profile state differs (${CONFIGURED:-unset})"
+if grep -qx 'tvcast' "$FEATURE_STATE" 2>/dev/null; then
+    ok "shared feature state: tvcast"
+else
+    warn "tvcast is mandatory but not recorded in feature state; validating it anyway"
+fi
+if ((${#UNKNOWN_FEATURES[@]})); then
+    warn "unknown feature state ignored: ${UNKNOWN_FEATURES[*]}"
+fi
 
 section "CORE"
-for cmd in fish fastfetch Hyprland easyeffects kitty git rsync wpctl qs; do
+for cmd in fish fastfetch Hyprland easyeffects kitty git rsync wpctl; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
-if qs --version >/tmp/devillionner-qs-version 2>&1; then ok "Quickshell runtime"; else fail "Quickshell runtime broken: $(tail -1 /tmp/devillionner-qs-version 2>/dev/null)"; fi
-rm -f /tmp/devillionner-qs-version
 
 section "SHELL"
 LOGIN_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
@@ -90,7 +119,9 @@ KEYBOARD_MODE="$(cat "$(bp_config_dir)/keyboard-mode" 2>/dev/null || true)"
 case "$KEYBOARD_MODE" in windows|mac|copilot) ok "layout switch mode: $KEYBOARD_MODE" ;; *) warn "layout switch mode missing" ;; esac
 
 section "DOTFILES"
-for dir in fish fastfetch hypr caelestia kitty; do [[ -d "$HOME/.config/$dir" ]] && ok "~/.config/$dir" || fail "~/.config/$dir missing"; done
+for dir in fish fastfetch hypr caelestia kitty; do
+    [[ -d "$HOME/.config/$dir" ]] && ok "~/.config/$dir" || fail "~/.config/$dir missing"
+done
 
 section "PACKAGES"
 mapfile -t REPO_PKGS < <(
@@ -101,7 +132,12 @@ mapfile -t REPO_PKGS < <(
     } | sort -u
 )
 REPO_MISSING=0
-for pkg in "${REPO_PKGS[@]}"; do pacman -Qq "$pkg" >/dev/null 2>&1 || { printf "         missing: %s\n" "$pkg"; REPO_MISSING=$((REPO_MISSING + 1)); }; done
+for pkg in "${REPO_PKGS[@]}"; do
+    pacman -Qq "$pkg" >/dev/null 2>&1 || {
+        printf "         missing: %s\n" "$pkg"
+        REPO_MISSING=$((REPO_MISSING + 1))
+    }
+done
 ((REPO_MISSING == 0)) && ok "repo packages ${#REPO_PKGS[@]}/${#REPO_PKGS[@]}" || fail "$REPO_MISSING repo package(s) missing"
 
 mapfile -t AUR_PKGS < <(
@@ -112,24 +148,15 @@ mapfile -t AUR_PKGS < <(
     } | sort -u
 )
 AUR_MISSING=0
-for pkg in "${AUR_PKGS[@]}"; do pacman -Qq "$pkg" >/dev/null 2>&1 || { printf "         missing: %s\n" "$pkg"; AUR_MISSING=$((AUR_MISSING + 1)); }; done
+for pkg in "${AUR_PKGS[@]}"; do
+    pacman -Qq "$pkg" >/dev/null 2>&1 || {
+        printf "         missing: %s\n" "$pkg"
+        AUR_MISSING=$((AUR_MISSING + 1))
+    }
+done
 ((AUR_MISSING == 0)) && ok "AUR/foreign packages ${#AUR_PKGS[@]}/${#AUR_PKGS[@]}" || fail "$AUR_MISSING AUR package(s) missing"
 
-section "CAELESTIA"
-SHELL_QML="/etc/xdg/quickshell/caelestia/shell.qml"
-if [[ -f "$SHELL_QML" ]]; then
-    ENV_MISSING=0
-    for name in QS_NO_RELOAD_POPUP QS_DROP_EXPENSIVE_FONTS QSG_RENDER_LOOP QT_QUICK_FLICKABLE_WHEEL_DECELERATION; do
-        grep -q "^//@ pragma Env $name=" "$SHELL_QML" || { printf "         missing Env pragma: %s\n" "$name"; ENV_MISSING=$((ENV_MISSING + 1)); }
-    done
-    ((ENV_MISSING == 0)) && ok "Caelestia runtime Env pragmas" || fail "$ENV_MISSING Caelestia Env pragma(s) missing"
-else
-    fail "Caelestia shell.qml missing"
-fi
-SHORTCUTS="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/Shortcuts\.qml$/ {print $2; exit}')"
-CONTENT="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/drawers\/ContentWindow\.qml$/ {print $2; exit}')"
-if [[ -n "$SHORTCUTS" ]] && ! grep -A7 'name: "sidebar"' "$SHORTCUTS" | grep -q 'if (root.hasFullscreen)'; then ok "fullscreen sidebar shortcut patch"; else fail "fullscreen sidebar shortcut patch missing"; fi
-if [[ -n "$CONTENT" ]] && grep -q 'mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions' "$CONTENT"; then ok "fullscreen sidebar input-mask patch"; else fail "fullscreen sidebar input-mask patch missing"; fi
+section "DESKTOP SESSION"
 if pgrep -af '(^|/)(qs|quickshell)([[:space:]].*)?-c[[:space:]]+caelestia|caelestia[[:space:]]+shell' >/dev/null 2>&1; then
     ok "Caelestia shell running"
 else
@@ -138,13 +165,20 @@ fi
 
 section "AUDIO"
 WP="$(wpctl status 2>/dev/null || true)"
-if [[ "$IS_VM" == true ]]; then warn "physical speaker check skipped in VM"; else grep -q "Speaker" <<< "$WP" && ok "PipeWire speaker sink" || warn "speaker sink not found by generic check"; fi
+if [[ "$IS_VM" == true ]]; then
+    warn "physical speaker check skipped in VM"
+else
+    grep -q "Speaker" <<< "$WP" && ok "PipeWire speaker sink" || warn "speaker sink not found by generic check"
+fi
 grep -q "WirePlumber" <<< "$WP" && ok "WirePlumber" || fail "WirePlumber not visible"
 if [[ "$HARDWARE" == "asus-zenbook-ux3405ca" ]]; then
     EE_OUT="$HOME/.local/share/easyeffects/output"
     PRESET_MISSING=0
     for preset in "Laptop.json" "Dolby Atmos.json" "Sony AutoEq Harman.json"; do
-        [[ -f "$EE_OUT/$preset" ]] || { printf "         missing preset: %s\n" "$preset"; PRESET_MISSING=$((PRESET_MISSING + 1)); }
+        [[ -f "$EE_OUT/$preset" ]] || {
+            printf "         missing preset: %s\n" "$preset"
+            PRESET_MISSING=$((PRESET_MISSING + 1))
+        }
     done
     ((PRESET_MISSING == 0)) && ok "Zenbook EasyEffects presets present" || warn "$PRESET_MISSING Zenbook EasyEffects preset(s) missing"
 else
@@ -153,7 +187,9 @@ fi
 
 if feature_enabled virtualization; then
     section "VIRTUALIZATION"
-    for cmd in virsh virt-manager qemu-system-x86_64; do command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"; done
+    for cmd in virsh virt-manager qemu-system-x86_64; do
+        command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
+    done
     systemctl is-enabled libvirtd.socket >/dev/null 2>&1 && ok "libvirtd.socket enabled" || fail "libvirtd.socket not enabled"
     [[ -x "$HOME/.local/bin/devos-vm" ]] && ok "devos-vm launcher" || fail "devos-vm launcher missing"
     if [[ -e /dev/kvm ]]; then
@@ -163,7 +199,20 @@ if feature_enabled virtualization; then
     else
         fail "/dev/kvm missing on physical virtualization host"
     fi
-    if virsh -c qemu:///system net-info default >/dev/null 2>&1; then ok "libvirt default network accessible"; else warn "libvirt network will be rechecked after relogin (libvirt group membership may be new)"; fi
+    if virsh -c qemu:///system net-info default >/dev/null 2>&1; then
+        ok "libvirt default network accessible"
+    else
+        warn "libvirt network will be rechecked after relogin (libvirt group membership may be new)"
+    fi
+fi
+
+section "COMPONENT RUNTIME CHECKS"
+run_component_check "Quickshell" bash "$REPO/scripts/check-quickshell"
+run_component_check "Caelestia" bash "$REPO/scripts/check-caelestia"
+run_component_check "Dolphin" bash "$REPO/scripts/check-dolphin"
+run_component_check "Spotify" bash "$REPO/scripts/check-spotify"
+if feature_enabled tvcast; then
+    run_component_check "TV Cast" bash "$REPO/scripts/check-tv-cast"
 fi
 
 section "BLUEPRINT"
@@ -172,5 +221,9 @@ git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1 && ok "Git reposi
 
 printf "\n========================================\n"
 printf "OK: %d   WARN: %d   FAIL: %d\n" "$OK" "$WARN" "$FAIL"
-if ((FAIL == 0)); then printf "RESULT: PASS\n"; exit 0; fi
-printf "RESULT: FAIL\n"; exit 1
+if ((FAIL == 0)); then
+    printf "RESULT: PASS\n"
+    exit 0
+fi
+printf "RESULT: FAIL\n"
+exit 1

@@ -7,6 +7,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [x] Add repository-level CI for Bash syntax, JSON syntax, manifest duplicates and core restore/check wiring.
 - [x] Merge-manage Caelestia `shell.json` and validate the common idle/app policy without overwriting unrelated local settings.
 - [x] Detect and automatically rebuild stale `quickshell-git` after Qt ABI changes, with `rebuild-detector` + runtime validation.
+- [x] Make `bash scripts/check` the single full runtime contract used both by restore and post-reboot validation.
 - [ ] Fresh **Gaming** install in KVM.
 - [ ] Fresh **Work** install in KVM.
 - [ ] Fresh **Laboratory** install in KVM (virtualization enabled by default).
