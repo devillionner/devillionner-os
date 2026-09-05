@@ -24,6 +24,24 @@ for file in \
     [[ -f "$file" ]] && ok "${file#$HOME/}" || fail "missing: ${file#$HOME/}"
 done
 
+DESKTOP="$HOME/.local/share/applications/spotify-launcher.desktop"
+if grep -qx 'TryExec=devos-spotify' "$DESKTOP" 2>/dev/null \
+    && grep -qx 'Exec=devos-spotify %U' "$DESKTOP" 2>/dev/null \
+    && grep -qx 'MimeType=x-scheme-handler/spotify;' "$DESKTOP" 2>/dev/null; then
+    ok "Spotify desktop entry preserves spotify: URI handling"
+else
+    fail "Spotify desktop entry is missing themed URI routing"
+fi
+
+LAUNCHER="$HOME/.local/bin/devos-spotify"
+if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" 2>/dev/null \
+    && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$LAUNCHER" 2>/dev/null \
+    && grep -Fq 'spotify-launcher --skip-update "$SPOTIFY_URI"' "$LAUNCHER" 2>/dev/null; then
+    ok "themed launcher supports MPRIS + spotify-launcher URI fallback"
+else
+    fail "themed launcher URI forwarding is incomplete"
+fi
+
 THEME="$HOME/.config/spicetify/Themes/devillionner-text"
 OVERRIDES="$HOME/.config/spicetify/devillionner-overrides.css"
 if [[ -f "$THEME/user.css" ]]; then
