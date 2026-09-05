@@ -4,6 +4,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 
 ## P0 — validate the new installer
 
+- [x] Add repository-level CI for Bash syntax, JSON syntax, manifest duplicates and core restore/check wiring.
 - [ ] Fresh **Gaming** install in KVM.
 - [ ] Fresh **Work** install in KVM.
 - [ ] Fresh **Laboratory** install in KVM (virtualization enabled by default).
@@ -20,7 +21,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [ ] Tasks on the top menu.
 - [ ] Fix the “5 строчками” issue after reproducing it on the clean profile.
 - [ ] Replace/customize the login screen.
-- [ ] Choose a better/stylish audio player if it improves the current setup.
+- [x] Standardize music on Spotify + Spicetify with a Caelestia-adaptive theme and managed launcher.
 - [ ] Replace cursor and possibly icon theme after checking consistency with Caelestia/Darkly.
 - [ ] Add an OCR region hotkey: select area → OCR → clipboard (ukr/eng/rus).
 - [ ] Add explicit validation for every Caelestia UI patch after upstream updates.
@@ -68,4 +69,6 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [x] Recovery-point behavior documented.
 - [x] Hardware-aware audio behavior documented.
 - [x] Helper commands documented.
+- [x] Adaptive Spotify integration documented.
+- [x] Repository CI / source-integrity validation documented.
 - [ ] Add screenshots only after the clean-install UI is stable.
