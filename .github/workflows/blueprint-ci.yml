@@ -18,6 +18,9 @@ jobs:
       - name: Validate Blueprint repository
         run: bash scripts/check-repo
 
+      - name: Validate documentation links
+        run: bash scripts/check-doc-links
+
       - name: Validate Caelestia patch contract
         run: bash scripts/check-caelestia-patch-source
 

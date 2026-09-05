@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+python3 - "$REPO" <<'PY'
+import re
+import sys
+from pathlib import Path
+from urllib.parse import unquote
+
+root = Path(sys.argv[1]).resolve()
+markdown_files = []
+readme = root / "README.md"
+if readme.exists():
+    markdown_files.append(readme)
+docs = root / "docs"
+if docs.exists():
+    markdown_files.extend(sorted(docs.rglob("*.md")))
+
+# Standard inline Markdown links/images. External URLs and in-document anchors
+# are intentionally ignored; this check owns only repository-local targets.
+link_re = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+# Blueprint docs also often mention repository-root documentation paths as code,
+# e.g. `docs/tv-cast.md`. Validate those too so stale prose references cannot
+# bypass the normal Markdown-link checker.
+code_doc_re = re.compile(r"`(docs/[A-Za-z0-9._/-]+\.md(?:#[A-Za-z0-9._-]+)?)`")
+errors = []
+checked = 0
+seen = set()
+
+
+def validate_target(source: Path, destination: str, *, root_relative: bool = False) -> None:
+    global checked
+
+    destination = destination.split("#", 1)[0].split("?", 1)[0]
+    if not destination:
+        return
+    destination = unquote(destination)
+
+    path = Path(destination)
+    if path.is_absolute():
+        # Absolute paths are website/runtime paths, not repository files.
+        return
+
+    target = ((root if root_relative else source.parent) / path).resolve()
+    key = (source, target)
+    if key in seen:
+        return
+    seen.add(key)
+
+    try:
+        target.relative_to(root)
+    except ValueError:
+        errors.append(
+            f"{source.relative_to(root)}: local link escapes repository: {destination}"
+        )
+        return
+
+    checked += 1
+    if not target.exists():
+        errors.append(
+            f"{source.relative_to(root)}: missing local link target: {destination}"
+        )
+
+
+for source in markdown_files:
+    text = source.read_text(encoding="utf-8")
+
+    for match in link_re.finditer(text):
+        raw = match.group(1).strip()
+        if not raw:
+            continue
+        if raw.startswith("<") and ">" in raw:
+            destination = raw[1:raw.index(">")]
+        else:
+            # Optional Markdown link titles follow the destination after
+            # whitespace; Blueprint local paths intentionally contain no spaces.
+            destination = raw.split(maxsplit=1)[0]
+
+        lower = destination.lower()
+        if lower.startswith(("http://", "https://", "mailto:", "tel:", "data:")):
+            continue
+        if destination.startswith("#"):
+            continue
+
+        validate_target(source, destination)
+
+    for match in code_doc_re.finditer(text):
+        validate_target(source, match.group(1), root_relative=True)
+
+if errors:
+    print("Documentation link errors:", file=sys.stderr)
+    for error in errors:
+        print(f"  - {error}", file=sys.stderr)
+    raise SystemExit(1)
+
+print(f"Documentation local links: PASS ({checked} checked across {len(markdown_files)} Markdown files)")
+PY

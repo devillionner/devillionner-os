@@ -62,7 +62,3 @@ caelestia shell -d
 ```
 
 A Qt private-ABI update can leave `quickshell-git` installed but stale. Package reconciliation checks both `qs --version` and `checkrebuild`; if either indicates a broken/stale Quickshell build, Blueprint rebuilds the current AUR package without `--needed` and verifies the ABI state again. See `docs/quickshell.md`.
-
-## YouTube Music
-
-YouTube Music is intentionally manual for now. See `docs/youtube-music.md`.
