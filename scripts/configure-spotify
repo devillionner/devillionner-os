@@ -54,6 +54,30 @@ if p.exists():
     p.write_text(json.dumps(data, indent=4) + "\n")
 PY
 
+# Make the managed desktop entry the actual spotify: protocol handler while
+# preserving every unrelated MIME/browser association already present.
+python - "$HOME/.config/mimeapps.list" <<'PY'
+from configparser import RawConfigParser
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+cfg = RawConfigParser(interpolation=None, strict=False)
+cfg.optionxform = str
+if path.exists():
+    cfg.read(path, encoding="utf-8")
+if not cfg.has_section("Default Applications"):
+    cfg.add_section("Default Applications")
+cfg.set(
+    "Default Applications",
+    "x-scheme-handler/spotify",
+    "spotify-launcher.desktop",
+)
+path.parent.mkdir(parents=True, exist_ok=True)
+with path.open("w", encoding="utf-8") as handle:
+    cfg.write(handle, space_around_delimiters=False)
+PY
+
 # Keep Dolphin and Spotify at the Blueprint's normal 0.95 compositor opacity in
 # fullscreen as well; install the canonical rules file containing that policy.
 install -Dm644 "$REPO/dotfiles/.config/hypr/hyprland/rules.lua" "$HOME/.config/hypr/hyprland/rules.lua"
@@ -75,4 +99,4 @@ fi
 if [[ ! -f "$HOME/.config/spotify/prefs" ]]; then
     bp_warn "Spotify needs one normal first launch/login (~60 seconds) before Spicetify can apply."
 fi
-bp_ok "Spotify integration ready: Caelestia-adaptive palette, live recolor and persistent 0.95 fullscreen opacity"
+bp_ok "Spotify integration ready: Caelestia-adaptive palette, live recolor, spotify: links and persistent 0.95 fullscreen opacity"
