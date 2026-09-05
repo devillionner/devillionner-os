@@ -3,6 +3,13 @@ source /usr/local/lib/cast-tv-i18n
 
 MODE="$1"
 
+case "$MODE" in
+    30) MODE_LABEL="$TXT_30" ;;
+    60) MODE_LABEL="$TXT_60" ;;
+    low) MODE_LABEL="$TXT_LOW" ;;
+    *) exit 1 ;;
+esac
+
 for _ in $(seq 1 240); do
     INFO=$(/usr/local/bin/cast-tv-status 2>/dev/null || echo "off|")
 
@@ -14,7 +21,7 @@ for _ in $(seq 1 240); do
             --app-name="TV Cast" \
             --icon=video-display \
             "TV Cast" \
-            "$TXT_CONNECTED_NOTIFICATION • ${MODE} FPS"
+            "$TXT_CONNECTED_NOTIFICATION • $MODE_LABEL"
         exit 0
     fi
 
