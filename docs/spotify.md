@@ -34,13 +34,19 @@ Actual window transparency belongs to Hyprland, not the Spotify CSS. Spotify the
 
 This avoids stacking CSS alpha on top of compositor alpha, which would make Spotify more transparent than Dolphin.
 
+## Desktop integration and links
+
+The Blueprint shadows the stock `spotify-launcher.desktop`, but preserves the upstream desktop contract: `%U`, `TryExec` and `x-scheme-handler/spotify` remain present and route through `devos-spotify` instead of bypassing the adaptive theme.
+
+When a `spotify:` URI is opened while Spotify is already running, `devos-spotify` first uses the standard MPRIS `OpenUri` method so it does not unnecessarily re-run Spicetify or disturb the existing client. If MPRIS is unavailable, it falls back to `spotify-launcher`'s native positional URI support. The same native URI support is preserved on the first vanilla launch before Spotify has generated its prefs.
+
 ## First launch
 
 Spicetify requires Spotify to create `~/.config/spotify/prefs`. On a fresh system, the first `devos-spotify` launch opens vanilla Spotify. Sign in and leave it open for about a minute, then close and reopen. From the second launch onward `spicetify auto` handles backup/re-apply after Spotify updates and launches the adaptive theme.
 
-`Super+M` uses `devos-spotify` through Caelestia's music toggle configuration. The user desktop entry also shadows the stock `spotify-launcher.desktop`, so normal app-launcher starts use the same path.
+`Super+M` uses `devos-spotify` through Caelestia's music toggle configuration. Normal app-launcher starts and `spotify:` links use that same managed path.
 
-`check-spotify` verifies both generated-theme revision markers, so a stale Blueprint CSS layer is reported as a failure rather than silently looking different from the repository state.
+`check-spotify` verifies the desktop URI contract, themed launcher routing and both generated-theme revision markers, so a stale or partially bypassed Spotify integration is reported as a failure rather than silently behaving differently from the repository state.
 
 Validate with:
 
