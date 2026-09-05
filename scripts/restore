@@ -59,7 +59,7 @@ done
 [[ -n "$TARGET" ]] || bp_die "Target is required (--vm or --test-partition)."
 
 printf "========================================\n"
-printf "       devillionner-os restore v0.5\n"
+printf "       devillionner-os restore v0.6\n"
 printf "========================================\n"
 
 grep -Eq '^ID="?cachyos"?$' /etc/os-release 2>/dev/null \
@@ -152,6 +152,9 @@ if [[ -f "$REPO/scripts/configure-helium" ]]; then
     fi
 fi
 
+bp_info "Configuring adaptive Spotify integration"
+"$REPO/scripts/configure-spotify"
+
 if feature_enabled tvcast; then
     "$REPO/scripts/configure-tv-cast"
 fi
@@ -220,6 +223,10 @@ if ! "$REPO/scripts/check" --profile "$PROFILE"; then
 fi
 
 if ! "$REPO/scripts/check-dolphin"; then
+    VALIDATION_PASS=false
+fi
+
+if ! "$REPO/scripts/check-spotify"; then
     VALIDATION_PASS=false
 fi
 
