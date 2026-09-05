@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG="$REPO/scripts/configure-spotify"
+CHECK="$REPO/scripts/check-spotify"
+DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
+CLI="$REPO/dotfiles/.config/caelestia/cli.json"
+
+FAIL=0
+OK=0
+ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
+fail() { printf '  [FAIL] %s\n' "$*" >&2; FAIL=$((FAIL + 1)); }
+
+printf '========================================\n'
+printf '    Spotify wrapper path source check\n'
+printf '========================================\n'
+
+if grep -Fq 'sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" /usr/local/bin/devos-spotify' "$CONFIG" \
+    && grep -Fq 'ln -sfn /usr/local/bin/devos-spotify "$HOME/.local/bin/devos-spotify"' "$CONFIG"; then
+    ok "canonical wrapper is system-visible with a user-local migration shim"
+else
+    fail "Spotify wrapper install path contract differs"
+fi
+
+if grep -Fq 'SYSTEM_LAUNCHER="/usr/local/bin/devos-spotify"' "$CHECK" \
+    && grep -Fq 'user-local Spotify shim points to system wrapper' "$CHECK"; then
+    ok "runtime check validates canonical wrapper + shadow prevention"
+else
+    fail "Spotify runtime check does not validate wrapper path contract"
+fi
+
+if grep -Fqx 'TryExec=devos-spotify' "$DESKTOP" \
+    && grep -Fqx 'Exec=devos-spotify %U' "$DESKTOP"; then
+    ok "desktop entry resolves wrapper through normal PATH"
+else
+    fail "Spotify desktop entry launcher contract differs"
+fi
+
+python3 - "$CLI" <<'PY'
+import json
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+data = json.loads(p.read_text(encoding="utf-8"))
+assert data["toggles"]["music"]["spotify"]["command"] == ["devos-spotify"]
+PY
+ok "Caelestia toggle uses the same PATH-resolved command"
+
+printf '\nOK: %d   FAIL: %d\n' "$OK" "$FAIL"
+if ((FAIL == 0)); then
+    printf 'RESULT: PASS\n'
+    exit 0
+fi
+printf 'RESULT: FAIL\n'
+exit 1

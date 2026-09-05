@@ -30,6 +30,9 @@ jobs:
       - name: Validate Dolphin global preview contract
         run: bash scripts/check-dolphin-global-view-source
 
+      - name: Validate Spotify wrapper path contract
+        run: bash scripts/check-spotify-wrapper-source
+
       - name: Validate Caelestia patch contract
         run: bash scripts/check-caelestia-patch-source
 
