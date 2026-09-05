@@ -136,11 +136,11 @@ tagged_rule(xwl_popup_tag, {
 tagged_rule(system_monitor_tag, { "btop" }, "class")
 tagged_rule(music_player_tag, {
     "feishin|Supersonic|Plexamp", -- Self hosted
-    "Spotify",                    -- Spotify
+    "Spotify|spotify",            -- Spotify class differs across client/window modes
     "Cider",                      -- Apple music
 }, "class")
 tagged_rule(music_player_tag, {
-    "Spotify|Spotify Free" -- Spotify wayland, it has no class for some reason
+    "Spotify|Spotify Free" -- Spotify wayland may expose no useful class
 }, "initial_title")
 tagged_rule(communication_app_tag, {
     "discord|equibop|vesktop", -- Discord clients
