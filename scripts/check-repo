@@ -109,6 +109,7 @@ required_paths=(
     scripts/check-tv-cast
     dotfiles/.local/bin/devos-spotify
     dotfiles/.local/bin/devos-spotify-theme-bootstrap
+    dotfiles/.local/share/applications/spotify-launcher.desktop
     dotfiles/.config/systemd/user/devos-spotify-theme.path
 )
 for path in "${required_paths[@]}"; do
@@ -147,7 +148,6 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     canonical = tmp / "canonical.lua"
     canonical.write_text('return {\n    fileExplorer = "/usr/local/bin/devos-dolphin",\n}\n')
 
-    # Existing unrelated overrides survive while an old file manager is replaced.
     custom = tmp / "custom.lua"
     custom.write_text(
         'return {\n'
@@ -164,7 +164,6 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     assert text.count("fileExplorer") == 1
     assert 'fileExplorer = "/usr/local/bin/devos-dolphin"' in text
 
-    # Existing symlinks are followed, not replaced.
     target = tmp / "managed-target.lua"
     target.write_text('return {\n    terminal = "kitty",\n}\n')
     link = tmp / "hypr-vars.lua"
@@ -176,7 +175,6 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     assert target_text.count("fileExplorer") == 1
     assert 'fileExplorer = "/usr/local/bin/devos-dolphin"' in target_text
 
-    # An upstream format change must fail safely instead of creating duplicates.
     unfamiliar = 'return {\n    fileExplorer = function() return "dolphin" end,\n}\n'
     try:
         module.update_text(unfamiliar)
@@ -198,6 +196,18 @@ if grep -Fq 'overrides-sha256' "$SPOTIFY_BOOTSTRAP" \
     ok "Spotify theme cache tracks Blueprint override revisions"
 else
     fail "Spotify theme override fingerprinting is incomplete"
+fi
+
+SPOTIFY_DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
+SPOTIFY_LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"
+if grep -Fqx 'TryExec=devos-spotify' "$SPOTIFY_DESKTOP" \
+    && grep -Fqx 'Exec=devos-spotify %U' "$SPOTIFY_DESKTOP" \
+    && grep -Fqx 'MimeType=x-scheme-handler/spotify;' "$SPOTIFY_DESKTOP" \
+    && grep -Fq 'org.mpris.MediaPlayer2.Player' "$SPOTIFY_LAUNCHER" \
+    && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$SPOTIFY_LAUNCHER"; then
+    ok "Spotify desktop contract routes spotify: URIs through themed launcher"
+else
+    fail "Spotify desktop URI integration is incomplete"
 fi
 
 if grep -Fq 'FEATURES=("tvcast")' "$REPO/scripts/restore" \
