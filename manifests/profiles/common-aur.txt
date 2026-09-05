@@ -1,4 +1,5 @@
 # Caelestia / Hyprland desktop
+bibata-cursor-theme-bin
 caelestia-cli
 caelestia-shell
 darkly
