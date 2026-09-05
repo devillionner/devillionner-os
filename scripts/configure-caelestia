@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+command -v python3 >/dev/null 2>&1 || bp_die "python3 is required to configure Caelestia"
+
+SRC="$REPO/dotfiles/.config/caelestia/shell.json"
+DST="$HOME/.config/caelestia/shell.json"
+
+bp_info "Merging Blueprint-owned Caelestia shell settings"
+python3 "$REPO/scripts/lib/merge-caelestia-shell.py" "$SRC" "$DST"
+
+bp_ok "Caelestia shell config merged safely"
+bp_info "Idle policy: lock 30 min, display off 35 min, suspend/hibernate 60 min"
