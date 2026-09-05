@@ -31,10 +31,12 @@ TXT_CONNECTED="$(_ "Connected")"
 
 TXT_30="$(_ "30 FPS — 1080p")"
 TXT_60="$(_ "60 FPS — 720p")"
+TXT_LOW="$(_ "Low Latency — 720p 30 FPS / 5 Mbps")"
 TXT_STOP="$(_ "Stop casting")"
 
 TXT_CONNECTING_30="$(_ "Connecting to TV… • 1080p 30 FPS")"
 TXT_CONNECTING_60="$(_ "Connecting to TV… • 720p 60 FPS")"
+TXT_CONNECTING_LOW="$(_ "Connecting to TV… • Low Latency • 720p 30 FPS / 5 Mbps")"
 
 TXT_CONNECTED_NOTIFICATION="$(_ "TV connected")"
 TXT_STOPPED_NOTIFICATION="$(_ "Casting stopped")"

@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MENU="$REPO/components/tv-cast/bin/cast-tv-menu"
+START="$REPO/components/tv-cast/bin/cast-tv-start"
+WAIT="$REPO/components/tv-cast/bin/cast-tv-wait-connected"
+WORKER="$REPO/components/tv-cast/lib/cast-tv-worker"
+I18N="$REPO/components/tv-cast/lib/cast-tv-i18n"
+LOCALE_DIR="$REPO/components/tv-cast/locale"
+RUNTIME_CHECK="$REPO/scripts/check-tv-cast"
+DOC="$REPO/docs/tv-cast.md"
+README="$REPO/README.md"
+
+fail() {
+    printf 'TV Cast source contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+for file in "$MENU" "$START" "$WAIT" "$WORKER" "$I18N" "$RUNTIME_CHECK" "$DOC" "$README"; do
+    [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
+done
+
+for script in "$MENU" "$START" "$WAIT" "$WORKER" "$I18N" "$RUNTIME_CHECK"; do
+    bash -n "$script" || fail "bash syntax: ${script#$REPO/}"
+done
+
+python3 - "$WORKER" "$START" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+worker = Path(sys.argv[1]).read_text(encoding="utf-8")
+start = Path(sys.argv[2]).read_text(encoding="utf-8")
+
+branches = re.findall(r"^\s*(30|60|low|\*)\)\s*$", worker, re.M)
+if branches != ["60", "low", "30", "*"]:
+    raise SystemExit(f"unexpected worker mode branches: {branches}")
+
+if "30|60|low) ;;" not in start:
+    raise SystemExit("cast-tv-start does not expose the canonical 30|60|low branch")
+if re.search(r"^\s*(?:quality|smooth|latency|90|120)\)", start, re.M):
+    raise SystemExit("cast-tv-start exposes an unexpected extra mode")
+
+def block(mode: str) -> str:
+    match = re.search(rf"^\s*{re.escape(mode)}\)\s*$([\s\S]*?)^\s*;;\s*$", worker, re.M)
+    if not match:
+        raise SystemExit(f"missing {mode} mode block")
+    return match.group(1)
+
+expected = {
+    "30": ('FPS=30', 'RES="1920x1080"', 'BITRATE="8M"'),
+    "60": ('FPS=60', 'RES="1280x720"', 'BITRATE="8M"'),
+    "low": ('FPS=30', 'RES="1280x720"', 'BITRATE="5M"'),
+}
+for mode, markers in expected.items():
+    current = block(mode)
+    for marker in markers:
+        if marker not in current:
+            raise SystemExit(f"{mode} missing {marker}")
+PY
+
+[[ "$(grep -Fc '/usr/local/bin/cast-tv-start 30' "$MENU")" == "1" ]] \
+    || fail "30 FPS menu action count differs"
+[[ "$(grep -Fc '/usr/local/bin/cast-tv-start 60' "$MENU")" == "1" ]] \
+    || fail "60 FPS menu action count differs"
+[[ "$(grep -Fc '/usr/local/bin/cast-tv-start low' "$MENU")" == "1" ]] \
+    || fail "Low Latency menu action count differs"
+
+grep -Fq 'TXT_LOW=' "$I18N" \
+    && grep -Fq 'Low Latency — 720p 30 FPS / 5 Mbps' "$I18N" \
+    && grep -Fq 'TXT_CONNECTING_LOW=' "$I18N" \
+    || fail "Low Latency localization keys missing"
+
+LOCALE_COUNT=0
+while IFS= read -r po; do
+    LOCALE_COUNT=$((LOCALE_COUNT + 1))
+    grep -Fq 'msgid "Low Latency — 720p 30 FPS / 5 Mbps"' "$po" \
+        || fail "missing Low Latency label translation in ${po#$REPO/}"
+    grep -Fq 'msgid "Connecting to TV… • Low Latency • 720p 30 FPS / 5 Mbps"' "$po" \
+        || fail "missing Low Latency connection translation in ${po#$REPO/}"
+done < <(find "$LOCALE_DIR" -maxdepth 1 -type f -name '*.po' | sort)
+((LOCALE_COUNT > 0)) || fail "no TV Cast locale catalogs found"
+
+grep -Fq 'Low Latency mode = 1280x720 / 30 FPS / 5 Mbps' "$RUNTIME_CHECK" \
+    || fail "runtime check does not validate Low Latency mode"
+
+grep -Fq 'Low Latency' "$DOC" \
+    || fail "TV Cast docs do not describe Low Latency mode"
+grep -Fq 'Low Latency' "$README" \
+    || fail "README does not describe Low Latency mode"
+
+printf 'TV Cast source contract: PASS (%d locale catalogs)\n' "$LOCALE_COUNT"

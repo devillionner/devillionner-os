@@ -22,12 +22,19 @@ INFO=$(/usr/local/bin/cast-tv-status 2>/dev/null || echo "off|")
 STATE="${INFO%%|*}"
 MODE="${INFO#*|}"
 
+case "$MODE" in
+    30) MODE_LABEL="$TXT_30" ;;
+    60) MODE_LABEL="$TXT_60" ;;
+    low) MODE_LABEL="$TXT_LOW" ;;
+    *) MODE_LABEL="" ;;
+esac
+
 case "$STATE" in
     connected)
-        HEADER="● $TXT_CONNECTED • ${MODE} FPS"
+        HEADER="● $TXT_CONNECTED${MODE_LABEL:+ • $MODE_LABEL}"
         ;;
     searching)
-        HEADER="◌ $TXT_SEARCHING • ${MODE} FPS"
+        HEADER="◌ $TXT_SEARCHING${MODE_LABEL:+ • $MODE_LABEL}"
         ;;
     *)
         HEADER="○ $TXT_OFF"
@@ -46,6 +53,12 @@ else
     MODE60="○  $TXT_60"
 fi
 
+if [ "$MODE" = "low" ] && [ "$STATE" != "off" ]; then
+    MODELOW="●  $TXT_LOW"
+else
+    MODELOW="○  $TXT_LOW"
+fi
+
 OUT="$(mktemp "$RUNTIME/cast-tv-menu.XXXXXX")"
 THEME_CONFIG="$(/usr/local/lib/cast-tv-fuzzel-theme 2>/dev/null || printf '%s' "$HOME/.config/fuzzel/tvcast.ini")"
 
@@ -54,9 +67,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-printf "%s\n%s\n%s\n" \
+printf "%s\n%s\n%s\n%s\n" \
     "$MODE30" \
     "$MODE60" \
+    "$MODELOW" \
     "⏹  $TXT_STOP" |
 fuzzel \
     --config="$THEME_CONFIG" \
@@ -102,6 +116,19 @@ case "$CHOICE" in
         /usr/local/bin/cast-tv-start 60
 
         nohup /usr/local/bin/cast-tv-wait-connected 60 \
+            >/dev/null 2>&1 &
+        ;;
+
+    *"$TXT_LOW")
+        notify-send \
+            --app-name="TV Cast" \
+            --icon=video-display \
+            "TV Cast" \
+            "$TXT_CONNECTING_LOW"
+
+        /usr/local/bin/cast-tv-start low
+
+        nohup /usr/local/bin/cast-tv-wait-connected low \
             >/dev/null 2>&1 &
         ;;
 

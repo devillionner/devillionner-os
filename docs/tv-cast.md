@@ -8,9 +8,10 @@ It mirrors the Hyprland display over **Wi-Fi Direct / Miracast (WFD)** using Flu
 
 1. Put the TV into Wireless Screen / Miracast mode.
 2. Press **Super+P** (the display/project hardware key on the ASUS Zenbook).
-3. Choose one of the two supported modes:
-   - **30 FPS — 1080p**
-   - **60 FPS — 720p**
+3. Choose one of the three supported modes:
+   - **30 FPS — 1080p** — quality mode, 8 Mbps
+   - **60 FPS — 720p** — smoothness mode, 8 Mbps
+   - **Low Latency — 720p 30 FPS / 5 Mbps** — minimum-latency mode
 4. Wait for the real WFD RTSP connection. The notification changes to connected only after TCP 7236 is established.
 5. Stop only with **Stop casting** in the menu.
 
@@ -22,9 +23,10 @@ Pressing Super+P again only closes/reopens the Fuzzel menu; it never toggles the
 - Casting runs in the background in tmux session `cast-tv`.
 - `systemd-inhibit` blocks sleep/idle/lid-switch only while the cast is active.
 - The laptop sink is muted during casting and its previous mute state is restored on stop.
-- Switching 30 ↔ 60 FPS tears down the previous WFD session before starting the new mode.
+- Switching between 30 FPS, 60 FPS and Low Latency tears down the previous WFD session before starting the new mode.
 - Connection status is based on an established RTSP TCP 7236 session, not merely on tmux or a NetworkManager profile.
 - TV scaling uses the tested `fast_bilinear` wf-recorder wrapper; the laptop's display mode is not changed.
+- The supported mode set is intentionally fixed at exactly three; new modes are not added without a new measured requirement.
 
 ## Localization
 
@@ -36,7 +38,7 @@ For a temporary translation test:
 TVCAST_LANG=ja /usr/local/bin/cast-tv-menu
 ```
 
-Source `.po` catalogs live in `components/tv-cast/locale/`; restore compiles them to `/usr/local/share/locale/.../tvcast.mo`.
+Source `.po` catalogs live in `components/tv-cast/locale/`; restore generates `.mo` catalogs with `msgfmt`.
 
 ## FluxCast upgrades
 
@@ -64,4 +66,4 @@ It does not disable the firewall or copy unrelated virtualization rules.
 bash scripts/check-tv-cast
 ```
 
-A VM can validate packages, files, syntax, bindings, catalogs and patch state, but an end-to-end WFD connection requires physical compatible Wi-Fi hardware and a Miracast TV.
+The runtime validator checks the exact three-mode contract in addition to packages, installed helper files, syntax, bindings, catalogs and FluxCast patch state. A VM can validate those static/runtime contracts, but an end-to-end WFD connection still requires physical compatible Wi-Fi hardware and a Miracast TV.

@@ -13,11 +13,18 @@ case "$MODE" in
         RES="1280x720"
         BITRATE="8M"
         ;;
-    *)
-        MODE=30
+    low)
+        FPS=30
+        RES="1280x720"
+        BITRATE="5M"
+        ;;
+    30)
         FPS=30
         RES="1920x1080"
-        BITRATE="6M"
+        BITRATE="8M"
+        ;;
+    *)
+        exit 1
         ;;
 esac
 
@@ -35,7 +42,7 @@ fi
 cleanup() {
     rm -f "$PROFILE"
 
-    # Під час 30 <-> 60 FPS звук не чіпаємо.
+    # Під час перемикання режимів звук не чіпаємо.
     if [ ! -f "$SWITCH" ]; then
         if [ -f "$STATE" ] && [ "$(cat "$STATE")" = "0" ]; then
             wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1 || true

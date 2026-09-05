@@ -11,6 +11,9 @@ msgstr "30 FPS — 1080p"
 msgid "60 FPS — 720p"
 msgstr "60 FPS — 720p"
 
+msgid "Low Latency — 720p 30 FPS / 5 Mbps"
+msgstr "저지연 — 720p 30 FPS / 5 Mbps"
+
 msgid "Casting stopped"
 msgstr "미러링이 중지됨"
 
@@ -22,6 +25,9 @@ msgstr "TV에 연결 중… • 1080p 30 FPS"
 
 msgid "Connecting to TV… • 720p 60 FPS"
 msgstr "TV에 연결 중… • 720p 60 FPS"
+
+msgid "Connecting to TV… • Low Latency • 720p 30 FPS / 5 Mbps"
+msgstr "TV에 연결 중… • 저지연 • 720p 30 FPS / 5 Mbps"
 
 msgid "Off"
 msgstr "꺼짐"

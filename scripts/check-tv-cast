@@ -79,14 +79,59 @@ else
 fi
 
 WORKER="/usr/local/lib/cast-tv-worker"
-WRAPPER="/usr/local/lib/cast-tv-bin/wf-recorder"
-grep -q 'RES="1920x1080"' "$WORKER" && grep -q 'FPS=30' "$WORKER" \
-    && ok "30 FPS = 1920x1080" || fail "30 FPS mode differs"
-grep -q 'RES="1280x720"' "$WORKER" && grep -q 'FPS=60' "$WORKER" \
-    && ok "60 FPS = 1280x720" || fail "60 FPS mode differs"
+START="/usr/local/bin/cast-tv-start"
+MENU="/usr/local/bin/cast-tv-menu"
+I18N="/usr/local/lib/cast-tv-i18n"
+
+mode_block() {
+    local mode="$1"
+    awk -v mode="$mode" '
+        $0 ~ "^[[:space:]]*" mode "\\)" {inside=1}
+        inside {print}
+        inside && $0 ~ "^[[:space:]]*;;" {exit}
+    ' "$WORKER"
+}
+
+MODE30_BLOCK="$(mode_block 30)"
+MODE60_BLOCK="$(mode_block 60)"
+MODELOW_BLOCK="$(mode_block low)"
+
+if grep -Fq 'FPS=30' <<<"$MODE30_BLOCK" \
+    && grep -Fq 'RES="1920x1080"' <<<"$MODE30_BLOCK" \
+    && grep -Fq 'BITRATE="8M"' <<<"$MODE30_BLOCK"; then
+    ok "30 FPS quality mode = 1920x1080 / 8 Mbps"
+else
+    fail "30 FPS quality mode differs"
+fi
+
+if grep -Fq 'FPS=60' <<<"$MODE60_BLOCK" \
+    && grep -Fq 'RES="1280x720"' <<<"$MODE60_BLOCK" \
+    && grep -Fq 'BITRATE="8M"' <<<"$MODE60_BLOCK"; then
+    ok "60 FPS smooth mode = 1280x720 / 8 Mbps"
+else
+    fail "60 FPS smooth mode differs"
+fi
+
+if grep -Fq 'FPS=30' <<<"$MODELOW_BLOCK" \
+    && grep -Fq 'RES="1280x720"' <<<"$MODELOW_BLOCK" \
+    && grep -Fq 'BITRATE="5M"' <<<"$MODELOW_BLOCK"; then
+    ok "Low Latency mode = 1280x720 / 30 FPS / 5 Mbps"
+else
+    fail "Low Latency mode differs"
+fi
+
+if grep -Fq '30|60|low)' "$START" \
+    && grep -Fq '/usr/local/bin/cast-tv-start low' "$MENU" \
+    && grep -Fq '$TXT_LOW' "$MENU" \
+    && grep -Fq 'TXT_LOW=' "$I18N"; then
+    ok "exact three-mode menu/start contract"
+else
+    fail "TV Cast menu/start does not expose exactly the final three modes"
+fi
+
 grep -q -- '--wfd-timeout 3' "$WORKER" \
     && ok "short WFD scan iterations" || fail "WFD timeout differs"
-grep -q 'flags=fast_bilinear' "$WRAPPER" \
+grep -q 'flags=fast_bilinear' /usr/local/lib/cast-tv-bin/wf-recorder \
     && ok "fast_bilinear cast scaling" || fail "fast_bilinear scaling missing"
 
 HYPR_USER="$HOME/.config/caelestia/hypr-user.lua"

@@ -6,7 +6,7 @@
 bash scripts/check
 ```
 
-This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, services and Git state. It then runs the dedicated Quickshell, Caelestia, Dolphin, Spotify and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
+This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, services and Git state. It then runs the dedicated Quickshell, Caelestia, Dolphin, Spotify, cursor and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
 
 Restore uses this exact same aggregate command, so the validation contract does not change between the end of installation and the recommended post-reboot check.
 
@@ -17,12 +17,13 @@ bash scripts/check-quickshell
 bash scripts/check-caelestia
 bash scripts/check-dolphin
 bash scripts/check-spotify
+bash scripts/check-cursor
 bash scripts/check-tv-cast
 ```
 
 The dedicated Quickshell check validates that `quickshell-git` is installed, `qs --version` succeeds and `rebuild-detector` does not report the package as linked against stale libraries.
 
-The TV Cast check validates Miracast dependencies, installed helper files, shell/Python syntax, FluxCast low-latency tuning, the two cast modes, `fast_bilinear`, gettext catalogs, UFW rules and the single persistent `Super+P` bind.
+The TV Cast check validates Miracast dependencies, installed helper files, shell/Python syntax, FluxCast low-latency tuning, the exact three-mode contract, `fast_bilinear`, gettext catalogs, UFW rules and the single persistent `Super+P` bind.
 
 ## Disk audit
 
@@ -39,9 +40,10 @@ The Work profile also installs Baobab for a visual disk-usage view.
 TV Cast is installed in Gaming, Work and Laboratory.
 
 ```text
-Super+P → TV Cast menu
-30 FPS  → 1080p
-60 FPS  → 720p
+Super+P     → TV Cast menu
+30 FPS      → 1080p / 8 Mbps (quality)
+60 FPS      → 720p / 8 Mbps (smoothness)
+Low Latency → 720p30 / 5 Mbps (minimum latency)
 ```
 
 See `docs/tv-cast.md` for WFD/Miracast behavior, localization, firewall rules and validation.

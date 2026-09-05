@@ -20,7 +20,7 @@ The installer asks for a profile:
 - **Work** — Helium, Telegram, calculator, scanner, disk analyzer and communication tools.
 - **Laboratory** — compilers, Python/Node tooling, GitHub CLI, debugging tools, VS Code, and **KVM/QEMU virtual machines by default**.
 
-**TV Cast / Miracast is a shared system feature and is installed in all three profiles.** Press `Super+P` to open its Fuzzel menu and choose 30 FPS / 1080p or 60 FPS / 720p.
+**TV Cast / Miracast is a shared system feature and is installed in all three profiles.** Press `Super+P` to open its Fuzzel menu and choose exactly one of the three Blueprint modes: **30 FPS / 1080p** for quality, **60 FPS / 720p** for smoothness, or **Low Latency / 720p30 / 5 Mbps** for minimum latency.
 
 All three profiles use **Dolphin** as the single file manager with the **Colloid-Dark** icon theme. `Super+E` opens Dolphin; JPEG, PNG and WEBP open in Swappy.
 
@@ -99,6 +99,6 @@ See:
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
 - Quickshell runtime + shared-library ABI state are validated; stale Qt-linked builds are rebuilt without `--needed` and checked again afterward.
 - Caelestia fullscreen and `Env` compatibility patches are applied during restore and validated afterward.
-- TV Cast uses FluxCast/WFD + wf-recorder + Fuzzel and is shared by Gaming, Work and Laboratory.
+- TV Cast uses FluxCast/WFD + wf-recorder + Fuzzel and is shared by Gaming, Work and Laboratory; its supported mode set is fixed at exactly 1080p30, 720p60 and Low Latency 720p30/5 Mbps.
 - KVM/QEMU + libvirt + virt-manager is the standard general VM stack; VirtualBox is not the Blueprint default.
 - Color/ICC tuning is not guessed on unknown displays; the Zenbook color-profile decision remains a measured/researched task.
