@@ -1,4 +1,7 @@
 {
+    "theme": {
+        "iconTheme": "Colloid-Dark"
+    },
     "toggles": {
         "music": {
             "spotify": {
