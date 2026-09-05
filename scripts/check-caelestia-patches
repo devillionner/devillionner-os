@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -u
+
+OK=0; WARN=0; FAIL=0
+ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
+warn() { printf '  [WARN] %s\n' "$*"; WARN=$((WARN + 1)); }
+fail() { printf '  [FAIL] %s\n' "$*"; FAIL=$((FAIL + 1)); }
+
+printf '========================================\n'
+printf '     Caelestia package patch check\n'
+printf '========================================\n'
+
+if ! command -v pacman >/dev/null 2>&1; then
+    fail "pacman missing"
+elif ! pacman -Qq caelestia-shell >/dev/null 2>&1; then
+    fail "caelestia-shell package missing"
+else
+    ok "caelestia-shell installed"
+fi
+
+SHORTCUTS="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/Shortcuts\.qml$/ {print $2; exit}')"
+CONTENT="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/drawers\/ContentWindow\.qml$/ {print $2; exit}')"
+SHELL_QML="/etc/xdg/quickshell/caelestia/shell.qml"
+
+if [[ ! -f "$SHELL_QML" ]]; then
+    SHELL_QML="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/shell\.qml$/ {print $2; exit}')"
+fi
+
+if [[ -n "$SHORTCUTS" && -f "$SHORTCUTS" ]]; then
+    ok "Shortcuts.qml located"
+else
+    fail "Shortcuts.qml not found in caelestia-shell package"
+fi
+
+if [[ -n "$CONTENT" && -f "$CONTENT" ]]; then
+    ok "ContentWindow.qml located"
+else
+    fail "ContentWindow.qml not found in caelestia-shell package"
+fi
+
+if [[ -n "$SHELL_QML" && -f "$SHELL_QML" ]]; then
+    ok "shell.qml located"
+else
+    fail "shell.qml not found in caelestia-shell package"
+fi
+
+if [[ -n "$SHORTCUTS" && -f "$SHORTCUTS" ]]; then
+    if python3 - "$SHORTCUTS" <<'PY' >/dev/null 2>&1
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+patched = '''    CustomShortcut {
+        // qmllint enable unresolved-type
+        name: "sidebar"
+        description: "Toggle sidebar"
+        onPressed: {
+            const screenState = ShellState.forActive();
+            screenState.sidebar = !screenState.sidebar;
+        }
+    }'''
+assert patched in text
+PY
+    then
+        ok "fullscreen sidebar shortcut patch active"
+    else
+        fail "fullscreen sidebar shortcut patch missing or upstream block changed"
+    fi
+fi
+
+if [[ -n "$CONTENT" && -f "$CONTENT" ]]; then
+    if grep -Fq 'mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions' "$CONTENT"; then
+        ok "fullscreen sidebar input-mask patch active"
+    else
+        fail "fullscreen sidebar input-mask patch missing or upstream expression changed"
+    fi
+fi
+
+if [[ -n "$SHELL_QML" && -f "$SHELL_QML" ]]; then
+    env_ok=true
+    for name in \
+        QS_NO_RELOAD_POPUP \
+        QS_DROP_EXPENSIVE_FONTS \
+        QSG_RENDER_LOOP \
+        QT_QUICK_FLICKABLE_WHEEL_DECELERATION; do
+        if grep -Fq "//@ pragma Env ${name}=" "$SHELL_QML"; then
+            ok "shell.qml Env pragma: $name"
+        else
+            fail "shell.qml Env pragma missing: $name"
+            env_ok=false
+        fi
+    done
+    [[ "$env_ok" == true ]] || true
+fi
+
+printf '\nOK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then
+    printf 'RESULT: PASS\n'
+    exit 0
+fi
+printf 'RESULT: FAIL\n'
+exit 1

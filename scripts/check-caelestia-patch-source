@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+PATCH="$REPO/scripts/patch-caelestia-fullscreen"
+CHECK="$REPO/scripts/check-caelestia-patches"
+SHELL_CHECK="$REPO/scripts/check-caelestia"
+MANIFEST="$REPO/manifests/profiles/common-aur.txt"
+
+fail() {
+    printf '  [FAIL] %s\n' "$*" >&2
+    exit 1
+}
+
+ok() {
+    printf '  [OK]   %s\n' "$*"
+}
+
+for file in "$PATCH" "$CHECK" "$SHELL_CHECK" "$MANIFEST"; do
+    [[ -f "$file" ]] || fail "missing required file: ${file#$REPO/}"
+done
+ok "Caelestia patch source files present"
+
+grep -Fqx 'caelestia-shell' "$MANIFEST" \
+    || fail "caelestia-shell must remain a common managed package"
+ok "caelestia-shell remains common"
+
+# Keep patch application and runtime validation coupled to the same package
+# files. Match stable filenames rather than awk's slash-escaping style.
+for token in \
+    'Shortcuts\.qml' \
+    'ContentWindow\.qml' \
+    'shell\.qml'; do
+    grep -Fq "$token" "$PATCH" || fail "patch script missing QML locator token: $token"
+    grep -Fq "$token" "$CHECK" || fail "runtime checker missing QML locator token: $token"
+done
+ok "patch and checker target the same Caelestia QML files"
+
+MASK='mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions'
+grep -Fq "$MASK" "$PATCH" || fail "patch script missing fullscreen input-mask result"
+grep -Fq "$MASK" "$CHECK" || fail "runtime checker missing fullscreen input-mask assertion"
+ok "fullscreen input-mask patch is source-validated"
+
+for name in \
+    QS_NO_RELOAD_POPUP \
+    QS_DROP_EXPENSIVE_FONTS \
+    QSG_RENDER_LOOP \
+    QT_QUICK_FLICKABLE_WHEEL_DECELERATION; do
+    grep -Fq "$name" "$PATCH" || fail "patch script missing Env pragma: $name"
+    grep -Fq "$name" "$CHECK" || fail "runtime checker missing Env pragma: $name"
+done
+ok "all four Env pragma patches are source-validated"
+
+# Both sides must know the exact patched sidebar block, not merely the word
+# 'sidebar'. This catches upstream structural changes to the shortcut before the
+# package-level runtime check is even reached.
+python3 - "$PATCH" "$CHECK" <<'PY'
+import sys
+from pathlib import Path
+
+patch = Path(sys.argv[1]).read_text(encoding="utf-8")
+check = Path(sys.argv[2]).read_text(encoding="utf-8")
+block = '''    CustomShortcut {
+        // qmllint enable unresolved-type
+        name: "sidebar"
+        description: "Toggle sidebar"
+        onPressed: {
+            const screenState = ShellState.forActive();
+            screenState.sidebar = !screenState.sidebar;
+        }
+    }'''
+if block not in patch:
+    raise SystemExit("patch script no longer declares the expected patched sidebar block")
+if block not in check:
+    raise SystemExit("runtime checker no longer asserts the expected patched sidebar block")
+PY
+ok "fullscreen sidebar shortcut result is source-validated"
+
+grep -Fq 'check-caelestia-patches' "$SHELL_CHECK" \
+    || fail "check-caelestia does not invoke package patch validation"
+ok "Caelestia runtime validation includes package patch check"
+
+printf '\nRESULT: PASS\n'

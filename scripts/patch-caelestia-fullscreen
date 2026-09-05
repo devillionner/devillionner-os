@@ -33,8 +33,12 @@ shortcuts = Path(sys.argv[1])
 content = Path(sys.argv[2])
 shell_qml = Path(sys.argv[3])
 
-# Allow SUPER+N/sidebar shortcut while a fullscreen client is active.
-s = shortcuts.read_text()
+# Read everything first. No package file is modified until every expected
+# upstream/patched state has been recognized successfully.
+s = shortcuts.read_text(encoding="utf-8")
+c = content.read_text(encoding="utf-8")
+q = shell_qml.read_text(encoding="utf-8")
+
 old_sidebar = '''    CustomShortcut {
         // qmllint enable unresolved-type
         name: "sidebar"
@@ -57,49 +61,36 @@ new_sidebar = '''    CustomShortcut {
     }'''
 
 if new_sidebar in s:
-    print("Shortcuts.qml: already patched")
+    sidebar_state = "already"
 elif old_sidebar in s:
-    shortcuts.write_text(s.replace(old_sidebar, new_sidebar, 1))
-    print("Shortcuts.qml: patched")
+    sidebar_state = "needs"
 else:
-    raise SystemExit("Shortcuts.qml: expected sidebar block not found; refusing to modify")
+    raise SystemExit("Shortcuts.qml: expected sidebar block not found; refusing to modify anything")
 
-# Keep fullscreen input masked normally, but make the sidebar interactive while open.
-c = content.read_text()
 old_mask = "mask: hasFullscreen ? emptyRegion : regions"
 new_mask = "mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions"
-
 if new_mask in c:
-    print("ContentWindow.qml: already patched")
+    mask_state = "already"
 elif old_mask in c:
-    content.write_text(c.replace(old_mask, new_mask, 1))
-    print("ContentWindow.qml: patched")
+    mask_state = "needs"
 else:
-    raise SystemExit("ContentWindow.qml: expected fullscreen mask not found; refusing to modify")
+    raise SystemExit("ContentWindow.qml: expected fullscreen mask not found; refusing to modify anything")
 
-# Caelestia currently needs these values forced with Env rather than DefaultEnv
-# on this setup; with DefaultEnv the shell may start without rendering.
 env_names = (
     "QS_NO_RELOAD_POPUP",
     "QS_DROP_EXPENSIVE_FONTS",
     "QSG_RENDER_LOOP",
     "QT_QUICK_FLICKABLE_WHEEL_DECELERATION",
 )
-
-q = shell_qml.read_text()
-changed = []
-already = []
+env_states = {}
 missing = []
-
 for name in env_names:
     old = f"//@ pragma DefaultEnv {name}="
     new = f"//@ pragma Env {name}="
-
     if new in q:
-        already.append(name)
+        env_states[name] = "already"
     elif old in q:
-        q = q.replace(old, new, 1)
-        changed.append(name)
+        env_states[name] = "needs"
     else:
         missing.append(name)
 
@@ -107,11 +98,38 @@ if missing:
     raise SystemExit(
         "shell.qml: expected environment pragmas not found: "
         + ", ".join(missing)
+        + "; refusing to modify anything"
     )
 
-if changed:
-    shell_qml.write_text(q)
-    print("shell.qml: Env patched: " + ", ".join(changed))
+# All preflight checks passed. Build the complete target contents in memory.
+new_s = s.replace(old_sidebar, new_sidebar, 1) if sidebar_state == "needs" else s
+new_c = c.replace(old_mask, new_mask, 1) if mask_state == "needs" else c
+new_q = q
+changed_env = []
+for name, state in env_states.items():
+    if state != "needs":
+        continue
+    old = f"//@ pragma DefaultEnv {name}="
+    new = f"//@ pragma Env {name}="
+    new_q = new_q.replace(old, new, 1)
+    changed_env.append(name)
+
+# Write only after the full package contract was validated.
+if new_s != s:
+    shortcuts.write_text(new_s, encoding="utf-8")
+    print("Shortcuts.qml: patched")
+else:
+    print("Shortcuts.qml: already patched")
+
+if new_c != c:
+    content.write_text(new_c, encoding="utf-8")
+    print("ContentWindow.qml: patched")
+else:
+    print("ContentWindow.qml: already patched")
+
+if new_q != q:
+    shell_qml.write_text(new_q, encoding="utf-8")
+    print("shell.qml: Env patched: " + ", ".join(changed_env))
 else:
     print("shell.qml: environment pragmas already patched")
 PY

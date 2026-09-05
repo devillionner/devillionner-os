@@ -37,6 +37,20 @@ The Blueprint uses the current Caelestia `general.idle.timeouts` schema:
 
 Audio playback inhibits idle actions. Charging does not inhibit them. `lockBeforeSleep` remains enabled.
 
+## Package compatibility patches
+
+The packaged Caelestia shell currently needs a small Blueprint compatibility/UI patch on this setup. `scripts/patch-caelestia-fullscreen` manages all current package-level changes:
+
+- allow the sidebar shortcut while a fullscreen client is active;
+- keep fullscreen input masked except while the sidebar is open;
+- convert the four required Quickshell environment pragmas from `DefaultEnv` to `Env`.
+
+`scripts/check-caelestia-patches` validates the installed package files after restore/update. It fails when a patch is missing or when the upstream QML structure moved enough that the known result can no longer be found.
+
+Repository CI separately runs `scripts/check-caelestia-patch-source`, which keeps patch application and runtime validation coupled to the same QML targets and exact expected results. This catches a stale checker/patch pair before it reaches a clean install.
+
+`scripts/check-caelestia` includes the package-patch check, so a restore cannot report a clean Caelestia validation while those runtime patches are absent.
+
 ## Safe apply and validation
 
 After pulling Blueprint changes, apply only the managed Caelestia shell settings with:
@@ -45,7 +59,7 @@ After pulling Blueprint changes, apply only the managed Caelestia shell settings
 bash scripts/configure-caelestia
 ```
 
-Validate the installed state with:
+Validate the installed state and package patches with:
 
 ```bash
 bash scripts/check-caelestia
