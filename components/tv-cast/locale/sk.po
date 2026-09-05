@@ -11,6 +11,9 @@ msgstr "30 FPS — 1080p"
 msgid "60 FPS — 720p"
 msgstr "60 FPS — 720p"
 
+msgid "Low Latency — 720p 30 FPS / 5 Mbps"
+msgstr "Nízka latencia — 720p 30 FPS / 5 Mb/s"
+
 msgid "Casting stopped"
 msgstr "Vysielanie zastavené"
 
@@ -22,6 +25,9 @@ msgstr "Pripájanie k TV… • 1080p 30 FPS"
 
 msgid "Connecting to TV… • 720p 60 FPS"
 msgstr "Pripájanie k TV… • 720p 60 FPS"
+
+msgid "Connecting to TV… • Low Latency • 720p 30 FPS / 5 Mbps"
+msgstr "Pripájanie k TV… • Nízka latencia • 720p 30 FPS / 5 Mb/s"
 
 msgid "Off"
 msgstr "Vypnuté"
