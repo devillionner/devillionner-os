@@ -36,6 +36,9 @@ jobs:
       - name: Validate Bibata cursor contract
         run: bash scripts/check-cursor-source
 
+      - name: Validate TV Cast three-mode contract
+        run: bash scripts/check-tv-cast-source
+
       - name: Validate Caelestia patch contract
         run: bash scripts/check-caelestia-patch-source
 
