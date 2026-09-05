@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+command -v python3 >/dev/null 2>&1 || bp_die "python3 is required to configure Caelestia CLI"
+
+SRC="$REPO/dotfiles/.config/caelestia/cli.json"
+DST="$HOME/.config/caelestia/cli.json"
+
+bp_info "Merging Blueprint-owned Caelestia CLI settings"
+python3 "$REPO/scripts/lib/merge-caelestia-cli.py" "$SRC" "$DST"
+
+bp_ok "Caelestia CLI config merged safely: Colloid-Dark + Spotify toggle"

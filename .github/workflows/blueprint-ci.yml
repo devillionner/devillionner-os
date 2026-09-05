@@ -20,3 +20,6 @@ jobs:
 
       - name: Validate Caelestia patch contract
         run: bash scripts/check-caelestia-patch-source
+
+      - name: Validate Caelestia CLI ownership
+        run: bash scripts/check-caelestia-cli-source

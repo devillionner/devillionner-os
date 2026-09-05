@@ -18,7 +18,7 @@ The configuration was captured from the tested host and deliberately reduced to 
 - JPEG, PNG and WEBP open in Swappy, matching the tested host.
 - Delete confirmation remains enabled.
 
-Caelestia's CLI theme config is pinned to `Colloid-Dark` so a wallpaper/theme refresh does not silently restore the old Papirus icon theme.
+Caelestia's CLI theme config is pinned to `Colloid-Dark` so a wallpaper/theme refresh does not silently restore the old Papirus icon theme. That key is owned centrally by `configure-caelestia-cli`; `configure-dolphin` invokes the central configurator when run standalone instead of rewriting `cli.json` itself.
 
 ## Preview stack
 
@@ -43,7 +43,7 @@ The Blueprint therefore installs `/usr/local/bin/devos-dolphin`, which sets `QT_
 
 `configure-dolphin` owns only the `fileExplorer` key in `~/.config/caelestia/hypr-vars.lua`. It preserves unrelated Caelestia/user overrides and follows an existing symlink instead of deleting the whole override file. Validation requires exactly one `fileExplorer` entry and that entry must target the Blueprint wrapper.
 
-The restore rsync deliberately excludes `caelestia/hypr-vars.lua` and `caelestia/cli.json`. Those files are merge-managed by the Dolphin/Spotify configurators, so an existing custom override survives a full restore instead of being overwritten before the safe merge runs.
+The restore rsync deliberately excludes `caelestia/hypr-vars.lua` and `caelestia/cli.json`. `hypr-vars.lua` is updated by the dedicated Dolphin helper; `cli.json` is handled by the single merge-safe `configure-caelestia-cli` owner. Existing custom overrides therefore survive a full restore instead of being overwritten before the safe merges run.
 
 No fixed selection colour is written. The adaptive Caelestia palette remains the source of colours, so changing wallpaper can continue to retint Colloid folders normally.
 

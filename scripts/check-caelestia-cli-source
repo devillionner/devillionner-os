@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+CANONICAL="$REPO/dotfiles/.config/caelestia/cli.json"
+MERGER="$REPO/scripts/lib/merge-caelestia-cli.py"
+CONFIGURE="$REPO/scripts/configure-caelestia-cli"
+DOLPHIN="$REPO/scripts/configure-dolphin"
+SPOTIFY="$REPO/scripts/configure-spotify"
+RESTORE="$REPO/scripts/restore"
+
+fail() {
+    printf '  [FAIL] %s\n' "$*" >&2
+    exit 1
+}
+
+ok() {
+    printf '  [OK]   %s\n' "$*"
+}
+
+for file in "$CANONICAL" "$MERGER" "$CONFIGURE" "$DOLPHIN" "$SPOTIFY" "$RESTORE"; do
+    [[ -f "$file" ]] || fail "missing required file: ${file#$REPO/}"
+done
+ok "Caelestia CLI ownership files present"
+
+python3 - "$CANONICAL" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+assert data["theme"]["iconTheme"] == "Colloid-Dark"
+spotify = data["toggles"]["music"]["spotify"]
+assert spotify["enable"] is True
+assert spotify["command"] == ["devos-spotify"]
+assert spotify["move"] is True
+matches = spotify["match"]
+assert {"class": "Spotify"} in matches
+assert {"class": "spotify"} in matches
+assert {"initialTitle": "Spotify"} in matches
+assert {"initialTitle": "Spotify Free"} in matches
+assert all("initial_title" not in item for item in matches if isinstance(item, dict))
+PY
+ok "canonical cli.json contains Colloid-Dark and current Spotify toggle schema"
+
+python3 - "$MERGER" "$CANONICAL" <<'PY'
+import importlib.util
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+helper = Path(sys.argv[1])
+canonical = Path(sys.argv[2])
+spec = importlib.util.spec_from_file_location("caelestia_cli_merge", helper)
+module = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory() as tmp_raw:
+    tmp = Path(tmp_raw)
+
+    current = tmp / "cli.json"
+    current.write_text(json.dumps({
+        "theme": {"iconTheme": "Papirus", "customAccent": "keep"},
+        "toggles": {
+            "customToggle": {"enable": True},
+            "music": {
+                "spotify": {
+                    "enable": False,
+                    "command": ["spotify-launcher"],
+                    "customUserFlag": "keep",
+                }
+            },
+        },
+        "customRoot": {"keep": True},
+    }, indent=4) + "\n", encoding="utf-8")
+
+    module.merge_file(canonical, current)
+    merged = json.loads(current.read_text(encoding="utf-8"))
+    assert merged["customRoot"] == {"keep": True}
+    assert merged["theme"]["customAccent"] == "keep"
+    assert merged["theme"]["iconTheme"] == "Colloid-Dark"
+    assert merged["toggles"]["customToggle"] == {"enable": True}
+    spotify = merged["toggles"]["music"]["spotify"]
+    assert spotify["enable"] is True
+    assert spotify["command"] == ["devos-spotify"]
+    assert spotify["move"] is True
+    assert spotify["customUserFlag"] == "keep"
+
+    target = tmp / "managed-target.json"
+    target.write_text('{"custom": 1}\n', encoding="utf-8")
+    link = tmp / "linked-cli.json"
+    link.symlink_to(target)
+    module.merge_file(canonical, link)
+    assert link.is_symlink()
+    linked = json.loads(target.read_text(encoding="utf-8"))
+    assert linked["custom"] == 1
+    assert linked["theme"]["iconTheme"] == "Colloid-Dark"
+
+    invalid = tmp / "invalid.json"
+    broken = '{"theme": {\n'
+    invalid.write_text(broken, encoding="utf-8")
+    try:
+        module.merge_file(canonical, invalid)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("malformed cli.json was silently overwritten")
+    assert invalid.read_text(encoding="utf-8") == broken
+PY
+ok "Caelestia CLI merge preserves custom data/symlinks and refuses malformed JSON"
+
+grep -Fq 'merge-caelestia-cli.py' "$CONFIGURE" \
+    || fail "configure-caelestia-cli does not invoke the safe merger"
+grep -Fq 'configure-caelestia-cli' "$RESTORE" \
+    || fail "restore does not invoke configure-caelestia-cli"
+grep -Fq -- "--exclude='caelestia/cli.json'" "$RESTORE" \
+    || fail "restore does not exclude merge-managed cli.json from broad rsync"
+ok "restore routes cli.json through the safe single owner"
+
+# Dolphin and Spotify must use the central configurator when run standalone,
+# but must never parse or write ~/.config/caelestia/cli.json themselves.
+for component in "$DOLPHIN" "$SPOTIFY"; do
+    grep -Fq 'configure-caelestia-cli' "$component" \
+        || fail "${component#$REPO/} does not invoke the shared CLI owner"
+    if grep -Fq '.config/caelestia/cli.json' "$component"; then
+        fail "${component#$REPO/} still directly accesses Caelestia cli.json"
+    fi
+done
+ok "Dolphin and Spotify delegate cli.json ownership to the central configurator"
+
+printf '\nRESULT: PASS\n'

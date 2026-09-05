@@ -7,6 +7,10 @@ source "$REPO/scripts/lib/common.sh"
 command -v spotify-launcher >/dev/null 2>&1 || bp_die "spotify-launcher is missing"
 command -v spicetify >/dev/null 2>&1 || bp_die "spicetify is missing"
 
+# Keep standalone Spotify configuration aligned with the single Caelestia CLI
+# owner instead of mutating cli.json here.
+bash "$REPO/scripts/configure-caelestia-cli"
+
 bp_info "Installing adaptive Spotify integration"
 install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" "$HOME/.local/bin/devos-spotify"
 install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap" "$HOME/.local/bin/devos-spotify-theme-bootstrap"
@@ -16,34 +20,8 @@ install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.path" "$
 install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.service" "$HOME/.config/systemd/user/devos-spotify-theme.service"
 install -Dm644 "$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop" "$HOME/.local/share/applications/spotify-launcher.desktop"
 
-# Preserve any user toggle customizations and only own the Spotify entry.
-python - "$REPO/dotfiles/.config/caelestia/cli.json" "$HOME/.config/caelestia/cli.json" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-src, dst = map(Path, sys.argv[1:])
-addition = json.loads(src.read_text())
-try:
-    current = json.loads(dst.read_text()) if dst.exists() else {}
-except Exception:
-    current = {}
-
-def merge(a, b):
-    for k, v in b.items():
-        if isinstance(v, dict) and isinstance(a.get(k), dict):
-            merge(a[k], v)
-        else:
-            a[k] = v
-
-merge(current, addition)
-dst.parent.mkdir(parents=True, exist_ok=True)
-dst.write_text(json.dumps(current, indent=4) + "\n")
-PY
-
 # `services.defaultPlayer=Spotify` is part of the canonical Caelestia shell
-# policy and is now owned by scripts/configure-caelestia. Keep this integration
-# focused on Spotify-specific runtime/launcher state.
+# policy and is owned by scripts/configure-caelestia.
 
 # Make the managed desktop entry the actual spotify: protocol handler while
 # preserving every unrelated MIME/browser association already present.

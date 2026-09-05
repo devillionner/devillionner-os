@@ -1,18 +1,18 @@
-# Caelestia shell policy
+# Caelestia configuration policy
 
-`~/.config/caelestia/shell.json` is merge-managed by the Blueprint. It is not copied wholesale during restore.
+Both `~/.config/caelestia/shell.json` and `~/.config/caelestia/cli.json` are merge-managed by the Blueprint. Neither file is copied wholesale during restore.
 
 ## Why
 
-Caelestia intentionally allows users to keep only the settings they override. Replacing the entire file during restore would erase unrelated local options, while manual JSON edits can accidentally break the object structure with a misplaced brace or comma.
+Caelestia intentionally allows users to keep only the settings they override. Replacing either JSON file during restore would erase unrelated local options, while manual JSON edits can accidentally break the object structure with a misplaced brace or comma.
 
-`scripts/configure-caelestia` therefore overlays only the Blueprint-owned keys from `dotfiles/.config/caelestia/shell.json` and preserves every unrelated key already present in the user's file.
+`scripts/configure-caelestia` overlays only the Blueprint-owned keys from `dotfiles/.config/caelestia/shell.json`. `scripts/configure-caelestia-cli` does the same for `dotfiles/.config/caelestia/cli.json`. Both preserve every unrelated key already present in the user's file.
 
-If the existing file is malformed JSON, the configurator refuses to overwrite it and reports the line/column of the parse failure. An existing symlink is followed rather than replaced.
+If an existing managed JSON file is malformed, its configurator refuses to overwrite it and reports the line/column of the parse failure. Existing symlinks are followed rather than replaced.
 
-## Blueprint-owned settings
+## Blueprint-owned shell settings
 
-The current common policy owns:
+The current common `shell.json` policy owns:
 
 - `appearance.transparency.enabled = true`;
 - dashboard enabled, visible and hover-enabled;
@@ -26,6 +26,20 @@ The current common policy owns:
 - the common idle policy below.
 
 Unrelated settings such as weather location, audio application choice, battery options, launcher preferences or monitor-specific configuration are preserved.
+
+## Blueprint-owned CLI settings
+
+The common `cli.json` policy has one owner, `scripts/configure-caelestia-cli`, and currently manages:
+
+- `theme.iconTheme = "Colloid-Dark"`;
+- the Spotify music toggle;
+- Spotify class aliases `Spotify` and `spotify`;
+- `initialTitle` fallbacks `Spotify` and `Spotify Free`;
+- managed command `["devos-spotify"]` and `move = true`.
+
+Dolphin and Spotify no longer parse or rewrite `cli.json` independently. Their standalone configurators call the central CLI configurator instead, so the same safe merge behavior is used whether a component is configured directly or through a full restore.
+
+Unrelated CLI theme keys, custom toggles and other user options remain intact. CI exercises preservation of custom keys, preservation of symlinks and refusal to overwrite malformed JSON.
 
 ## Idle policy
 
@@ -53,22 +67,26 @@ Repository CI separately runs `scripts/check-caelestia-patch-source`, which keep
 
 ## Safe apply and validation
 
-After pulling Blueprint changes, apply only the managed Caelestia shell settings with:
+After pulling Blueprint changes, apply the managed Caelestia JSON settings with:
 
 ```bash
 bash scripts/configure-caelestia
+bash scripts/configure-caelestia-cli
 ```
 
-Validate the installed state and package patches with:
+Then validate the installed state and package patches with:
 
 ```bash
 bash scripts/check-caelestia
+bash scripts/check-dolphin
+bash scripts/check-spotify
 ```
 
 For a manual edit, validate JSON before restarting the shell:
 
 ```bash
 jq empty ~/.config/caelestia/shell.json
+jq empty ~/.config/caelestia/cli.json
 ```
 
-A full restore excludes `caelestia/shell.json` from the broad rsync and runs `configure-caelestia` afterward, so the same merge behavior is used on both existing and clean systems.
+A full restore excludes both JSON files from the broad rsync and runs their central configurators afterward, so the same merge behavior is used on existing and clean systems.
