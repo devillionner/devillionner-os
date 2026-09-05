@@ -131,6 +131,21 @@ else
     fail "Dolphin restore/check wiring is incomplete"
 fi
 
+DOLPHIN_MANIFEST="$REPO/manifests/profiles/common-repo.txt"
+DOLPHIN_CONFIG="$REPO/scripts/configure-dolphin"
+PREVIEW_STACK_OK=true
+for pkg in ffmpegthumbs kdegraphics-thumbnailers kimageformats qt6-imageformats; do
+    grep -Fqx "$pkg" "$DOLPHIN_MANIFEST" || PREVIEW_STACK_OK=false
+done
+if [[ "$PREVIEW_STACK_OK" == true ]] \
+    && grep -Fq -- '--group General --key GlobalViewProps true' "$DOLPHIN_CONFIG" \
+    && grep -Fq -- '--group General --key EnlargeSmallPreviews true' "$DOLPHIN_CONFIG" \
+    && grep -Fq -- '--group Dolphin --key PreviewsShown true' "$DOLPHIN_CONFIG"; then
+    ok "Dolphin preview backends and global preview defaults are managed"
+else
+    fail "Dolphin preview stack is incomplete"
+fi
+
 RESTORE="$REPO/scripts/restore"
 if grep -Fq -- "--exclude='caelestia/hypr-vars.lua'" "$RESTORE" \
     && grep -Fq -- "--exclude='caelestia/cli.json'" "$RESTORE"; then
