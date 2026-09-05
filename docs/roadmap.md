@@ -68,5 +68,4 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [x] Recovery-point behavior documented.
 - [x] Hardware-aware audio behavior documented.
 - [x] Helper commands documented.
-- [x] Manual YouTube Music + Better Lyrics theme guide retained.
 - [ ] Add screenshots only after the clean-install UI is stable.

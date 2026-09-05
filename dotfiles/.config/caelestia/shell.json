@@ -21,8 +21,7 @@
         }
     },
     "services": {
-        "brightnessIncrement": 0.05,
-        "defaultPlayer": "YouTube Music for Desktop"
+        "brightnessIncrement": 0.05
     },
     "utilities": {
         "toasts": {

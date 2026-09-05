@@ -67,7 +67,6 @@ See:
 - [Virtual machines](docs/virtualization.md)
 - [Recovery points](docs/recovery.md)
 - [Tools and helper commands](docs/tools.md)
-- [YouTube Music manual setup](docs/youtube-music.md)
 - [Roadmap](docs/roadmap.md)
 
 ## Current design decisions
