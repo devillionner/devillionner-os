@@ -16,7 +16,7 @@ mkdir -p "$THEME_DIR"
 
 get_colour() {
     local key="$1" fallback="$2" value
-    value="$(awk -v key="$key" '$1 == key && $2 == "=" { gsub(/[\",]/, "", $3); print $3; exit }' "$SCHEME")"
+    value="$(awk -v key="$key" '$1 == key && $2 == "=" { gsub(/[",]/, "", $3); print $3; exit }' "$SCHEME")"
     if [[ "$value" =~ ^[[:xdigit:]]{6}$ ]]; then
         printf '%s' "$value"
     else
