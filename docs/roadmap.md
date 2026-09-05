@@ -26,7 +26,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [x] Complete Dolphin preview UX: Information panel, global thumbnails and image/video/document preview backends.
 - [ ] Replace cursor and possibly icon theme after checking consistency with Caelestia/Darkly.
 - [ ] Add an OCR region hotkey: select area → OCR → clipboard (ukr/eng/rus).
-- [ ] Add explicit validation for every Caelestia UI patch after upstream updates.
+- [x] Add explicit validation for every current Caelestia UI/runtime package patch after upstream updates.
 
 ## P1 — system / performance
 
