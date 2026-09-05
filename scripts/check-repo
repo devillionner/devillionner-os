@@ -100,6 +100,9 @@ else
 fi
 
 required_paths=(
+    scripts/configure-caelestia
+    scripts/check-caelestia
+    scripts/lib/merge-caelestia-shell.py
     scripts/configure-dolphin
     scripts/check-dolphin
     scripts/lib/set-caelestia-file-explorer.py
@@ -107,6 +110,7 @@ required_paths=(
     scripts/check-spotify
     scripts/configure-tv-cast
     scripts/check-tv-cast
+    dotfiles/.config/caelestia/shell.json
     dotfiles/.config/caelestia/cli.json
     dotfiles/.config/hypr/hyprland/rules.lua
     dotfiles/.config/spicetify/devillionner-overrides.css
@@ -119,6 +123,13 @@ for path in "${required_paths[@]}"; do
     [[ -e "$REPO/$path" ]] || fail "missing required path: $path"
 done
 [[ $FAIL -gt 0 ]] || ok "required integration files present"
+
+if grep -Fq '"$REPO/scripts/configure-caelestia"' "$REPO/scripts/restore" \
+    && grep -Fq '"$REPO/scripts/check-caelestia"' "$REPO/scripts/restore"; then
+    ok "Caelestia shell policy is wired into restore + validation"
+else
+    fail "Caelestia shell restore/check wiring is incomplete"
+fi
 
 if grep -Fq '"$REPO/scripts/configure-spotify"' "$REPO/scripts/restore" \
     && grep -Fq '"$REPO/scripts/check-spotify"' "$REPO/scripts/restore"; then
@@ -151,10 +162,87 @@ fi
 
 RESTORE="$REPO/scripts/restore"
 if grep -Fq -- "--exclude='caelestia/hypr-vars.lua'" "$RESTORE" \
-    && grep -Fq -- "--exclude='caelestia/cli.json'" "$RESTORE"; then
+    && grep -Fq -- "--exclude='caelestia/cli.json'" "$RESTORE" \
+    && grep -Fq -- "--exclude='caelestia/shell.json'" "$RESTORE"; then
     ok "restore preserves merge-managed Caelestia overrides before configurators run"
 else
     fail "restore may overwrite merge-managed Caelestia overrides"
+fi
+
+if python3 - "$REPO/scripts/lib/merge-caelestia-shell.py" "$REPO/dotfiles/.config/caelestia/shell.json" <<'PY'
+import importlib.util
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+helper = Path(sys.argv[1])
+canonical_path = Path(sys.argv[2])
+spec = importlib.util.spec_from_file_location("caelestia_shell_merge", helper)
+module = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(module)
+
+canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+idle = canonical["general"]["idle"]
+assert idle["timeouts"] == [
+    {"timeout": 1800, "idleAction": "lock"},
+    {"timeout": 2100, "idleAction": "dpms off", "returnAction": "dpms on"},
+    {"timeout": 3600, "idleAction": ["suspendThenHibernate"]},
+]
+assert canonical["general"]["apps"]["explorer"] == ["dolphin"]
+assert canonical["general"]["apps"]["playback"] == ["clapper"]
+assert canonical["general"]["apps"]["terminal"] == ["kitty"]
+assert canonical["services"]["defaultPlayer"] == "Spotify"
+
+with tempfile.TemporaryDirectory() as tmp_raw:
+    tmp = Path(tmp_raw)
+    current = tmp / "shell.json"
+    current.write_text(json.dumps({
+        "appearance": {"customUserFlag": 7},
+        "general": {
+            "apps": {"audio": ["pwvucontrol"], "explorer": ["thunar"]},
+            "customGeneral": "keep-me",
+        },
+        "services": {"weatherLocation": "Kyiv"},
+        "customRoot": {"enabled": True},
+    }, indent=4) + "\n", encoding="utf-8")
+
+    module.merge_file(canonical_path, current)
+    merged = json.loads(current.read_text(encoding="utf-8"))
+    assert merged["customRoot"] == {"enabled": True}
+    assert merged["appearance"]["customUserFlag"] == 7
+    assert merged["general"]["customGeneral"] == "keep-me"
+    assert merged["general"]["apps"]["audio"] == ["pwvucontrol"]
+    assert merged["general"]["apps"]["explorer"] == ["dolphin"]
+    assert merged["services"]["weatherLocation"] == "Kyiv"
+    assert merged["services"]["defaultPlayer"] == "Spotify"
+
+    target = tmp / "managed-target.json"
+    target.write_text('{"custom": 1}\n', encoding="utf-8")
+    link = tmp / "linked-shell.json"
+    link.symlink_to(target)
+    module.merge_file(canonical_path, link)
+    assert link.is_symlink()
+    linked = json.loads(target.read_text(encoding="utf-8"))
+    assert linked["custom"] == 1
+    assert linked["general"]["apps"]["explorer"] == ["dolphin"]
+
+    invalid = tmp / "invalid.json"
+    broken = '{"general": {\n'
+    invalid.write_text(broken, encoding="utf-8")
+    try:
+        module.merge_file(canonical_path, invalid)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("malformed shell.json was silently overwritten")
+    assert invalid.read_text(encoding="utf-8") == broken
+PY
+then
+    ok "Caelestia shell merge preserves custom data/symlinks and refuses malformed JSON"
+else
+    fail "Caelestia shell merge behavior/policy"
 fi
 
 if python3 - "$REPO/scripts/lib/set-caelestia-file-explorer.py" <<'PY'
