@@ -76,4 +76,5 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [x] Quickshell ABI recovery documented.
 - [x] Adaptive Spotify integration documented.
 - [x] Repository CI / source-integrity validation documented.
+- [x] Validate repository-local documentation links and referenced `docs/*.md` paths in CI.
 - [ ] Add screenshots only after the clean-install UI is stable.
