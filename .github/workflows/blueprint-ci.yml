@@ -27,6 +27,9 @@ jobs:
       - name: Validate Dolphin compact fileExplorer contract
         run: bash scripts/check-dolphin-file-explorer-source
 
+      - name: Validate Dolphin global preview contract
+        run: bash scripts/check-dolphin-global-view-source
+
       - name: Validate Caelestia patch contract
         run: bash scripts/check-caelestia-patch-source
 
