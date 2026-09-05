@@ -17,6 +17,12 @@ for cmd in dolphin swappy kwriteconfig6; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
 
+for pkg in ffmpegthumbs kdegraphics-thumbnailers kimageformats qt6-imageformats; do
+    pacman -Qq "$pkg" >/dev/null 2>&1 \
+        && ok "$pkg preview backend installed" \
+        || fail "$pkg preview backend missing"
+done
+
 if [[ -x /usr/local/bin/devos-dolphin ]] \
     && grep -q 'QT_STYLE_OVERRIDE=qtengine' /usr/local/bin/devos-dolphin \
     && grep -q 'QT_QPA_PLATFORMTHEME=qtengine' /usr/local/bin/devos-dolphin; then
@@ -74,6 +80,19 @@ grep -qx 'Theme=Colloid-Dark' "$HOME/.config/kdeglobals" 2>/dev/null \
 grep -qx 'SingleClick=false' "$HOME/.config/dolphinrc" 2>/dev/null \
     && ok "Dolphin double-click activation" \
     || fail "Dolphin is not configured for double-click"
+
+grep -qx 'GlobalViewProps=true' "$HOME/.config/dolphinrc" 2>/dev/null \
+    && ok "Dolphin uses global view properties" \
+    || fail "Dolphin global view properties are not enabled"
+
+grep -qx 'EnlargeSmallPreviews=true' "$HOME/.config/dolphinrc" 2>/dev/null \
+    && ok "small file previews are enlarged" \
+    || fail "Dolphin small-preview enlargement differs"
+
+GLOBAL_VIEW="$HOME/.local/share/dolphin/view_properties/global/.directory"
+grep -qx 'PreviewsShown=true' "$GLOBAL_VIEW" 2>/dev/null \
+    && ok "Dolphin thumbnails/previews enabled globally" \
+    || fail "Dolphin global previews are not enabled"
 
 grep -qx 'IconSize=16' "$HOME/.config/dolphinrc" 2>/dev/null \
     && ok "Dolphin Places icon size: 16" \
