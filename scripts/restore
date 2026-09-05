@@ -59,7 +59,7 @@ done
 [[ -n "$TARGET" ]] || bp_die "Target is required (--vm or --test-partition)."
 
 printf "========================================\n"
-printf "       devillionner-os restore v0.8\n"
+printf "       devillionner-os restore v0.9\n"
 printf "========================================\n"
 
 grep -Eq '^ID="?cachyos"?$' /etc/os-release 2>/dev/null \
@@ -232,6 +232,10 @@ bp_info "Running Blueprint validation"
 VALIDATION_PASS=true
 
 if ! "$REPO/scripts/check" --profile "$PROFILE"; then
+    VALIDATION_PASS=false
+fi
+
+if ! bash "$REPO/scripts/check-quickshell"; then
     VALIDATION_PASS=false
 fi
 
