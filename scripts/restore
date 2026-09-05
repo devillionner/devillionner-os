@@ -137,7 +137,7 @@ rsync -a "$REPO/dotfiles/.local/" "$HOME/.local/"
 find "$HOME/.local/bin" -maxdepth 1 -type f -exec chmod +x {} + 2>/dev/null || true
 
 bp_info "Configuring Caelestia shell defaults"
-"$REPO/scripts/configure-caelestia"
+bash "$REPO/scripts/configure-caelestia"
 
 bp_info "Configuring keyboard"
 "$REPO/scripts/configure-keyboard" "$KEYBOARD"
@@ -232,7 +232,7 @@ if ! "$REPO/scripts/check" --profile "$PROFILE"; then
     VALIDATION_PASS=false
 fi
 
-if ! "$REPO/scripts/check-caelestia"; then
+if ! bash "$REPO/scripts/check-caelestia"; then
     VALIDATION_PASS=false
 fi
 
