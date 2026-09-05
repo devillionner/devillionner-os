@@ -5,8 +5,8 @@
                 "enable": true,
                 "match": [
                     { "class": "Spotify" },
-                    { "initial_title": "Spotify" },
-                    { "initial_title": "Spotify Free" }
+                    { "initialTitle": "Spotify" },
+                    { "initialTitle": "Spotify Free" }
                 ],
                 "command": ["devos-spotify"],
                 "move": true

@@ -107,6 +107,7 @@ required_paths=(
     scripts/check-spotify
     scripts/configure-tv-cast
     scripts/check-tv-cast
+    dotfiles/.config/caelestia/cli.json
     dotfiles/.config/spicetify/devillionner-overrides.css
     dotfiles/.local/bin/devos-spotify
     dotfiles/.local/bin/devos-spotify-theme-bootstrap
@@ -211,6 +212,31 @@ then
     ok "Dolphin Caelestia override updater preserves custom data and symlinks"
 else
     fail "Dolphin Caelestia override updater behavior"
+fi
+
+CAELESTIA_CLI="$REPO/dotfiles/.config/caelestia/cli.json"
+if python3 - "$CAELESTIA_CLI" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+p = Path(sys.argv[1])
+data = json.loads(p.read_text())
+spotify = data["toggles"]["music"]["spotify"]
+assert spotify.get("enable") is True
+assert spotify.get("command") == ["devos-spotify"]
+assert spotify.get("move") is True
+matches = spotify.get("match")
+assert isinstance(matches, list)
+assert {"class": "Spotify"} in matches
+assert {"initialTitle": "Spotify"} in matches
+assert {"initialTitle": "Spotify Free"} in matches
+assert all("initial_title" not in match for match in matches if isinstance(match, dict))
+PY
+then
+    ok "Caelestia Spotify toggle uses current CLI camelCase match schema"
+else
+    fail "Caelestia Spotify toggle schema"
 fi
 
 SPOTIFY_BOOTSTRAP="$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap"
