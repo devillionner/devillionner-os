@@ -51,15 +51,17 @@ The Caelestia surface layer uses opaque semantic theme colors inside the Spotify
 
 The Blueprint shadows the stock `spotify-launcher.desktop`, but preserves the upstream desktop contract: `%U`, `TryExec` and `x-scheme-handler/spotify` remain present and route through `devos-spotify` instead of bypassing the adaptive theme.
 
+The desktop entry keeps upstream `StartupWMClass=spotify` (lowercase). Runtime Spotify windows are not fully consistent across client/XWayland/Wayland modes, so Blueprint deliberately accepts both `Spotify` and `spotify` classes and then falls back to the initial titles `Spotify` / `Spotify Free`. Hyprland's `special:music` routing and Caelestia's music toggle share that same identity contract.
+
 `configure-spotify` also sets `x-scheme-handler/spotify=spotify-launcher.desktop` in `~/.config/mimeapps.list`. It owns only that protocol mapping and preserves unrelated browser/MIME defaults, so clicking a `spotify:` link consistently enters the managed themed launcher instead of depending on whichever desktop association happened to exist before restore.
 
 When a `spotify:` URI is opened while Spotify is already running, `devos-spotify` first uses the standard MPRIS `OpenUri` method so it does not unnecessarily re-run Spicetify or disturb the existing client. If MPRIS is unavailable, it falls back to `spotify-launcher`'s native positional URI support. The same native URI support is preserved on the first vanilla launch before Spotify has generated its prefs.
 
 ## Caelestia music toggle
 
-`~/.config/caelestia/cli.json` keeps the `Super+M` music toggle on the managed `devos-spotify` command. Spotify is matched first by class and then by `initialTitle` values `Spotify` / `Spotify Free`. `initialTitle` is the current Caelestia CLI JSON key; the older Blueprint `initial_title` spelling was invalid for this schema and could silently disable the title fallback when Spotify exposed no useful class.
+`~/.config/caelestia/cli.json` keeps the `Super+M` music toggle on the managed `devos-spotify` command. Spotify is matched by both known class variants and then by `initialTitle` values `Spotify` / `Spotify Free`. `initialTitle` is the current Caelestia CLI JSON key; the older Blueprint `initial_title` spelling was invalid for this schema and could silently disable the title fallback when Spotify exposed no useful class.
 
-Repository CI and `check-spotify` validate the exact current match structure so future Caelestia/Blueprint changes cannot silently reintroduce the wrong key.
+Repository CI and `check-spotify` validate the same identity aliases across Caelestia, Hyprland and the desktop entry so future client or window-system changes cannot silently split special-workspace behavior from launcher behavior.
 
 ## Single managed launcher
 
@@ -73,7 +75,7 @@ Spicetify requires Spotify to create `~/.config/spotify/prefs`. On a fresh syste
 
 `Super+M` uses `devos-spotify` through Caelestia's music toggle configuration. Normal app-launcher starts and `spotify:` links use that same managed path.
 
-`check-spotify` verifies the Caelestia toggle schema, real protocol association, single-wrapper guard, desktop URI contract, themed launcher routing, semantic Caelestia surface layer, no-hard-coded-color rule and both generated-theme revision markers, so a stale or partially bypassed Spotify integration is reported as a failure rather than silently behaving differently from the repository state.
+`check-spotify` verifies the shared window identity contract, Caelestia toggle schema, real protocol association, single-wrapper guard, desktop URI contract, themed launcher routing, semantic Caelestia surface layer, no-hard-coded-color rule and both generated-theme revision markers, so a stale or partially bypassed Spotify integration is reported as a failure rather than silently behaving differently from the repository state.
 
 Validate with:
 
