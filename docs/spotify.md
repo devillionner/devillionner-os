@@ -51,7 +51,15 @@ The Caelestia surface layer uses opaque semantic theme colors inside the Spotify
 
 The Blueprint shadows the stock `spotify-launcher.desktop`, but preserves the upstream desktop contract: `%U`, `TryExec` and `x-scheme-handler/spotify` remain present and route through `devos-spotify` instead of bypassing the adaptive theme.
 
+`configure-spotify` also sets `x-scheme-handler/spotify=spotify-launcher.desktop` in `~/.config/mimeapps.list`. It owns only that protocol mapping and preserves unrelated browser/MIME defaults, so clicking a `spotify:` link consistently enters the managed themed launcher instead of depending on whichever desktop association happened to exist before restore.
+
 When a `spotify:` URI is opened while Spotify is already running, `devos-spotify` first uses the standard MPRIS `OpenUri` method so it does not unnecessarily re-run Spicetify or disturb the existing client. If MPRIS is unavailable, it falls back to `spotify-launcher`'s native positional URI support. The same native URI support is preserved on the first vanilla launch before Spotify has generated its prefs.
+
+## Single managed launcher
+
+`devos-spotify` holds `~/.local/state/devillionner-os/spotify-wrapper.lock` with `flock` for the lifetime of the managed Spotify session. That guarantees one wrapper owns `spicetify watch -s`, so repeated app-menu or `Super+M` launches do not accumulate duplicate theme watcher processes.
+
+A `spotify:` link is handled specially: if another managed wrapper is still starting Spotify, the new invocation waits for MPRIS and forwards the URI to the first client. Normal duplicate launches become no-ops. The lock is inherited through the vanilla fallback on first launch/theme failure, so the same single-session rule remains valid there too.
 
 ## First launch
 
@@ -59,7 +67,7 @@ Spicetify requires Spotify to create `~/.config/spotify/prefs`. On a fresh syste
 
 `Super+M` uses `devos-spotify` through Caelestia's music toggle configuration. Normal app-launcher starts and `spotify:` links use that same managed path.
 
-`check-spotify` verifies the desktop URI contract, themed launcher routing, semantic Caelestia surface layer, no-hard-coded-color rule and both generated-theme revision markers, so a stale or partially bypassed Spotify integration is reported as a failure rather than silently behaving differently from the repository state.
+`check-spotify` verifies the real protocol association, single-wrapper guard, desktop URI contract, themed launcher routing, semantic Caelestia surface layer, no-hard-coded-color rule and both generated-theme revision markers, so a stale or partially bypassed Spotify integration is reported as a failure rather than silently behaving differently from the repository state.
 
 Validate with:
 
