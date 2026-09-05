@@ -25,9 +25,10 @@ grep -Fq 'THEME="Bibata-Modern-Ice"' "$CONFIG" \
     || fail "cursor configurator does not own the complete XCursor/GTK contract"
 
 # Bibata's official Arch package is XCursor-only. Current Hyprland must fall
-# back through XCURSOR_THEME; pointing HYPRCURSOR_THEME or hyprctl setcursor at
-# this package would claim a native hyprcursor theme that is not installed.
-if grep -Fq 'HYPRCURSOR_THEME' "$CONFIG" || grep -Fq 'hyprctl setcursor' "$CONFIG"; then
+# back through XCURSOR_THEME; do not actually configure a HYPRCURSOR theme or
+# call setcursor for this package. Ignore comments when enforcing this.
+if grep -Eq '^[[:space:]]*(export[[:space:]]+)?HYPRCURSOR_THEME=' "$CONFIG" \
+    || grep -Eq '^[[:space:]]*hyprctl[[:space:]]+setcursor([[:space:]]|$)' "$CONFIG"; then
     fail "XCursor-only Bibata configurator incorrectly claims hyprcursor support"
 fi
 
