@@ -8,15 +8,60 @@ SPOTIFY_ROOT="$DATA_HOME/spotify-launcher/install/usr/share/spotify"
 PREFS="$CONFIG_HOME/spotify/prefs"
 LOG_DIR="$STATE_HOME/devillionner-os"
 LOG="$LOG_DIR/spotify.log"
+SPOTIFY_URI="${1:-}"
 mkdir -p "$LOG_DIR"
 
 notify() {
     command -v notify-send >/dev/null 2>&1 && notify-send "Spotify" "$1" >/dev/null 2>&1 || true
 }
 
+if [[ -n "$SPOTIFY_URI" && "$SPOTIFY_URI" != spotify:* ]]; then
+    notify "Ignoring unsupported launch target; only spotify: links are accepted"
+    SPOTIFY_URI=""
+fi
+if (($# > 1)); then
+    notify "Spotify accepts one link at a time; opening the first link only"
+fi
+
 if ! command -v spotify-launcher >/dev/null 2>&1; then
     notify "spotify-launcher is not installed"
     exit 127
+fi
+
+launch_vanilla() {
+    if [[ -n "$SPOTIFY_URI" ]]; then
+        exec spotify-launcher --skip-update "$SPOTIFY_URI"
+    fi
+    exec spotify-launcher --skip-update
+}
+
+open_spotify_uri() {
+    [[ -n "$SPOTIFY_URI" ]] || return 0
+    command -v busctl >/dev/null 2>&1 || return 1
+
+    local _
+    for _ in $(seq 1 80); do
+        if busctl --user call \
+            org.mpris.MediaPlayer2.spotify \
+            /org/mpris/MediaPlayer2 \
+            org.mpris.MediaPlayer2.Player \
+            OpenUri s "$SPOTIFY_URI" >>"$LOG" 2>&1; then
+            return 0
+        fi
+        sleep 0.1
+    done
+    return 1
+}
+
+# When Spotify is already alive, opening a spotify: link should not re-run
+# Spicetify or disturb the themed client. Prefer the standard MPRIS OpenUri
+# method; if the player has not exposed MPRIS, fall back to spotify-launcher's
+# native positional URI support.
+if [[ -n "$SPOTIFY_URI" ]] && pgrep -x spotify >/dev/null 2>&1; then
+    if open_spotify_uri; then
+        exit 0
+    fi
+    launch_vanilla
 fi
 
 # spotify-launcher owns updates/downloads; Spicetify then operates on its
@@ -25,20 +70,21 @@ spotify-launcher --no-exec >>"$LOG" 2>&1 || true
 
 if ! "$HOME/.local/bin/devos-spotify-theme-bootstrap" >>"$LOG" 2>&1; then
     notify "Adaptive theme bootstrap failed; opening Spotify without it"
-    exec spotify-launcher --skip-update
+    launch_vanilla
 fi
 "$HOME/.local/bin/devos-spotify-theme-sync" >>"$LOG" 2>&1 || true
 
 # Spicetify requires Spotify to have generated prefs first. Keep first launch
 # vanilla and functional, then the next launch becomes themed automatically.
+# spotify-launcher itself accepts one positional URI and converts it to --uri=.
 if [[ ! -f "$PREFS" ]]; then
     notify "First launch: sign in and leave Spotify open about a minute, then reopen it for the adaptive theme"
-    exec spotify-launcher --skip-update
+    launch_vanilla
 fi
 
 if ! command -v spicetify >/dev/null 2>&1 || [[ ! -d "$SPOTIFY_ROOT" ]]; then
     notify "Spicetify is not ready; opening Spotify normally"
-    exec spotify-launcher --skip-update
+    launch_vanilla
 fi
 
 spicetify config \
@@ -52,7 +98,7 @@ spicetify config \
     spotify_launch_flags '--remote-debugging-port=9222|--remote-allow-origins=*' \
     >>"$LOG" 2>&1 || {
         notify "Spicetify configuration failed; opening Spotify normally"
-        exec spotify-launcher --skip-update
+        launch_vanilla
     }
 
 # `auto` handles first backup, Spotify upgrades and applying the theme, then
@@ -60,7 +106,7 @@ spicetify config \
 # color.ini when Caelestia changes the wallpaper palette.
 if ! spicetify -q auto >>"$LOG" 2>&1; then
     notify "Spicetify apply failed; opening Spotify normally"
-    exec spotify-launcher --skip-update
+    launch_vanilla
 fi
 
 for _ in $(seq 1 100); do
@@ -70,6 +116,13 @@ done
 
 if ! pgrep -x spotify >/dev/null 2>&1; then
     exit 0
+fi
+
+if [[ -n "$SPOTIFY_URI" ]] && ! open_spotify_uri; then
+    # MPRIS is optional and may come up late. spotify-launcher has native URI
+    # forwarding, so use it as the final compatibility fallback without
+    # changing the Spicetify launch flags stored for later sessions.
+    spotify-launcher --skip-update "$SPOTIFY_URI" >>"$LOG" 2>&1 &
 fi
 
 # Give the remote-debugging endpoint a moment to appear. If it is still late,
