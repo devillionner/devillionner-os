@@ -16,34 +16,11 @@ install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.path" "$
 install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.service" "$HOME/.config/systemd/user/devos-spotify-theme.service"
 install -Dm644 "$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop" "$HOME/.local/share/applications/spotify-launcher.desktop"
 
-# Preserve any user toggle customizations and only own the Spotify entry.
-python - "$REPO/dotfiles/.config/caelestia/cli.json" "$HOME/.config/caelestia/cli.json" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-src, dst = map(Path, sys.argv[1:])
-addition = json.loads(src.read_text())
-try:
-    current = json.loads(dst.read_text()) if dst.exists() else {}
-except Exception:
-    current = {}
-
-def merge(a, b):
-    for k, v in b.items():
-        if isinstance(v, dict) and isinstance(a.get(k), dict):
-            merge(a[k], v)
-        else:
-            a[k] = v
-
-merge(current, addition)
-dst.parent.mkdir(parents=True, exist_ok=True)
-dst.write_text(json.dumps(current, indent=4) + "\n")
-PY
+# Caelestia CLI toggle/theme ownership lives in scripts/configure-caelestia-cli.
+# Keep this integration focused on Spotify-specific runtime/launcher state.
 
 # `services.defaultPlayer=Spotify` is part of the canonical Caelestia shell
-# policy and is now owned by scripts/configure-caelestia. Keep this integration
-# focused on Spotify-specific runtime/launcher state.
+# policy and is owned by scripts/configure-caelestia.
 
 # Make the managed desktop entry the actual spotify: protocol handler while
 # preserving every unrelated MIME/browser association already present.
