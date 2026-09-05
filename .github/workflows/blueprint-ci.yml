@@ -23,3 +23,6 @@ jobs:
 
       - name: Validate Caelestia CLI ownership
         run: bash scripts/check-caelestia-cli-source
+
+      - name: Validate Quickshell rebuild contract
+        run: bash scripts/check-quickshell-rebuild-source
