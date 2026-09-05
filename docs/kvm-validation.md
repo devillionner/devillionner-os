@@ -25,16 +25,37 @@ Baseline requirements:
 
 Do not reuse a guest after a Blueprint profile has already been installed when claiming a **fresh profile** pass.
 
-## Evidence to keep
+## Pin one Blueprint revision per test
 
-For each profile, keep two logs:
+A clean-install test must use one exact repository revision from install through the post-reboot check. Do **not** `git pull` between those two stages.
+
+Immediately after cloning, record the tested revision:
 
 ```bash
+cd ~/devillionner-os
+git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
+```
+
+After reboot, verify the same revision is still checked out before validation:
+
+```bash
+cd ~/devillionner-os
+test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
+```
+
+If `main` changes while a VM test is in progress, finish or discard that test first. Update to the newer commit only before starting a new clean validation cycle.
+
+## Evidence to keep
+
+For each profile, keep the tested commit plus two logs:
+
+```text
+~/blueprint-tested-commit.txt
 ~/blueprint-<profile>-install.log
 ~/blueprint-<profile>-postreboot-check.log
 ```
 
-The install log proves the recovery checkpoint, package reconciliation, configurators and first aggregate check. The post-reboot log proves the resulting system survives a clean session restart and satisfies the same runtime contract.
+The install log proves the recovery checkpoint, package reconciliation, configurators and first aggregate check. The post-reboot log proves the resulting system survives a clean session restart and satisfies the **same revision's** runtime contract.
 
 A warning is not automatically a failure, but every warning must be understood before the profile is marked complete.
 
@@ -45,6 +66,7 @@ From the fresh Gaming guest:
 ```bash
 git clone https://github.com/devillionner/devillionner-os.git ~/devillionner-os
 cd ~/devillionner-os
+git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
 
 bash scripts/install \
   --profile gaming \
@@ -68,7 +90,7 @@ Then reboot and run:
 
 ```bash
 cd ~/devillionner-os
-git pull --ff-only
+test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
 bash scripts/check 2>&1 | tee ~/blueprint-gaming-postreboot-check.log
 ```
 
@@ -81,6 +103,7 @@ Start from a separate fresh baseline guest:
 ```bash
 git clone https://github.com/devillionner/devillionner-os.git ~/devillionner-os
 cd ~/devillionner-os
+git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
 
 bash scripts/install \
   --profile work \
@@ -96,7 +119,7 @@ After the installer finishes, reboot and run:
 
 ```bash
 cd ~/devillionner-os
-git pull --ff-only
+test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
 bash scripts/check 2>&1 | tee ~/blueprint-work-postreboot-check.log
 ```
 
@@ -111,6 +134,7 @@ Start from another fresh baseline guest. This profile must test its **default vi
 ```bash
 git clone https://github.com/devillionner/devillionner-os.git ~/devillionner-os
 cd ~/devillionner-os
+git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
 
 bash scripts/install \
   --profile laboratory \
@@ -126,7 +150,7 @@ After reboot:
 
 ```bash
 cd ~/devillionner-os
-git pull --ff-only
+test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
 bash scripts/check 2>&1 | tee ~/blueprint-laboratory-postreboot-check.log
 ```
 
@@ -152,11 +176,12 @@ A KVM guest cannot prove a real Miracast/WFD connection. The current three-mode 
 Only after at least one clean profile is stable:
 
 1. snapshot the VM;
-2. perform a real system update that changes the relevant Qt libraries;
-3. confirm `rebuild-detector`/`checkrebuild` identifies stale `quickshell-git` when applicable;
-4. run the normal Blueprint package reconciliation/restore path rather than manually rebuilding Quickshell first;
-5. confirm the same-version-capable rebuild occurs without `--needed` blocking it;
-6. require `qs --version` and `bash scripts/check-quickshell` to pass afterward.
+2. record the Blueprint commit being exercised;
+3. perform a real system update that changes the relevant Qt libraries;
+4. confirm `rebuild-detector`/`checkrebuild` identifies stale `quickshell-git` when applicable;
+5. run the normal Blueprint package reconciliation/restore path rather than manually rebuilding Quickshell first;
+6. confirm the same-version-capable rebuild occurs without `--needed` blocking it;
+7. require `qs --version` and `bash scripts/check-quickshell` to pass afterward.
 
 If the chosen update does not actually create an ABI mismatch, record the test as inconclusive rather than marking the rebuild path validated.
 
@@ -164,9 +189,9 @@ If the chosen update does not actually create an ABI mismatch, record the test a
 
 The KVM milestone is complete only when all of these are true:
 
-- Gaming: fresh install + reboot + aggregate PASS;
-- Work: fresh install + reboot + aggregate PASS;
-- Laboratory: fresh install + reboot + aggregate PASS, with virtualization state understood;
+- Gaming: fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
+- Work: fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
+- Laboratory: fresh install + reboot + aggregate PASS on one pinned Blueprint revision, with virtualization state understood;
 - no restore safety gate was weakened to obtain a pass;
 - each install created a usable-looking recovery-point record;
 - all unexplained WARN/FAIL output has been resolved or documented as an intentional environment limitation.
