@@ -74,6 +74,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor. 
 
 - [x] Three install profiles documented.
 - [x] Reusable virtualization feature documented.
+- [x] Clean KVM validation runbook documented without prematurely adding the one-command VM template.
 - [x] Keyboard chooser documented.
 - [x] Recovery-point behavior documented.
 - [x] Hardware-aware audio behavior documented.

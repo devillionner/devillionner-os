@@ -63,4 +63,6 @@ For now, guest creation stays in virt-manager so CPU/RAM/disk choices remain exp
 - virtio graphics with 3D acceleration when the host supports a render node;
 - SPICE/virt-viewer for the display.
 
-A reproducible one-command **Blueprint Test VM** template is a separate roadmap task and will be added only after the new host profiles pass clean-install validation.
+The current manual clean-install procedure for Gaming, Work and Laboratory is documented in [Clean KVM validation runbook](kvm-validation.md). It intentionally keeps the three guests separate and requires a post-reboot `bash scripts/check` pass for each profile.
+
+A reproducible one-command **Blueprint Test VM** template is a separate roadmap task and will be added only after the new host profiles pass that clean-install validation.
