@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+RECONCILE="$REPO/scripts/reconcile-packages"
+RUNTIME_CHECK="$REPO/scripts/check-quickshell"
+RESTORE="$REPO/scripts/restore"
+REPO_MANIFEST="$REPO/manifests/profiles/common-repo.txt"
+AUR_MANIFEST="$REPO/manifests/profiles/common-aur.txt"
+
+fail() {
+    printf '  [FAIL] %s\n' "$*" >&2
+    exit 1
+}
+
+ok() {
+    printf '  [OK]   %s\n' "$*"
+}
+
+for file in "$RECONCILE" "$RUNTIME_CHECK" "$RESTORE" "$REPO_MANIFEST" "$AUR_MANIFEST"; do
+    [[ -f "$file" ]] || fail "missing required file: ${file#$REPO/}"
+done
+ok "Quickshell rebuild contract files present"
+
+grep -Fqx 'rebuild-detector' "$REPO_MANIFEST" \
+    || fail "rebuild-detector must remain a common repository package"
+grep -Fqx 'quickshell-git' "$AUR_MANIFEST" \
+    || fail "quickshell-git must remain a common AUR package"
+ok "Quickshell and rebuild-detector remain common dependencies"
+
+for token in \
+    'quickshell_needs_abi_rebuild()' \
+    'checkrebuild' \
+    'rebuild-detector flagged a stale shared-library ABI' \
+    'qs --version' \
+    'rebuild-detector still flags quickshell-git after rebuild.'; do
+    grep -Fq "$token" "$RECONCILE" \
+        || fail "reconcile-packages missing Quickshell rebuild token: $token"
+done
+ok "reconcile-packages detects runtime and rebuild-detector failures"
+
+# Same-version VCS packages must be reinstalled after a Qt private-ABI change.
+# --needed would suppress exactly the rebuild we need.
+grep -Fq 'makepkg -si --noconfirm' "$RECONCILE" \
+    || fail "intentional Quickshell rebuild command missing"
+if grep -Fq 'makepkg -si --needed --noconfirm' "$RECONCILE"; then
+    fail "Quickshell rebuild still uses --needed and may skip same-version ABI rebuilds"
+fi
+ok "intentional Quickshell rebuild cannot be skipped by --needed"
+
+for token in \
+    'pacman -Qq quickshell-git' \
+    'qs --version' \
+    'checkrebuild' \
+    'rebuild-detector flags quickshell-git for ABI rebuild'; do
+    grep -Fq "$token" "$RUNTIME_CHECK" \
+        || fail "runtime checker missing assertion: $token"
+done
+ok "runtime checker validates package, executable and ABI state"
+
+grep -Fq 'check-quickshell' "$RESTORE" \
+    || fail "restore does not include Quickshell runtime/ABI validation"
+ok "restore includes Quickshell runtime/ABI validation"
+
+printf '\nRESULT: PASS\n'
