@@ -39,7 +39,7 @@ Mapping:
 
 `devos-spotify-theme.path` watches the Caelestia/Hypr scheme directory. When wallpaper-derived colors change, it rewrites `color.ini`. Spotify is launched through `devos-spotify`, which keeps `spicetify watch -s` attached while Spotify is running, so the active client hot-reloads the new palette.
 
-The restore rsync excludes `~/.config/caelestia/cli.json` from blind copying. `configure-dolphin` and `configure-spotify` then merge only their owned keys into the existing file, so unrelated Caelestia toggles survive a full Blueprint restore.
+The restore rsync excludes `~/.config/caelestia/cli.json` from blind copying. One central `configure-caelestia-cli` merge owns both the Colloid-Dark theme key and the Spotify toggle while preserving unrelated Caelestia CLI settings. `configure-spotify` invokes that central owner when run standalone instead of parsing or rewriting `cli.json` itself.
 
 ## Transparency
 
@@ -61,7 +61,7 @@ When a `spotify:` URI is opened while Spotify is already running, `devos-spotify
 
 `~/.config/caelestia/cli.json` keeps the `Super+M` music toggle on the managed `devos-spotify` command. Spotify is matched by both known class variants and then by `initialTitle` values `Spotify` / `Spotify Free`. `initialTitle` is the current Caelestia CLI JSON key; the older Blueprint `initial_title` spelling was invalid for this schema and could silently disable the title fallback when Spotify exposed no useful class.
 
-Repository CI and `check-spotify` validate the same identity aliases across Caelestia, Hyprland and the desktop entry so future client or window-system changes cannot silently split special-workspace behavior from launcher behavior.
+The toggle is part of the canonical merge-managed CLI policy rather than Spotify-specific ad-hoc JSON editing. Repository CI and `check-spotify` validate the same identity aliases across Caelestia, Hyprland and the desktop entry so future client or window-system changes cannot silently split special-workspace behavior from launcher behavior.
 
 ## Single managed launcher
 
