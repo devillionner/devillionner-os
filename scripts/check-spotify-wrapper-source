@@ -7,6 +7,7 @@ CHECK="$REPO/scripts/check-spotify"
 DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
 CLI="$REPO/dotfiles/.config/caelestia/cli.json"
 SYNC="$REPO/dotfiles/.local/bin/devos-spotify-theme-sync"
+OVERRIDES="$REPO/dotfiles/.config/spicetify/devillionner-overrides.css"
 
 FAIL=0
 OK=0
@@ -47,6 +48,19 @@ data = json.loads(p.read_text(encoding="utf-8"))
 assert data["toggles"]["music"]["spotify"]["command"] == ["devos-spotify"]
 PY
 ok "Caelestia toggle uses the same PATH-resolved command"
+
+# The pinned upstream text theme paints an opaque background behind the pane
+# labels, which visually cuts the highlighted pane border. Blueprint overrides
+# must leave that label background transparent and use a semantic text shadow
+# instead, so the outline stays continuous without hard-coded colors.
+if grep -Fq 'background: transparent !important;' "$OVERRIDES" \
+    && grep -Fq 'text-shadow:' "$OVERRIDES" \
+    && grep -Fq -- '-2px 0 var(--spice-main)' "$OVERRIDES" \
+    && grep -Fq 'Root__right-sidebar:has(aside:not(:empty))::before' "$OVERRIDES"; then
+    ok "pane labels preserve continuous semantic borders"
+else
+    fail "Spotify pane-label border continuity contract differs"
+fi
 
 # Reproduce the physical-host palette format with GNU awk and require a silent
 # parse. The old /[\",]/ expression produced one warning per palette key even
