@@ -4,9 +4,20 @@ The Blueprint uses the official Arch `spotify-launcher` package together with `s
 
 ## Visual base
 
-The UI starts from Spicetify's upstream `text` theme, pinned to commit `3f55a3702bd6d87799dc97023e0fe2b11d88c704` (the 2026-09-04 Spotify 1.2.98 compatibility update). `devos-spotify-theme-bootstrap` downloads that exact CSS once, removes remote font imports, and appends the Blueprint's small layout layer. JetBrains Mono Nerd Font is already installed locally.
+The UI starts from Spicetify's upstream `text` theme, pinned to commit `3f55a3702bd6d87799dc97023e0fe2b11d88c704` (the 2026-09-04 Spotify 1.2.98 compatibility update). `devos-spotify-theme-bootstrap` downloads that exact CSS once, removes remote font imports, and appends the Blueprint's layout layer. JetBrains Mono Nerd Font is already installed locally.
 
-The Blueprint does not copy 43PR's static Monochrome palette. Only the text-theme layout language is retained.
+The Blueprint does not copy 43PR's static Monochrome palette. The text-theme structure remains recognizable, but Blueprint now adds its own Caelestia-oriented surface system on top:
+
+- compact 10 px panel gaps;
+- 14 px primary pane radius and 10 px control/card radius;
+- search, cards, menus and filter controls use the adaptive `surfaceContainer` semantic color;
+- hover/selected surfaces use adaptive `surfaceContainerHigh`;
+- borders follow `outlineVariant` / `primary` through the generated Spicetify palette;
+- keyboard focus uses the adaptive accent instead of browser-default outlines;
+- media corners, library rows and track rows share the same shape language;
+- no extra CSS transparency is introduced.
+
+All of those rules reference Spicetify semantic variables. `devillionner-overrides.css` intentionally contains no hard-coded hex/RGB/HSL colors, so a wallpaper change can recolor the interface without leaving static UI fragments behind.
 
 The generated theme cache tracks two revisions independently: the pinned upstream commit and the SHA-256 fingerprint of Blueprint-owned `devillionner-overrides.css`. If either changes, `user.css` is rebuilt automatically. This prevents a Blueprint UI update from being skipped merely because the upstream Spicetify theme pin stayed the same.
 
@@ -18,7 +29,7 @@ Mapping:
 
 - accent / active border / banner -> `primary`
 - background -> `surface`
-- header -> `surfaceContainer`
+- header / elevated surface -> `surfaceContainer`
 - hover/highlight -> `surfaceContainerHigh`
 - inactive border -> `outlineVariant`
 - text -> `onSurface`
@@ -34,7 +45,7 @@ The restore rsync excludes `~/.config/caelestia/cli.json` from blind copying. `c
 
 Actual window transparency belongs to Hyprland, not the Spotify CSS. Spotify therefore uses the same Blueprint `windowOpacity = 0.95` as Dolphin. The fullscreen rule keeps the same 0.95 value instead of jumping to 1.0. Apps explicitly tagged `opaque` and games still opt out at 1.0.
 
-This avoids stacking CSS alpha on top of compositor alpha, which would make Spotify more transparent than Dolphin.
+The Caelestia surface layer uses opaque semantic theme colors inside the Spotify window rather than stacking another alpha layer. This keeps visual hierarchy without making Spotify more transparent than Dolphin.
 
 ## Desktop integration and links
 
@@ -48,7 +59,7 @@ Spicetify requires Spotify to create `~/.config/spotify/prefs`. On a fresh syste
 
 `Super+M` uses `devos-spotify` through Caelestia's music toggle configuration. Normal app-launcher starts and `spotify:` links use that same managed path.
 
-`check-spotify` verifies the desktop URI contract, themed launcher routing and both generated-theme revision markers, so a stale or partially bypassed Spotify integration is reported as a failure rather than silently behaving differently from the repository state.
+`check-spotify` verifies the desktop URI contract, themed launcher routing, semantic Caelestia surface layer, no-hard-coded-color rule and both generated-theme revision markers, so a stale or partially bypassed Spotify integration is reported as a failure rather than silently behaving differently from the repository state.
 
 Validate with:
 

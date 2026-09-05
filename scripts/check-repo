@@ -107,6 +107,7 @@ required_paths=(
     scripts/check-spotify
     scripts/configure-tv-cast
     scripts/check-tv-cast
+    dotfiles/.config/spicetify/devillionner-overrides.css
     dotfiles/.local/bin/devos-spotify
     dotfiles/.local/bin/devos-spotify-theme-bootstrap
     dotfiles/.local/share/applications/spotify-launcher.desktop
@@ -219,6 +220,40 @@ if grep -Fq 'overrides-sha256' "$SPOTIFY_BOOTSTRAP" \
     ok "Spotify theme cache tracks Blueprint override revisions"
 else
     fail "Spotify theme override fingerprinting is incomplete"
+fi
+
+SPOTIFY_OVERRIDES="$REPO/dotfiles/.config/spicetify/devillionner-overrides.css"
+if python3 - "$SPOTIFY_OVERRIDES" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+clean = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+clean = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', "", clean)
+if clean.count("{") != clean.count("}"):
+    raise SystemExit("unbalanced CSS braces")
+required = (
+    "--devos-surface: var(--spice-header);",
+    "--devos-surface-high: var(--spice-highlight);",
+    "--devos-outline: var(--spice-border-inactive);",
+    "--devos-outline-active: var(--spice-border-active);",
+    "--devos-accent: var(--spice-accent);",
+    "--panel-gap: var(--devos-panel-gap) !important;",
+)
+for token in required:
+    if token not in text:
+        raise SystemExit(f"missing semantic surface token: {token}")
+if re.search(r"#[0-9a-fA-F]{3,8}\b", clean):
+    raise SystemExit("hard-coded hex color in Spotify overrides")
+if re.search(r"\b(?:rgb|hsl)a?\(", clean, flags=re.I):
+    raise SystemExit("hard-coded rgb/hsl color in Spotify overrides")
+PY
+then
+    ok "Spotify Caelestia surface CSS is balanced, semantic and palette-only"
+else
+    fail "Spotify Caelestia surface CSS validation"
 fi
 
 SPOTIFY_DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"

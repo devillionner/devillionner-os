@@ -50,6 +50,21 @@ else
     fail "theme CSS not bootstrapped"
 fi
 
+if grep -Fq -- '--devos-surface: var(--spice-header);' "$OVERRIDES" 2>/dev/null \
+    && grep -Fq -- '--devos-surface-high: var(--spice-highlight);' "$OVERRIDES" 2>/dev/null \
+    && grep -Fq -- '--devos-accent: var(--spice-accent);' "$OVERRIDES" 2>/dev/null \
+    && grep -Fq -- '--panel-gap: var(--devos-panel-gap) !important;' "$OVERRIDES" 2>/dev/null; then
+    ok "Caelestia semantic surface layer installed"
+else
+    fail "Spotify Caelestia surface layer is incomplete"
+fi
+
+if grep -Eq '#[[:xdigit:]]{3,8}|(rgb|hsl)a?\(' "$OVERRIDES" 2>/dev/null; then
+    fail "Spotify overrides contain a hard-coded color; palette must stay Caelestia-driven"
+else
+    ok "Spotify layout layer has no hard-coded colors"
+fi
+
 grep -q '^\[Devillionner\]$' "$THEME/color.ini" 2>/dev/null && ok "adaptive color scheme generated" || fail "adaptive color.ini missing"
 
 if command -v sha256sum >/dev/null 2>&1 \
