@@ -8,6 +8,7 @@ SPOTIFY_ROOT="$DATA_HOME/spotify-launcher/install/usr/share/spotify"
 PREFS="$CONFIG_HOME/spotify/prefs"
 LOG_DIR="$STATE_HOME/devillionner-os"
 LOG="$LOG_DIR/spotify.log"
+LOCK="$LOG_DIR/spotify-wrapper.lock"
 SPOTIFY_URI="${1:-}"
 mkdir -p "$LOG_DIR"
 
@@ -62,6 +63,32 @@ if [[ -n "$SPOTIFY_URI" ]] && pgrep -x spotify >/dev/null 2>&1; then
         exit 0
     fi
     launch_vanilla
+fi
+
+# Keep exactly one managed launcher alive for the lifetime of Spotify. This
+# launcher owns `spicetify watch -s`; without the lock, repeated menu/hotkey
+# clicks could create multiple watchers for the same client. A URI launch that
+# races with initial startup waits for the first instance to expose MPRIS.
+if command -v flock >/dev/null 2>&1; then
+    exec 9>"$LOCK"
+    if ! flock -n 9; then
+        if [[ -n "$SPOTIFY_URI" ]] && open_spotify_uri; then
+            exit 0
+        fi
+        exit 0
+    fi
+else
+    notify "flock is unavailable; Spotify single-instance guard is disabled"
+fi
+
+# Re-check after acquiring the lock: Spotify may have appeared while this
+# wrapper was being scheduled. A normal duplicate launch should become a no-op;
+# a URI launch should be forwarded to the running client.
+if pgrep -x spotify >/dev/null 2>&1; then
+    if [[ -n "$SPOTIFY_URI" ]]; then
+        open_spotify_uri || launch_vanilla
+    fi
+    exit 0
 fi
 
 # spotify-launcher owns updates/downloads; Spicetify then operates on its

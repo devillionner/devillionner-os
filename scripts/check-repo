@@ -258,6 +258,7 @@ fi
 
 SPOTIFY_DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
 SPOTIFY_LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"
+SPOTIFY_CONFIG="$REPO/scripts/configure-spotify"
 if grep -Fqx 'TryExec=devos-spotify' "$SPOTIFY_DESKTOP" \
     && grep -Fqx 'Exec=devos-spotify %U' "$SPOTIFY_DESKTOP" \
     && grep -Fqx 'MimeType=x-scheme-handler/spotify;' "$SPOTIFY_DESKTOP" \
@@ -266,6 +267,17 @@ if grep -Fqx 'TryExec=devos-spotify' "$SPOTIFY_DESKTOP" \
     ok "Spotify desktop contract routes spotify: URIs through themed launcher"
 else
     fail "Spotify desktop URI integration is incomplete"
+fi
+
+if grep -Fq 'x-scheme-handler/spotify' "$SPOTIFY_CONFIG" \
+    && grep -Fq 'spotify-launcher.desktop' "$SPOTIFY_CONFIG" \
+    && grep -Fq 'spotify-wrapper.lock' "$SPOTIFY_LAUNCHER" \
+    && grep -Fq 'exec 9>"$LOCK"' "$SPOTIFY_LAUNCHER" \
+    && grep -Fq 'flock -n 9' "$SPOTIFY_LAUNCHER" \
+    && grep -Fq 'spotify-wrapper.lock' "$REPO/scripts/check-spotify"; then
+    ok "Spotify protocol default and single-wrapper lifecycle are managed"
+else
+    fail "Spotify protocol/default lifecycle guard is incomplete"
 fi
 
 if grep -Fq 'FEATURES=("tvcast")' "$REPO/scripts/restore" \
