@@ -100,6 +100,8 @@ else
 fi
 
 required_paths=(
+    scripts/check
+    scripts/check-quickshell
     scripts/configure-caelestia
     scripts/check-caelestia
     scripts/lib/merge-caelestia-shell.py
@@ -124,25 +126,35 @@ for path in "${required_paths[@]}"; do
 done
 [[ $FAIL -gt 0 ]] || ok "required integration files present"
 
-if grep -Fq '"$REPO/scripts/configure-caelestia"' "$REPO/scripts/restore" \
-    && grep -Fq '"$REPO/scripts/check-caelestia"' "$REPO/scripts/restore"; then
-    ok "Caelestia shell policy is wired into restore + validation"
+RUNTIME_CHECK="$REPO/scripts/check"
+RESTORE="$REPO/scripts/restore"
+
+if grep -Fq '"$REPO/scripts/configure-caelestia"' "$RESTORE" \
+    && grep -Fq '$REPO/scripts/check-caelestia' "$RUNTIME_CHECK"; then
+    ok "Caelestia shell policy is wired into restore + aggregate validation"
 else
     fail "Caelestia shell restore/check wiring is incomplete"
 fi
 
-if grep -Fq '"$REPO/scripts/configure-spotify"' "$REPO/scripts/restore" \
-    && grep -Fq '"$REPO/scripts/check-spotify"' "$REPO/scripts/restore"; then
-    ok "Spotify is wired into restore + validation"
+if grep -Fq '"$REPO/scripts/configure-spotify"' "$RESTORE" \
+    && grep -Fq '$REPO/scripts/check-spotify' "$RUNTIME_CHECK"; then
+    ok "Spotify is wired into restore + aggregate validation"
 else
     fail "Spotify restore/check wiring is incomplete"
 fi
 
-if grep -Fq '"$REPO/scripts/configure-dolphin"' "$REPO/scripts/restore" \
-    && grep -Fq '"$REPO/scripts/check-dolphin"' "$REPO/scripts/restore"; then
-    ok "Dolphin is wired into restore + validation"
+if grep -Fq '"$REPO/scripts/configure-dolphin"' "$RESTORE" \
+    && grep -Fq '$REPO/scripts/check-dolphin' "$RUNTIME_CHECK"; then
+    ok "Dolphin is wired into restore + aggregate validation"
 else
     fail "Dolphin restore/check wiring is incomplete"
+fi
+
+if grep -Fq '$REPO/scripts/check-quickshell' "$RUNTIME_CHECK" \
+    && grep -Fq '"$REPO/scripts/check" --profile "$PROFILE"' "$RESTORE"; then
+    ok "Quickshell and restore use the aggregate validation contract"
+else
+    fail "aggregate runtime validation wiring is incomplete"
 fi
 
 DOLPHIN_MANIFEST="$REPO/manifests/profiles/common-repo.txt"
@@ -160,7 +172,6 @@ else
     fail "Dolphin preview stack is incomplete"
 fi
 
-RESTORE="$REPO/scripts/restore"
 if grep -Fq -- "--exclude='caelestia/hypr-vars.lua'" "$RESTORE" \
     && grep -Fq -- "--exclude='caelestia/cli.json'" "$RESTORE" \
     && grep -Fq -- "--exclude='caelestia/shell.json'" "$RESTORE"; then
@@ -405,11 +416,12 @@ else
     fail "Spotify protocol/default lifecycle guard is incomplete"
 fi
 
-if grep -Fq 'FEATURES=("tvcast")' "$REPO/scripts/restore" \
-    && grep -Fq '"$REPO/scripts/check-tv-cast"' "$REPO/scripts/restore"; then
-    ok "TV Cast shared-feature wiring present"
+if grep -Fq 'FEATURES=("tvcast")' "$RESTORE" \
+    && grep -Fq 'FEATURES=("tvcast")' "$RUNTIME_CHECK" \
+    && grep -Fq '$REPO/scripts/check-tv-cast' "$RUNTIME_CHECK"; then
+    ok "TV Cast shared-feature wiring present in restore + aggregate validation"
 else
-    fail "TV Cast restore/check wiring is incomplete"
+    fail "TV Cast shared-feature validation wiring is incomplete"
 fi
 
 printf '\n========================================\n'
