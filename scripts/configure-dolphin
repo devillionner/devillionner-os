@@ -17,6 +17,7 @@ CONFIG_DIR="$(bp_config_dir)"
 mkdir -p "$CONFIG_DIR"
 
 "$REPO/scripts/configure-colloid-icons"
+bash "$REPO/scripts/configure-caelestia-cli"
 
 bp_info "Configuring Dolphin as the default file manager"
 
