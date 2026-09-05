@@ -27,6 +27,8 @@ The Blueprint therefore installs `/usr/local/bin/devos-dolphin`, which sets `QT_
 
 `Super+E` targets this wrapper. A user-level override of `org.kde.dolphin.desktop` preserves Dolphin's upstream desktop metadata/actions but rewrites its `Exec=` entries to the wrapper and disables D-Bus activation so app-menu and default-directory launches use the same fixed path.
 
+`configure-dolphin` owns only the `fileExplorer` key in `~/.config/caelestia/hypr-vars.lua`. It preserves unrelated Caelestia/user overrides and follows an existing symlink instead of deleting the whole override file. Validation requires exactly one `fileExplorer` entry and that entry must target the Blueprint wrapper.
+
 No fixed selection colour is written. The adaptive Caelestia palette remains the source of colours, so changing wallpaper can continue to retint Colloid folders normally.
 
 Upstream context: Darkly issue #316 documents the Dolphin/QStyle focus/highlight compatibility problem.
