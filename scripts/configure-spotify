@@ -12,7 +12,16 @@ command -v spicetify >/dev/null 2>&1 || bp_die "spicetify is missing"
 bash "$REPO/scripts/configure-caelestia-cli"
 
 bp_info "Installing adaptive Spotify integration"
-install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" "$HOME/.local/bin/devos-spotify"
+
+# The primary launcher is referenced by Caelestia and by a .desktop TryExec/Exec
+# entry, so it must live on the desktop session's normal system PATH. Do not
+# depend on an interactive shell adding ~/.local/bin. Keep a user-local symlink
+# as a migration shim so an existing PATH that prefers ~/.local/bin cannot
+# shadow the canonical launcher with an older Blueprint copy.
+sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" /usr/local/bin/devos-spotify
+mkdir -p "$HOME/.local/bin"
+ln -sfn /usr/local/bin/devos-spotify "$HOME/.local/bin/devos-spotify"
+
 install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap" "$HOME/.local/bin/devos-spotify-theme-bootstrap"
 install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-theme-sync" "$HOME/.local/bin/devos-spotify-theme-sync"
 install -Dm644 "$REPO/dotfiles/.config/spicetify/devillionner-overrides.css" "$HOME/.config/spicetify/devillionner-overrides.css"
