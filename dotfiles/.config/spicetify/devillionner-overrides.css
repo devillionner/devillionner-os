@@ -58,6 +58,23 @@
     border-radius: var(--devos-radius-control) !important;
 }
 
+/* Upstream text-theme pane labels sit on top of the border with an opaque
+ * background, which punches a large gap into the active outline. Keep the
+ * original label position, but let the pane border continue underneath and
+ * clear only the glyph edges so Library/Main/Sidebar/Playing stay readable. */
+.Root__globalNav::before,
+.Root__nav-bar .main-yourLibraryX-entryPoints::before,
+.Root__main-view::before,
+.main-nowPlayingBar-container::before,
+.Root__right-sidebar:has(aside:not(:empty))::before {
+    background: transparent !important;
+    text-shadow:
+        -2px 0 var(--spice-main),
+        2px 0 var(--spice-main),
+        0 -1px var(--spice-main),
+        0 1px var(--spice-main) !important;
+}
+
 /* Elevated controls use surfaceContainer / surfaceContainerHigh from the
  * Caelestia palette instead of adding another translucent layer. */
 .main-topBar-searchBar,
