@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -u
+
+OK=0; WARN=0; FAIL=0
+ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
+warn() { printf '  [WARN] %s\n' "$*"; WARN=$((WARN + 1)); }
+fail() { printf '  [FAIL] %s\n' "$*"; FAIL=$((FAIL + 1)); }
+
+printf '========================================\n'
+printf '       Quickshell runtime check\n'
+printf '========================================\n'
+
+if pacman -Qq quickshell-git >/dev/null 2>&1; then
+    ok "quickshell-git installed"
+else
+    fail "quickshell-git missing"
+fi
+
+if command -v qs >/dev/null 2>&1; then
+    ok "qs executable available"
+else
+    fail "qs executable missing"
+fi
+
+QS_VERSION=""
+if command -v qs >/dev/null 2>&1; then
+    if QS_VERSION="$(qs --version 2>&1)"; then
+        ok "Quickshell runtime: ${QS_VERSION:-version command succeeded}"
+    else
+        fail "Quickshell runtime failed: ${QS_VERSION:-unknown error}"
+    fi
+fi
+
+if command -v checkrebuild >/dev/null 2>&1; then
+    ok "rebuild-detector available"
+    REBUILD_OUTPUT="$(checkrebuild 2>/dev/null || true)"
+    if grep -Eq '(^|[[:space:]])quickshell-git([[:space:]]|$)' <<< "$REBUILD_OUTPUT"; then
+        fail "rebuild-detector flags quickshell-git for ABI rebuild"
+    else
+        ok "quickshell-git not flagged for ABI rebuild"
+    fi
+else
+    fail "checkrebuild missing (rebuild-detector package required)"
+fi
+
+printf '\nOK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then
+    printf 'RESULT: PASS\n'
+    exit 0
+fi
+printf 'RESULT: FAIL\n'
+exit 1

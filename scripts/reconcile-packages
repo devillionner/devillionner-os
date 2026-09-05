@@ -172,15 +172,26 @@ for pkg in "${AUR_PKGS[@]}"; do
     fi
 done
 
+quickshell_needs_abi_rebuild() {
+    command -v checkrebuild >/dev/null 2>&1 || return 1
+    local output
+    output="$(checkrebuild 2>/dev/null || true)"
+    grep -Eq '(^|[[:space:]])quickshell-git([[:space:]]|$)' <<< "$output"
+}
+
 if [[ "$NEED_QS" == true ]]; then
-    QS_HEALTHY=false
-    if pacman -Qq quickshell-git >/dev/null 2>&1 \
-        && qs --version >/dev/null 2>&1; then
-        QS_HEALTHY=true
+    QS_REBUILD_REASON=""
+
+    if ! pacman -Qq quickshell-git >/dev/null 2>&1; then
+        QS_REBUILD_REASON="package missing"
+    elif ! command -v qs >/dev/null 2>&1 || ! qs --version >/dev/null 2>&1; then
+        QS_REBUILD_REASON="runtime check failed"
+    elif quickshell_needs_abi_rebuild; then
+        QS_REBUILD_REASON="rebuild-detector flagged a stale shared-library ABI"
     fi
 
-    if [[ "$QS_HEALTHY" != true ]]; then
-        bp_info "Building current quickshell-git for Caelestia"
+    if [[ -n "$QS_REBUILD_REASON" ]]; then
+        bp_info "Building current quickshell-git for Caelestia ($QS_REBUILD_REASON)"
 
         if pacman -Qq noctalia-qs >/dev/null 2>&1; then
             bp_info "Removing conflicting noctalia-qs provider"
@@ -191,14 +202,22 @@ if [[ "$NEED_QS" == true ]]; then
         git clone --depth 1 https://aur.archlinux.org/quickshell-git.git "$TMP_QS"
         (
             cd "$TMP_QS"
-            makepkg -si --needed --noconfirm
+            # This is an intentional rebuild, not an ordinary install. Do not
+            # pass --needed: the installed VCS version can be identical while
+            # its binaries are still linked against the previous Qt ABI.
+            makepkg -si --noconfirm
         )
 
+        pacman -Qq quickshell-git >/dev/null 2>&1 \
+            || bp_die "quickshell-git is missing after rebuild."
         qs --version >/dev/null 2>&1 \
             || bp_die "quickshell-git still fails after rebuild."
-        bp_ok "quickshell-git runtime healthy"
+        if quickshell_needs_abi_rebuild; then
+            bp_die "rebuild-detector still flags quickshell-git after rebuild."
+        fi
+        bp_ok "quickshell-git runtime and ABI healthy"
     else
-        bp_ok "quickshell-git runtime healthy"
+        bp_ok "quickshell-git runtime and ABI healthy"
     fi
 fi
 

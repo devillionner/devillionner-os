@@ -4,10 +4,13 @@
 
 ```bash
 bash scripts/check
+bash scripts/check-quickshell
 bash scripts/check-tv-cast
 ```
 
 The main check validates the selected profile, enabled features, core binaries, Quickshell runtime, Caelestia compatibility patches, keyboard mode, hardware/audio helper selection, services and Git state.
+
+The dedicated Quickshell check validates that `quickshell-git` is installed, `qs --version` succeeds and `rebuild-detector` does not report the package as linked against stale libraries.
 
 The TV Cast check validates Miracast dependencies, installed helper files, shell/Python syntax, FluxCast low-latency tuning, the two cast modes, `fast_bilinear`, gettext catalogs, UFW rules and the single persistent `Super+P` bind.
 
@@ -51,14 +54,14 @@ ASUS Zenbook UX3405CA: `eq-laptop`, `eq-dolby`, `eq-sony`.
 
 Generic hardware: EasyEffects is installed, but presets are user-managed (`eq-audio`).
 
-## Caelestia restart
+## Caelestia / Quickshell restart
 
 ```bash
 qs -c caelestia kill
 caelestia shell -d
 ```
 
-The Blueprint validates `qs --version` because Quickshell can require a rebuild after a Qt private-ABI update.
+A Qt private-ABI update can leave `quickshell-git` installed but stale. Package reconciliation checks both `qs --version` and `checkrebuild`; if either indicates a broken/stale Quickshell build, Blueprint rebuilds the current AUR package without `--needed` and verifies the ABI state again. See `docs/quickshell.md`.
 
 ## YouTube Music
 

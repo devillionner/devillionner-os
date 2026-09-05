@@ -6,15 +6,16 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 
 - [x] Add repository-level CI for Bash syntax, JSON syntax, manifest duplicates and core restore/check wiring.
 - [x] Merge-manage Caelestia `shell.json` and validate the common idle/app policy without overwriting unrelated local settings.
+- [x] Detect and automatically rebuild stale `quickshell-git` after Qt ABI changes, with `rebuild-detector` + runtime validation.
 - [ ] Fresh **Gaming** install in KVM.
 - [ ] Fresh **Work** install in KVM.
 - [ ] Fresh **Laboratory** install in KVM (virtualization enabled by default).
 - [ ] Reboot each VM and run `bash scripts/check`.
+- [ ] Exercise the automatic Quickshell ABI rebuild after a real Qt update in a clean KVM.
 - [ ] Validate the virtualization feature on a physical Linux host with `/dev/kvm`.
 - [ ] Verify a Linux/Hyprland guest uses virtio/virgl rather than `llvmpipe` when 3D acceleration is enabled.
 - [ ] After VM passes, test on the reserved physical Blueprint partition.
 - [ ] Verify Snapper/Btrfs checkpoint is usable before touching the main installation.
-- [ ] Verify Quickshell rebuild logic after a Qt update.
 
 ## P1 — visible desktop / UX
 
@@ -72,6 +73,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor.
 - [x] Hardware-aware audio behavior documented.
 - [x] Helper commands documented.
 - [x] Caelestia shell policy documented.
+- [x] Quickshell ABI recovery documented.
 - [x] Adaptive Spotify integration documented.
 - [x] Repository CI / source-integrity validation documented.
 - [ ] Add screenshots only after the clean-install UI is stable.

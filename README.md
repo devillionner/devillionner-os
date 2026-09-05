@@ -28,6 +28,8 @@ All three profiles also include **Spotify + Spicetify** with the `devillionner-t
 
 Caelestia's `shell.json` and `cli.json` are merge-managed rather than blindly replaced. Blueprint owns the common app/idle policy, Colloid-Dark CLI theme setting and Spotify toggle while preserving unrelated local Caelestia settings. The idle policy locks at 30 min, turns the display off at 35 min and suspends/hibernates at 60 min.
 
+Quickshell is ABI-checked after package reconciliation and restore. If `qs --version` fails or `rebuild-detector` flags `quickshell-git` after a Qt library update, Blueprint performs an intentional same-version-capable rebuild and validates the result before reporting success.
+
 Virtualization is a reusable feature, not hard-wired to one profile. Work or Gaming can enable the same KVM/libvirt/virt-manager stack during install or with:
 
 ```bash
@@ -46,8 +48,9 @@ On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbo
 - Physical restore is currently allowed only on the reserved Blueprint test partition.
 - A pre-restore Btrfs/Snapper recovery point is created before package/system changes.
 - The scripts never repartition disks or touch Windows partitions.
-- GitHub pull requests run repository-integrity and Caelestia contract checks before changes reach `main`.
+- GitHub pull requests run repository-integrity and desktop-contract checks before changes reach `main`.
 - Merge-managed Caelestia JSON refuses malformed existing files instead of silently overwriting them.
+- Quickshell rebuilds are checked both by runtime validation and a source-level CI contract.
 
 Recommended validation order:
 
@@ -61,6 +64,7 @@ Recommended validation order:
 ```bash
 bash scripts/check-repo
 bash scripts/check
+bash scripts/check-quickshell
 bash scripts/configure-caelestia
 bash scripts/configure-caelestia-cli
 bash scripts/check-caelestia
@@ -75,6 +79,7 @@ See:
 
 - [Profiles and hardware behavior](docs/profiles.md)
 - [Caelestia configuration policy](docs/caelestia.md)
+- [Quickshell ABI recovery](docs/quickshell.md)
 - [Dolphin file manager](docs/dolphin.md)
 - [Adaptive Spotify](docs/spotify.md)
 - [TV Cast / Miracast](docs/tv-cast.md)
@@ -92,7 +97,7 @@ See:
 - Normal desktop translucency remains `0.95` in fullscreen; explicitly opaque apps and games opt out at `1.0`.
 - Colloid-Dark is the common icon theme. Papirus is no longer declared by the Blueprint just to theme the file manager.
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
-- Quickshell runtime health is validated, so a Qt ABI break is caught instead of silently passing.
+- Quickshell runtime + shared-library ABI state are validated; stale Qt-linked builds are rebuilt without `--needed` and checked again afterward.
 - Caelestia fullscreen and `Env` compatibility patches are applied during restore and validated afterward.
 - TV Cast uses FluxCast/WFD + wf-recorder + Fuzzel and is shared by Gaming, Work and Laboratory.
 - KVM/QEMU + libvirt + virt-manager is the standard general VM stack; VirtualBox is not the Blueprint default.
