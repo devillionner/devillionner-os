@@ -7,6 +7,10 @@ source "$REPO/scripts/lib/common.sh"
 command -v spotify-launcher >/dev/null 2>&1 || bp_die "spotify-launcher is missing"
 command -v spicetify >/dev/null 2>&1 || bp_die "spicetify is missing"
 
+# Keep standalone Spotify configuration aligned with the single Caelestia CLI
+# owner instead of mutating cli.json here.
+bash "$REPO/scripts/configure-caelestia-cli"
+
 bp_info "Installing adaptive Spotify integration"
 install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" "$HOME/.local/bin/devos-spotify"
 install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap" "$HOME/.local/bin/devos-spotify-theme-bootstrap"
@@ -15,9 +19,6 @@ install -Dm644 "$REPO/dotfiles/.config/spicetify/devillionner-overrides.css" "$H
 install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.path" "$HOME/.config/systemd/user/devos-spotify-theme.path"
 install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.service" "$HOME/.config/systemd/user/devos-spotify-theme.service"
 install -Dm644 "$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop" "$HOME/.local/share/applications/spotify-launcher.desktop"
-
-# Caelestia CLI toggle/theme ownership lives in scripts/configure-caelestia-cli.
-# Keep this integration focused on Spotify-specific runtime/launcher state.
 
 # `services.defaultPlayer=Spotify` is part of the canonical Caelestia shell
 # policy and is owned by scripts/configure-caelestia.
