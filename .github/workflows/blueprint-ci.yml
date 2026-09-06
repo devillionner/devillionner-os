@@ -27,6 +27,9 @@ jobs:
       - name: Validate installer safety contract
         run: bash scripts/check-installer-safety-source
 
+      - name: Validate display manager contract
+        run: bash scripts/check-display-manager-source
+
       - name: Validate hardware audio policy
         run: bash scripts/check-hardware-audio-source
 

@@ -4,7 +4,9 @@
 
 Every profile receives the same lean desktop core: Hyprland, Caelestia, Quickshell, Kitty, Fish, Helium, PipeWire/WirePlumber, EasyEffects, Dolphin, common viewers, fonts, firmware and basic maintenance tools.
 
-The active manifests intentionally do not install several duplicate applications from the old full-system capture. In particular, the Blueprint has one default terminal (**Kitty**) and one default file manager (**Dolphin**).
+The active manifests intentionally do not install several duplicate applications from the old full-system capture. In particular, the Blueprint has one default terminal (**Kitty**), one default file manager (**Dolphin**) and one login/display manager (**SDDM**).
+
+SDDM matches the CachyOS Hyprland baseline and is enabled for the next boot without restarting the active graphical session during restore. Login-screen theming/customization remains a separate UX task; the current contract is about having one deterministic display manager.
 
 Dolphin uses Colloid-Dark, double-click activation, compact 16 px Places icons and Swappy for JPEG/PNG/WEBP. Machine-specific Places/UDisks entries are deliberately not copied from one host. See `docs/dolphin.md`.
 

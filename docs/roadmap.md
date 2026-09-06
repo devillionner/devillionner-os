@@ -8,6 +8,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor. 
 - [x] Merge-manage Caelestia `shell.json` and validate the common idle/app policy without overwriting unrelated local settings.
 - [x] Detect and automatically rebuild stale `quickshell-git` after Qt ABI changes, with `rebuild-detector` + runtime validation.
 - [x] Make `bash scripts/check` the single full runtime contract used both by restore and post-reboot validation.
+- [x] Standardize the common login-manager baseline on **SDDM** and validate its next-boot alias instead of layering GDM onto a fresh CachyOS Hyprland install.
 - [x] Exercise focused Quickshell, Caelestia, Dolphin, Spotify and cursor runtime checks on the existing ASUS UX3405CA host without running a production restore.
 - [ ] Re-test the **current three-mode TV Cast** contract on the physical host + Miracast TV, including Low Latency 720p30 / 5 Mbps.
 - [ ] Resolve the intended keyboard layout/switch state on the existing host and rerun the current full `bash scripts/check` aggregate.
@@ -26,7 +27,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor. 
 - [ ] New calculator. Work profile temporarily keeps GNOME Calculator until the replacement is chosen and tested.
 - [ ] Tasks on the top menu.
 - [ ] Fix the “5 строчками” issue after reproducing it on the clean profile.
-- [ ] Replace/customize the login screen.
+- [ ] Customize/replace the current SDDM login screen without changing the validated login-manager baseline accidentally.
 - [x] Standardize music on Spotify + Spicetify with a Caelestia-adaptive theme and managed launcher.
 - [ ] Visually recheck the latest Spotify continuous pane-border tweak on the physical host.
 - [x] Complete Dolphin preview UX: Information panel, global thumbnails and image/video/document preview backends.

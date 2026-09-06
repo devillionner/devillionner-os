@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+pacman -Qq sddm >/dev/null 2>&1 \
+    || bp_die "SDDM is missing; package reconciliation did not install the Blueprint display manager."
+systemctl cat sddm.service >/dev/null 2>&1 \
+    || bp_die "sddm.service is unavailable after installing SDDM."
+
+bp_info "Configuring SDDM for the next login"
+
+# Do not use --now here: restore runs from the current graphical session and
+# restarting a display manager would terminate that session. --force replaces a
+# stale display-manager.service alias left by an older/other display manager so
+# the next boot has one deterministic Blueprint login manager.
+sudo systemctl enable --force sddm.service >/dev/null \
+    || bp_die "Could not enable SDDM as the display manager."
+
+if systemctl is-enabled sddm.service >/dev/null 2>&1; then
+    bp_ok "SDDM enabled for the next boot/login"
+else
+    bp_die "SDDM did not remain enabled after configuration."
+fi

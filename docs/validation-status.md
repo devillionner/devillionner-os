@@ -16,6 +16,7 @@ This file records **what has actually been exercised**. A green source/CI check 
 | Component / gate | CI / source | Existing UX3405CA host | Fresh KVM | Physical test partition | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Repository integrity | ✅ | n/a | ⏳ | ⏳ | GitHub Actions runs repository, documentation and component source contracts. |
+| SDDM login/display manager | ✅ | ⏳ | ⏳ | ⏳ | Blueprint now uses the CachyOS Hyprland-aligned SDDM baseline, forces the next-boot `display-manager.service` alias without restarting the current graphical session, and treats the old Blueprint GDM package as retired. Existing-host and clean-boot runtime checks are still pending. |
 | Quickshell runtime / ABI check | ✅ | ✅ | ⏳ | ⏳ | `check-quickshell` passed on the existing host. A deliberate real Qt-update rebuild exercise is still pending. |
 | Caelestia merge policy + package patches | ✅ | ✅ | ⏳ | ⏳ | `check-caelestia` passed after applying the managed settings and QML patches on the existing host. |
 | Dolphin | ✅ | ✅ | ⏳ | ⏳ | `check-dolphin`: 30 OK, 0 FAIL on the existing host; legacy Thunar only produced a warning. |
@@ -33,7 +34,7 @@ Legend: ✅ exercised at that level · ⚠️ useful evidence but current code d
 
 ## Next validation order
 
-1. Finish the two small existing-host visual checks when the laptop is available: Spotify pane border and Bibata cursor after relogin.
+1. Finish the small existing-host checks when the laptop is available: SDDM state, Spotify pane border and Bibata cursor after relogin.
 2. Apply the current TV Cast component and exercise all **three** modes against the physical Miracast TV, especially Low Latency.
 3. Resolve the intended keyboard layout/switch policy, then rerun the current aggregate `bash scripts/check` on the existing host.
 4. Fresh **Gaming** install in KVM → reboot → `bash scripts/check`.
