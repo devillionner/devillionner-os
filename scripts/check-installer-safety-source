@@ -170,8 +170,63 @@ grep -Fq 'install -Dm644 "$DESIRED_REPO" "$MANAGED_DIR/repo.txt"' "$RECONCILE" \
 grep -Fq 'install -Dm644 "$DESIRED_AUR" "$MANAGED_DIR/aur.txt"' "$RECONCILE" \
     || fail "AUR package ownership snapshot missing"
 
-if grep -Eq 'pacman[[:space:]]+-R[^\n]*(--nodeps|-d[[:space:]]|--cascade|-c[[:space:]])' "$RECONCILE"; then
-    fail "unsafe generic package-removal flags detected"
-fi
+# One force-removal exception exists for AUR dependency-layout migrations. It is
+# intentionally narrow: only already-installed packages from the desired AUR
+# target that paru itself reports as upgradeable may enter MIGRATION_BLOCKERS.
+# They are removed once with -Rdd and the complete desired AUR target is retried
+# immediately. Any broader/additional force-removal path must fail this contract.
+python3 - "$RECONCILE" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+
+raw_force_calls = re.findall(r'^\s*sudo\s+pacman\s+-Rdd\b[^\n]*$', text, re.M)
+force_calls = [line.strip() for line in raw_force_calls]
+expected = 'sudo pacman -Rdd --noconfirm "${MIGRATION_BLOCKERS[@]}"'
+if force_calls != [expected]:
+    raise SystemExit(f"unexpected pacman -Rdd calls: {force_calls}")
+
+required = [
+    'mapfile -t UPGRADABLE < <(paru -Qua --quiet 2>/dev/null || true)',
+    'MIGRATION_BLOCKERS=()',
+    'for pkg in "${FILTERED_AUR[@]}"; do',
+    'pacman -Qq "$pkg" >/dev/null 2>&1 || continue',
+    'printf \'%s\\n\' "${UPGRADABLE[@]}" | grep -qxF "$pkg"',
+    '&& MIGRATION_BLOCKERS+=("$pkg")',
+    'if ((${#MIGRATION_BLOCKERS[@]} == 0)); then',
+    'bp_die "AUR install failed and no safe Blueprint-managed upgrade blocker was identified"',
+    expected,
+    'if ! install_aur_target; then',
+    'bp_die "AUR install still fails after managed-package migration recovery"',
+]
+for needle in required:
+    if needle not in text:
+        raise SystemExit(f"AUR migration safety marker missing: {needle}")
+
+# Ordering matters: identify blockers first, force-remove only that array, then
+# immediately retry the complete desired AUR target.
+pos = {needle: text.index(needle) for needle in required}
+if not (
+    pos['mapfile -t UPGRADABLE < <(paru -Qua --quiet 2>/dev/null || true)']
+    < pos['MIGRATION_BLOCKERS=()']
+    < pos['for pkg in "${FILTERED_AUR[@]}"; do']
+    < pos[expected]
+    < pos['bp_die "AUR install still fails after managed-package migration recovery"']
+):
+    raise SystemExit("AUR migration recovery order changed unexpectedly")
+
+# Do not allow other common dependency-bypass/cascade removal forms anywhere in
+# the reconciler. The exact -Rdd exception above is the only permitted one.
+for line in text.splitlines():
+    stripped = line.strip()
+    if 'pacman ' not in stripped or ' -R' not in stripped:
+        continue
+    if stripped == expected:
+        continue
+    if re.search(r'(--nodeps|--cascade|\s-R[^\s]*d|\s-R[^\s]*c)', stripped):
+        raise SystemExit(f"unsafe additional removal flags: {stripped}")
+PY
 
 printf 'Installer safety contract: PASS\n'
