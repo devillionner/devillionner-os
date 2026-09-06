@@ -123,6 +123,11 @@ for feature in "${FEATURES[@]}"; do
 done
 "$REPO/scripts/reconcile-packages" "${RECONCILE_ARGS[@]}"
 
+# SDDM is the Blueprint login manager and also matches the fresh CachyOS
+# Hyprland baseline. Configure only the next boot/login; never restart the active
+# display manager in the middle of a restore session.
+"$REPO/scripts/configure-display-manager"
+
 bp_info "Restoring dotfiles"
 mkdir -p "$HOME/.config" "$HOME/.local"
 # These Caelestia files are merge-managed. Copying them blindly here would
@@ -248,7 +253,7 @@ if [[ "$VALIDATION_PASS" == true ]]; then
 else
     printf "\n========================================\n"
     printf "RESTORE COMPLETED WITH DIFFERENCES\n"
-printf "Review validation output above.\n"
+    printf "Review validation output above.\n"
     printf "========================================\n"
 fi
 
