@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+COMMON_REPO="$REPO/manifests/profiles/common-repo.txt"
+COMMON_SERVICES="$REPO/manifests/profiles/services-common.txt"
+LEGACY="$REPO/manifests/legacy-managed-packages.txt"
+CONFIGURE="$REPO/scripts/configure-display-manager"
+RUNTIME="$REPO/scripts/check-display-manager"
+AGGREGATE="$REPO/scripts/check"
+RESTORE="$REPO/scripts/restore"
+DOC="$REPO/docs/profiles.md"
+
+fail() {
+    printf 'Display manager source contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+for file in "$COMMON_REPO" "$COMMON_SERVICES" "$LEGACY" "$CONFIGURE" "$RUNTIME" "$AGGREGATE" "$RESTORE" "$DOC"; do
+    [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
+done
+
+bash -n "$CONFIGURE" || fail "configure-display-manager Bash syntax"
+bash -n "$RUNTIME" || fail "check-display-manager Bash syntax"
+
+[[ "$(grep -Fxc 'sddm' "$COMMON_REPO")" == "1" ]] \
+    || fail "common package manifest must contain exactly one sddm entry"
+if grep -Fqx 'gdm' "$COMMON_REPO"; then
+    fail "GDM is still active in the common package manifest"
+fi
+
+[[ "$(grep -Fxc 'sddm.service' "$COMMON_SERVICES")" == "1" ]] \
+    || fail "common services must contain exactly one sddm.service entry"
+if grep -Fqx 'gdm.service' "$COMMON_SERVICES"; then
+    fail "gdm.service is still active in the common service manifest"
+fi
+
+grep -Fqx 'gdm' "$LEGACY" \
+    || fail "retired Blueprint GDM package is not recorded for legacy ownership cleanup"
+
+# SDDM must be configured for the next boot without killing the current graphical
+# session in the middle of restore.
+grep -Fq 'systemctl enable --force sddm.service' "$CONFIGURE" \
+    || fail "configure-display-manager does not force the SDDM next-boot alias"
+if grep -Eq 'systemctl[[:space:]]+enable[[:space:]]+--now|systemctl[[:space:]]+(start|restart)[[:space:]]+sddm' "$CONFIGURE"; then
+    fail "configure-display-manager may restart SDDM during restore"
+fi
+
+python3 - "$RESTORE" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+needles = {
+    "reconcile": '"$REPO/scripts/reconcile-packages" "${RECONCILE_ARGS[@]}"',
+    "display": '"$REPO/scripts/configure-display-manager"',
+    "dotfiles": 'bp_info "Restoring dotfiles"',
+}
+positions = {}
+for label, needle in needles.items():
+    if needle not in text:
+        raise SystemExit(f"restore missing {label}: {needle}")
+    positions[label] = text.index(needle)
+if not positions["reconcile"] < positions["display"] < positions["dotfiles"]:
+    raise SystemExit("display-manager configuration must run after package reconciliation and before dotfile restore")
+PY
+
+for marker in \
+    'pacman -Qq sddm' \
+    'systemctl is-enabled sddm.service' \
+    'display-manager.service -> sddm.service'
+do
+    grep -Fq "$marker" "$RUNTIME" \
+        || fail "runtime SDDM validation missing marker: $marker"
+done
+
+grep -Fq '$REPO/scripts/check-display-manager' "$AGGREGATE" \
+    || fail "unified scripts/check does not aggregate display-manager validation"
+
+grep -Fq '**SDDM**' "$DOC" \
+    || fail "profile documentation does not identify SDDM as the Blueprint login manager"
+
+printf 'Display manager source contract: PASS\n'
