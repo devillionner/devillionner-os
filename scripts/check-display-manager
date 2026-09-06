@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -u
+
+OK=0
+WARN=0
+FAIL=0
+ok() { printf "  [OK]   %s\n" "$*"; OK=$((OK + 1)); }
+warn() { printf "  [WARN] %s\n" "$*"; WARN=$((WARN + 1)); }
+fail() { printf "  [FAIL] %s\n" "$*"; FAIL=$((FAIL + 1)); }
+
+printf "\nDISPLAY MANAGER\n"
+
+if pacman -Qq sddm >/dev/null 2>&1; then
+    ok "sddm package"
+else
+    fail "sddm package missing"
+fi
+
+if systemctl cat sddm.service >/dev/null 2>&1; then
+    ok "sddm.service available"
+else
+    fail "sddm.service unavailable"
+fi
+
+if systemctl is-enabled sddm.service >/dev/null 2>&1; then
+    ok "sddm.service enabled"
+else
+    fail "sddm.service not enabled"
+fi
+
+DISPLAY_LINK="/etc/systemd/system/display-manager.service"
+if [[ -L "$DISPLAY_LINK" ]]; then
+    TARGET="$(readlink -f "$DISPLAY_LINK" 2>/dev/null || true)"
+    if [[ "$TARGET" == */sddm.service ]]; then
+        ok "display-manager.service -> sddm.service"
+    else
+        fail "display-manager.service points to ${TARGET:-unknown}, not SDDM"
+    fi
+else
+    fail "display-manager.service alias missing"
+fi
+
+# During restore we intentionally never restart the active display manager. A
+# migration from an older manager may therefore show SDDM as inactive until the
+# requested reboot even though the next-boot alias is already correct.
+if systemctl is-active sddm.service >/dev/null 2>&1; then
+    ok "SDDM active in current boot"
+else
+    warn "SDDM is configured for next boot but is not active in this session yet"
+fi
+
+printf "Display Manager: OK=%d WARN=%d FAIL=%d\n" "$OK" "$WARN" "$FAIL"
+((FAIL == 0))
