@@ -182,7 +182,8 @@ import sys
 
 text = Path(sys.argv[1]).read_text(encoding="utf-8")
 
-force_calls = re.findall(r'^\s*sudo\s+pacman\s+-Rdd\b[^\n]*$', text, re.M)
+raw_force_calls = re.findall(r'^\s*sudo\s+pacman\s+-Rdd\b[^\n]*$', text, re.M)
+force_calls = [line.strip() for line in raw_force_calls]
 expected = 'sudo pacman -Rdd --noconfirm "${MIGRATION_BLOCKERS[@]}"'
 if force_calls != [expected]:
     raise SystemExit(f"unexpected pacman -Rdd calls: {force_calls}")
