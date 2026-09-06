@@ -27,6 +27,9 @@ jobs:
       - name: Validate installer safety contract
         run: bash scripts/check-installer-safety-source
 
+      - name: Validate hardware audio policy
+        run: bash scripts/check-hardware-audio-source
+
       - name: Validate Dolphin compact fileExplorer contract
         run: bash scripts/check-dolphin-file-explorer-source
 
