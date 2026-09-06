@@ -12,9 +12,9 @@ The old `manifests/packages-explicit-with-versions.txt` remains an audit/referen
 
 ## Reusable features
 
-Capabilities that may make sense in more than one profile live separately from the profile manifests. The first such feature is `virtualization`.
+Capabilities that may make sense in more than one profile live separately from the profile manifests. `virtualization` is optional/reusable, while TV Cast is a mandatory shared feature installed by every profile.
 
-This means the same tested VM stack can be attached to Laboratory, Work or Gaming without duplicating package/configuration logic.
+This means the same tested VM stack can be attached to Laboratory, Work or Gaming without duplicating package/configuration logic, while TV Cast stays part of the common Blueprint contract.
 
 ## Gaming
 
@@ -52,14 +52,14 @@ ASUS UX3405CA defaults to `copilot`; generic hardware defaults to `windows`.
 
 ### ASUS Zenbook UX3405CA
 
-Keeps `eq-laptop`, `eq-dolby`, `eq-sony` and the existing Zenbook/EasyEffects configuration.
+Keeps the captured owner-specific `eq-laptop`, `eq-dolby`, `eq-sony` helpers and restores the matching EasyEffects presets for this machine only.
 
-### Other laptops
+### Generic hardware
 
-Receives a generic `eq-laptop` helper plus `eq-dolby`. Zenbook-specific `eq-sony` is removed from the restored user config.
+The Blueprint deliberately does **not** reuse the owner's Zenbook/Sony/Dolby speaker tuning on another laptop, desktop or VM. It removes `eq-laptop`, `eq-dolby`, `eq-sony` and the old `eq-pc` helper from the restored Fish functions, then exposes only:
 
-### Desktop / PC
+- `eq-audio` → opens EasyEffects so presets appropriate to that machine can be created or selected manually.
 
-Receives a generic `eq-pc` helper plus `eq-dolby`. Zenbook-specific helpers are not exposed.
+The hardware profile is recorded as `generic`, and no Zenbook EasyEffects preset files are treated as a valid generic-machine default.
 
-This is intentionally hardware-aware: the Blueprint should not claim that one speaker EQ is safe for every laptop.
+This is intentionally hardware-aware: a preset tuned for one laptop's speakers must not be presented as safe for unrelated hardware.

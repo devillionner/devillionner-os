@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIGURE="$REPO/scripts/configure-hardware"
+CHECK="$REPO/scripts/check"
+PROFILES_DOC="$REPO/docs/profiles.md"
+ROADMAP="$REPO/docs/roadmap.md"
+
+fail() {
+    printf 'Hardware audio source contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+for file in "$CONFIGURE" "$CHECK" "$PROFILES_DOC" "$ROADMAP"; do
+    [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
+done
+
+bash -n "$CONFIGURE" || fail "configure-hardware Bash syntax"
+bash -n "$CHECK" || fail "scripts/check Bash syntax"
+
+# Zenbook path keeps only the owner-specific helpers/presets for the matching model.
+grep -Fq 'printf '\''%s\n'\'' "asus-zenbook-ux3405ca" > "$CONFIG_DIR/hardware-profile"' "$CONFIGURE" \
+    || fail "Zenbook hardware profile marker missing"
+for helper in eq-laptop eq-dolby eq-sony; do
+    grep -Fq "$helper" "$CHECK" \
+        || fail "runtime check no longer validates Zenbook helper: $helper"
+done
+
+grep -Fq 'rsync -a "$ZENBOOK_EE/output/" "$EE_DATA/output/"' "$CONFIGURE" \
+    || fail "Zenbook EasyEffects preset restore missing"
+
+# Generic hardware must never inherit the owner's speaker/headphone tuning.
+grep -Fq 'write_generic_audio' "$CONFIGURE" \
+    || fail "generic eq-audio helper creation missing"
+grep -Fq 'printf '\''%s\n'\'' "generic" > "$CONFIG_DIR/hardware-profile"' "$CONFIGURE" \
+    || fail "generic hardware profile marker missing"
+for helper in eq-laptop eq-pc eq-dolby eq-sony; do
+    grep -Fq '"$FUN/'"$helper"'.fish"' "$CONFIGURE" \
+        || fail "generic cleanup does not remove $helper"
+done
+
+grep -Fq 'functions/eq-audio.fish' "$CHECK" \
+    || fail "runtime aggregate does not validate generic eq-audio helper"
+grep -Fq 'EasyEffects presets are user-managed on generic hardware' "$CHECK" \
+    || fail "runtime aggregate no longer treats generic presets as user-managed"
+
+# Documentation must describe the actual safe policy rather than suggesting the
+# owner's Zenbook/Dolby presets are portable to unrelated hardware.
+grep -Fq 'Generic hardware' "$PROFILES_DOC" \
+    && grep -Fq '`eq-audio`' "$PROFILES_DOC" \
+    || fail "profiles documentation does not describe generic eq-audio policy"
+grep -Fq 'generic laptop/desktop/VM exposes only the safe `eq-audio` helper' "$ROADMAP" \
+    || fail "roadmap still targets owner-specific audio helpers on generic hardware"
+
+printf 'Hardware audio source contract: PASS\n'
