@@ -17,7 +17,6 @@ file-roller
 fish
 frameworkintegration
 fwupd
-gdm
 git
 gnome-keyring
 helium-browser-bin
@@ -55,6 +54,7 @@ qt6-imageformats
 rebuild-detector
 ripgrep
 rsync
+sddm
 showtime
 snapper
 sof-firmware
