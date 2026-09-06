@@ -58,9 +58,8 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor. 
 ## P2 — hardware-specific
 
 - [ ] Zenbook color profile: compare the current panel behavior with an official/model-specific ICC or measured profile. Do **not** install a random generic OLED ICC.
-- [ ] Verify Zenbook `eq-laptop`, `eq-dolby`, `eq-sony` from a completely clean profile.
-- [ ] Verify generic laptop exposes only `eq-laptop` + `eq-dolby`.
-- [ ] Verify generic desktop exposes only `eq-pc` + `eq-dolby`.
+- [ ] Verify Zenbook `eq-laptop`, `eq-dolby`, `eq-sony` and the matching EasyEffects presets from a completely clean profile.
+- [ ] Verify a generic laptop/desktop/VM exposes only the safe `eq-audio` helper and does not retain the owner's Zenbook/Sony/Dolby helpers or presets.
 - [ ] Review battery/power behavior on ASUS hardware separately from VM results.
 
 ## P2 — application cleanup
