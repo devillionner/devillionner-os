@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTALL="$REPO/scripts/install"
+RESTORE="$REPO/scripts/restore"
+RECOVERY="$REPO/scripts/create-recovery-point"
+RECONCILE="$REPO/scripts/reconcile-packages"
+
+fail() {
+    printf 'Installer safety contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+for file in "$INSTALL" "$RESTORE" "$RECOVERY" "$RECONCILE"; do
+    [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
+    bash -n "$file" || fail "bash syntax: ${file#$REPO/}"
+done
+
+python3 - "$INSTALL" "$RESTORE" "$RECOVERY" <<'PY'
+from pathlib import Path
+import sys
+
+install = Path(sys.argv[1]).read_text(encoding="utf-8")
+restore = Path(sys.argv[2]).read_text(encoding="utf-8")
+recovery = Path(sys.argv[3]).read_text(encoding="utf-8")
+
+
+def require(text: str, needle: str, label: str) -> None:
+    if needle not in text:
+        raise SystemExit(f"missing {label}: {needle}")
+
+
+def pos(text: str, needle: str, label: str) -> int:
+    require(text, needle, label)
+    return text.index(needle)
+
+
+# Installer profile/feature defaults must stay deterministic.
+require(
+    install,
+    '[[ "$PROFILE" == "laboratory" ]] && DEFAULT_VIRT=true || DEFAULT_VIRT=false',
+    "Laboratory virtualization default",
+)
+require(
+    install,
+    'VIRTUALIZATION="$DEFAULT_VIRT"',
+    "non-interactive virtualization default",
+)
+require(
+    install,
+    '[[ "$VIRTUALIZATION" == true ]] && ARGS+=(--feature virtualization)',
+    "virtualization feature forwarding",
+)
+
+# Auto-targeting is intentionally narrow: KVM/QEMU or the one reserved partition.
+require(install, 'if bp_is_vm; then\n        TARGET="--vm"', "VM auto-target")
+require(
+    install,
+    '"$(bp_root_partuuid)" == "1c08b2fd-b4c8-4933-920b-80746d466558"',
+    "reserved physical test PARTUUID",
+)
+require(
+    install,
+    'Physical install is intentionally blocked on an unknown root.',
+    "unknown physical root hard stop",
+)
+require(
+    install,
+    'exec "$REPO/scripts/restore" "${ARGS[@]}"',
+    "installer delegation to restore",
+)
+
+# Restore safety constants and target gates are contractual.
+require(
+    restore,
+    'MAIN_PARTUUID="dd1a5d46-e370-454d-8278-2335f9eb1262"',
+    "main CachyOS PARTUUID block",
+)
+require(
+    restore,
+    'TEST_PARTUUID="1c08b2fd-b4c8-4933-920b-80746d466558"',
+    "reserved test PARTUUID",
+)
+require(restore, 'FEATURES=("tvcast")', "mandatory shared TV Cast feature")
+require(restore, '[[ $EUID -ne 0 ]] || bp_die', "non-root execution guard")
+require(
+    restore,
+    'if [[ "$ROOT_PARTUUID" == "$MAIN_PARTUUID" ]]; then',
+    "main-installation guard",
+)
+require(
+    restore,
+    'bp_die "You are on the MAIN CachyOS. Restore is blocked."',
+    "main-installation hard failure",
+)
+require(restore, 'kvm|qemu) bp_ok "KVM/QEMU test VM confirmed"', "KVM/QEMU VM gate")
+require(
+    restore,
+    '[[ "$ROOT_PARTUUID" == "$TEST_PARTUUID" ]]',
+    "reserved physical partition gate",
+)
+require(restore, 'read -r -p "Type RESTORE to continue: " ANSWER', "explicit restore confirmation")
+require(restore, '[[ "$ANSWER" == "RESTORE" ]] || bp_die "Cancelled."', "exact RESTORE token")
+
+# A rollback point must exist before package/system mutation begins.
+checkpoint = pos(
+    restore,
+    '"$REPO/scripts/create-recovery-point"',
+    "recovery-point invocation",
+)
+prereqs = pos(restore, 'bp_info "Installing restore prerequisites"', "restore prerequisites")
+reconcile = pos(
+    restore,
+    '"$REPO/scripts/reconcile-packages" "${RECONCILE_ARGS[@]}"',
+    "package reconciliation",
+)
+dotfiles = pos(restore, 'bp_info "Restoring dotfiles"', "dotfile restore")
+if not checkpoint < prereqs < reconcile < dotfiles:
+    raise SystemExit(
+        "unsafe restore order: recovery point must precede prerequisites, package reconciliation and dotfile mutation"
+    )
+
+# Managed state must be written before the single aggregate validation runs.
+state_profile = pos(
+    restore,
+    'printf \'%s\\n\' "$PROFILE" > "$CONFIG_DIR/profile"',
+    "profile state write",
+)
+state_keyboard = pos(
+    restore,
+    'printf \'%s\\n\' "$KEYBOARD" > "$CONFIG_DIR/keyboard-mode"',
+    "keyboard state write",
+)
+state_features = pos(
+    restore,
+    'printf \'%s\\n\' "${FEATURES[@]}" > "$CONFIG_DIR/features"',
+    "feature state write",
+)
+aggregate = pos(
+    restore,
+    'if "$REPO/scripts/check" --profile "$PROFILE"; then',
+    "aggregate runtime validation",
+)
+if not max(state_profile, state_keyboard, state_features) < aggregate:
+    raise SystemExit("aggregate validation runs before Blueprint state is fully recorded")
+
+# Recovery helper must fail closed when it cannot create a Btrfs/Snapper checkpoint.
+require(
+    recovery,
+    'Automatic recovery points currently require a Btrfs root',
+    "non-Btrfs recovery hard stop",
+)
+require(recovery, 'sudo snapper -c root create', "Snapper checkpoint path")
+require(recovery, 'sudo btrfs subvolume snapshot -r / "$TARGET"', "Btrfs fallback checkpoint")
+require(recovery, 'last-checkpoint', "checkpoint state record")
+require(
+    recovery,
+    'Neither a working root Snapper config nor btrfs command is available.',
+    "missing recovery backend hard stop",
+)
+PY
+
+# The package reconciler must remain explicit-ownership based and never remove
+# arbitrary packages outside its previously recorded Blueprint target.
+grep -Fq 'comm -23 "$PREVIOUS_ALL" "$DESIRED_ALL"' "$RECONCILE" \
+    || fail "reconcile-packages no longer computes removals from previous Blueprint ownership"
+grep -Fq 'install -Dm644 "$DESIRED_REPO" "$MANAGED_DIR/repo.txt"' "$RECONCILE" \
+    || fail "repository package ownership snapshot missing"
+grep -Fq 'install -Dm644 "$DESIRED_AUR" "$MANAGED_DIR/aur.txt"' "$RECONCILE" \
+    || fail "AUR package ownership snapshot missing"
+
+if grep -Eq 'pacman[[:space:]]+-R[^\n]*(--nodeps|-d[[:space:]]|--cascade|-c[[:space:]])' "$RECONCILE"; then
+    fail "unsafe generic package-removal flags detected"
+fi
+
+printf 'Installer safety contract: PASS\n'
