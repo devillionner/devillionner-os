@@ -1,6 +1,6 @@
 # Clean KVM validation runbook
 
-This runbook is the next installer gate. It deliberately uses **three separate fresh CachyOS guests** so profile validation is not confused with package reconciliation after switching profiles on one machine.
+This runbook is the next installer gate. It deliberately uses **four separate fresh CachyOS guests** so profile validation is not confused with package reconciliation after switching profiles on one machine.
 
 It is **not** the future one-command Blueprint Test VM template. Guest creation remains explicit in virt-manager until these clean-install tests pass.
 
@@ -14,7 +14,7 @@ Do not mark the physical-host virtualization roadmap item complete merely becaus
 
 ## Fresh guest baseline
 
-Prepare one clean CachyOS installation and either repeat the installation three times or take a **pre-Blueprint VM snapshot** and clone/revert it separately for each profile.
+Prepare one clean CachyOS installation and either repeat the installation four times or take a **pre-Blueprint VM snapshot** and clone/revert it separately for each profile.
 
 Baseline requirements:
 
@@ -54,7 +54,8 @@ Each command therefore supplies the profile and keyboard, uses `--non-interactiv
 
 - Gaming must resolve to virtualization **off** by default;
 - Work must resolve to virtualization **off** by default;
-- Laboratory must resolve to virtualization **on** by default.
+- Laboratory must resolve to virtualization **on** by default;
+- University must resolve to virtualization **off** by default.
 
 The destructive restore confirmation is still interactive: the user must verify the KVM target and type `RESTORE`.
 
@@ -178,6 +179,35 @@ devos-blueprint --ref "$REV" check \
 
 Laboratory is not complete until the aggregate result and virtualization-specific output are understood. If nested KVM is unavailable, record that separately; it does **not** satisfy the later physical-host `/dev/kvm` validation item.
 
+## University
+
+Start from a fourth fresh baseline guest. University is a separate first-class profile rather than an alias of Work. Its University-specific package set is intentionally still minimal/common-only until the real study workflow is finalized, but the profile identity, package ownership boundary, service manifest and default behavior must already install cleanly.
+
+```bash
+BOOTSTRAP_URL="https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap"
+REV="$(cat ~/blueprint-tested-commit.txt)"
+
+curl -fsSL "$BOOTSTRAP_URL" \
+  | bash -s -- --ref "$REV" install \
+      --profile university \
+      --keyboard windows \
+      --non-interactive \
+      --vm \
+  2>&1 | tee ~/blueprint-university-install.log
+```
+
+The installation plan must show `Virtualization: false`. The resulting Blueprint state must record `profile = university`; a Work profile result is a failure even if the common desktop happens to look identical at this stage.
+
+After the installer finishes, reboot and run:
+
+```bash
+REV="$(cat ~/blueprint-tested-commit.txt)"
+devos-blueprint --ref "$REV" check \
+  2>&1 | tee ~/blueprint-university-postreboot-check.log
+```
+
+University is not complete until the aggregate reports `RESULT: PASS` on the same revision. Later University-specific apps can be added without changing this profile identity or its clean-install gate.
+
 ## Per-profile visual sanity check
 
 After the post-reboot aggregate passes, do a short manual sanity pass without changing configuration:
@@ -215,6 +245,7 @@ The KVM milestone is complete only when all of these are true:
 - Gaming: its real default resolves virtualization off, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
 - Work: its real default resolves virtualization off, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
 - Laboratory: its real default resolves virtualization on, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision, with virtualization state understood;
+- University: its real default resolves virtualization off, then fresh install + reboot + aggregate PASS as the distinct `university` profile on one pinned Blueprint revision;
 - no persistent Blueprint Git checkout is required in the guest;
 - declared system/user service manifests pass the aggregate contract;
 - no restore safety gate was weakened to obtain a pass;
