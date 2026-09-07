@@ -16,7 +16,7 @@ The old `manifests/packages-explicit-with-versions.txt` remains an audit/referen
 
 Capabilities that may make sense in more than one profile live separately from the profile manifests. `virtualization` is optional/reusable, while TV Cast is a mandatory shared feature installed by every profile.
 
-This means the same tested VM stack can be attached to Laboratory, Work or Gaming without duplicating package/configuration logic, while TV Cast stays part of the common Blueprint contract.
+This means the same tested VM stack can be attached to Laboratory, Work, Gaming or University without duplicating package/configuration logic, while TV Cast stays part of the common Blueprint contract.
 
 ## Gaming
 
@@ -32,13 +32,23 @@ Adds Telegram Desktop, Vesktop, GNOME Calculator (temporary choice until the cal
 
 Virtualization defaults to **off**, but can be enabled during installation.
 
-## Laboratory
+## Laboratory / Dev
 
 Adds Clang, CMake, Ninja, GDB, Python pip/virtualenv, Node.js + npm, GitHub CLI + Git LFS, Lazygit, direnv, shellcheck and VS Code (`visual-studio-code-bin`).
 
 Laboratory enables the reusable **virtualization** feature by default: KVM/QEMU, libvirt, virt-manager, virt-viewer, OVMF/UEFI, swtpm, virglrenderer, NAT networking and a VM storage pool.
 
 Aliases `lab`, `dev` and `dev-laboratory` normalize to `laboratory`.
+
+## University / Uni
+
+University is a **separate first-class profile**, not a Work alias. It has its own package manifests, service manifest, saved profile state and future clean-install validation gate.
+
+At the moment its profile-specific package/AUR/service manifests are intentionally empty, so it receives only the common Blueprint desktop. This is deliberate: the University app set will be chosen from the real study workflow instead of copying Work or guessing a generic “student distro” stack.
+
+Virtualization defaults to **off**, but remains available as the same reusable feature if it is actually needed later.
+
+Aliases `uni`, `study` and `student` normalize to `university`.
 
 ## Keyboard layouts
 
