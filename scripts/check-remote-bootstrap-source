@@ -5,6 +5,7 @@ REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 BOOTSTRAP="$REPO/bootstrap"
 CONFIGURE="$REPO/scripts/configure-blueprint-cli"
 APPLY="$REPO/scripts/apply-component"
+COLLOID="$REPO/scripts/configure-colloid-icons"
 RESTORE="$REPO/scripts/restore"
 CHECK="$REPO/scripts/check"
 
@@ -13,22 +14,24 @@ fail() {
     exit 1
 }
 
-for file in "$BOOTSTRAP" "$CONFIGURE" "$APPLY" "$RESTORE" "$CHECK"; do
+for file in "$BOOTSTRAP" "$CONFIGURE" "$APPLY" "$COLLOID" "$RESTORE" "$CHECK"; do
     [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
 done
 bash -n "$BOOTSTRAP" || fail "bootstrap Bash syntax"
 bash -n "$CONFIGURE" || fail "configure-blueprint-cli Bash syntax"
 bash -n "$APPLY" || fail "apply-component Bash syntax"
+bash -n "$COLLOID" || fail "configure-colloid-icons Bash syntax"
 
-python3 - "$BOOTSTRAP" "$CONFIGURE" "$APPLY" "$RESTORE" "$CHECK" <<'PY'
+python3 - "$BOOTSTRAP" "$CONFIGURE" "$APPLY" "$COLLOID" "$RESTORE" "$CHECK" <<'PY'
 from pathlib import Path
 import sys
 
 bootstrap = Path(sys.argv[1]).read_text(encoding="utf-8")
 configure = Path(sys.argv[2]).read_text(encoding="utf-8")
 apply = Path(sys.argv[3]).read_text(encoding="utf-8")
-restore = Path(sys.argv[4]).read_text(encoding="utf-8")
-check = Path(sys.argv[5]).read_text(encoding="utf-8")
+colloid = Path(sys.argv[4]).read_text(encoding="utf-8")
+restore = Path(sys.argv[5]).read_text(encoding="utf-8")
+check = Path(sys.argv[6]).read_text(encoding="utf-8")
 
 required_bootstrap = [
     'REPOSITORY="devillionner/devillionner-os"',
@@ -90,6 +93,13 @@ for forbidden in (
 ):
     if forbidden in apply:
         raise SystemExit(f"targeted component apply crossed its safety boundary: {forbidden}")
+
+if 'export DEVOS_NO_PACKAGE_REMOVAL=1' not in apply:
+    raise SystemExit("component apply no longer disables transitive package-removal migrations")
+if '"${DEVOS_NO_PACKAGE_REMOVAL:-0}" == "1"' not in colloid:
+    raise SystemExit("Colloid configurator does not honor component apply no-removal mode")
+if 'targeted component apply never removes packages' not in colloid:
+    raise SystemExit("Colloid no-removal branch is not explicit")
 
 if '"$REPO/scripts/configure-blueprint-cli"' not in restore:
     raise SystemExit("restore does not install the clone-less Blueprint command")

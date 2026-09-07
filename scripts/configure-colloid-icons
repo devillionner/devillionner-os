@@ -13,13 +13,19 @@ DEST="$HOME/.local/share/icons"
 bp_info "Installing minimal Colloid icon set"
 
 # The AUR -git package installs the complete matrix of colour/scheme variants.
-# It is intentionally not part of the Blueprint anymore. Migrate old installs
-# away from it when nothing else depends on the package.
+# It is intentionally not part of the Blueprint anymore. A full restore may
+# migrate an old install away from it when nothing else depends on the package.
+# Clone-less `devos-blueprint apply` explicitly disables package removal and
+# leaves the legacy package in place with a warning instead.
 if pacman -Qq colloid-icon-theme-git >/dev/null 2>&1; then
     REQUIRED_BY="$(pacman -Qi colloid-icon-theme-git 2>/dev/null | awk -F': *' '/^Required By/ {print $2; exit}')"
     if [[ -z "$REQUIRED_BY" || "$REQUIRED_BY" == "None" ]]; then
-        bp_info "Removing legacy full Colloid AUR package"
-        sudo pacman -R --noconfirm colloid-icon-theme-git >/dev/null
+        if [[ "${DEVOS_NO_PACKAGE_REMOVAL:-0}" == "1" ]]; then
+            bp_warn "legacy colloid-icon-theme-git remains installed; targeted component apply never removes packages"
+        else
+            bp_info "Removing legacy full Colloid AUR package"
+            sudo pacman -R --noconfirm colloid-icon-theme-git >/dev/null
+        fi
     else
         bp_warn "colloid-icon-theme-git is still required by: $REQUIRED_BY"
         bp_warn "Leaving the package installed; extra variants may remain"
