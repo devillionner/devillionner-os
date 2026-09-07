@@ -5,7 +5,7 @@ REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO/scripts/lib/common.sh"
 
 PROFILE="$(bp_normalize_profile "${1:-}")" \
-    || bp_die "Usage: scripts/optimize-system gaming|work|laboratory"
+    || bp_die "Usage: scripts/optimize-system gaming|work|laboratory|university"
 
 bp_info "Applying conservative system optimizations"
 
