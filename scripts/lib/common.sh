@@ -22,6 +22,7 @@ bp_normalize_profile() {
         gaming|game) printf '%s\n' gaming ;;
         work|office) printf '%s\n' work ;;
         laboratory|lab|dev|dev-laboratory) printf '%s\n' laboratory ;;
+        university|uni|study|student) printf '%s\n' university ;;
         *) return 1 ;;
     esac
 }

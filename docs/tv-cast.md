@@ -1,6 +1,6 @@
 # TV Cast / Miracast
 
-TV Cast is a shared Blueprint feature installed for **Gaming, Work and Laboratory**.
+TV Cast is a shared Blueprint feature installed for **Gaming, Work, Laboratory/Dev and University/Uni**.
 
 It mirrors the Hyprland display over **Wi-Fi Direct / Miracast (WFD)** using FluxCast. It does not use Chromecast, AirPlay or DLNA.
 
@@ -61,6 +61,14 @@ The Blueprint already uses UFW. TV Cast adds only the two rules from the tested 
 It does not disable the firewall or copy unrelated virtualization rules.
 
 ## Validation
+
+From an installed clone-less Blueprint system, TV Cast is included in:
+
+```bash
+devos-blueprint check
+```
+
+From a development checkout, the focused validator is:
 
 ```bash
 bash scripts/check-tv-cast

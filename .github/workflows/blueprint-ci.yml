@@ -30,6 +30,9 @@ jobs:
       - name: Validate clone-less remote bootstrap
         run: bash scripts/check-remote-bootstrap-source
 
+      - name: Validate four-profile contract
+        run: bash scripts/check-profile-contract-source
+
       - name: Validate KVM runbook defaults
         run: bash scripts/check-kvm-runbook-source
 

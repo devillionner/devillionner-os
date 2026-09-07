@@ -1,0 +1,2 @@
+# University profile
+# No University-specific AUR packages are selected yet.

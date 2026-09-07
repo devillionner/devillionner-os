@@ -55,6 +55,7 @@ expected = {
     "gaming": "false",
     "work": "false",
     "laboratory": "true",
+    "university": "false",
 }
 
 for profile, expected_value in expected.items():

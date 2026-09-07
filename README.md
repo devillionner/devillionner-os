@@ -29,17 +29,18 @@ devos-blueprint check
 
 A local `git clone` remains useful for development/debugging only; it is not part of the final installed-system architecture.
 
-The installer asks for a profile:
+The installer has four first-class profiles:
 
 - **Gaming** — Steam, Gamescope, MangoHud, GameMode, gaming scheduler and Vesktop.
 - **Work** — Helium, Telegram, calculator, scanner, disk analyzer and communication tools.
-- **Laboratory** — compilers, Python/Node tooling, GitHub CLI, debugging tools, VS Code, and **KVM/QEMU virtual machines by default**.
+- **Laboratory / Dev** — compilers, Python/Node tooling, GitHub CLI, debugging tools, VS Code, and **KVM/QEMU virtual machines by default**.
+- **University / Uni** — a separate study system with its own profile identity and ownership boundary. It currently uses the common desktop baseline only; University-specific apps will be chosen from the real study workflow rather than guessed in advance.
 
-**TV Cast / Miracast is a shared system feature and is installed in all three profiles.** Press `Super+P` to open its Fuzzel menu and choose exactly one of the three Blueprint modes: **30 FPS / 1080p** for quality, **60 FPS / 720p** for smoothness, or **Low Latency / 720p30 / 5 Mbps** for minimum latency.
+**TV Cast / Miracast is a shared system feature and is installed in all four profiles.** Press `Super+P` to open its Fuzzel menu and choose exactly one of the three Blueprint modes: **30 FPS / 1080p** for quality, **60 FPS / 720p** for smoothness, or **Low Latency / 720p30 / 5 Mbps** for minimum latency.
 
-All three profiles use **Dolphin** as the single file manager with the **Colloid-Dark** icon theme. `Super+E` opens Dolphin; JPEG, PNG and WEBP open in Swappy.
+All four profiles use **Dolphin** as the single file manager with the **Colloid-Dark** icon theme. `Super+E` opens Dolphin; JPEG, PNG and WEBP open in Swappy.
 
-All three profiles also include **Spotify + Spicetify** with the `devillionner-text` theme. Its colors are generated from the active Caelestia/Hypr Material palette, update when the wallpaper palette changes, and use the same `0.95` compositor opacity as Dolphin in normal and fullscreen modes. `Super+M` opens the managed Spotify launcher.
+All four profiles also include **Spotify + Spicetify** with the `devillionner-text` theme. Its colors are generated from the active Caelestia/Hypr Material palette, update when the wallpaper palette changes, and use the same `0.95` compositor opacity as Dolphin in normal and fullscreen modes. `Super+M` opens the managed Spotify launcher.
 
 The common cursor is **Bibata Modern Ice** at 24 px, managed across XCursor, GTK and session environment with an XCursor fallback for Hyprland/XWayland consumers.
 
@@ -47,14 +48,11 @@ Caelestia's `shell.json` and `cli.json` are merge-managed rather than blindly re
 
 Quickshell is ABI-checked after package reconciliation and restore. If `qs --version` fails or `rebuild-detector` flags `quickshell-git` after a Qt library update, Blueprint performs an intentional same-version-capable rebuild and validates the result before reporting success.
 
-Virtualization is a reusable feature, not hard-wired to one profile. Work or Gaming can enable the same KVM/libvirt/virt-manager stack during install:
+Virtualization is a reusable feature, not hard-wired to one profile. Laboratory enables it by default; Gaming, Work or University can opt into the same KVM/libvirt/virt-manager stack during install:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
-  | bash -s -- --profile work --with virtualization --vm
-
-curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
-  | bash -s -- --profile gaming --with virtualization --vm
+  | bash -s -- --profile university --with virtualization --vm
 ```
 
 The installer also asks for keyboard layout switching: **Alt+Shift**, **Super+Space**, or the **Copilot/Menu key**.
@@ -74,7 +72,7 @@ Useful remote actions:
 
 ```bash
 devos-blueprint check             # validate the installed revision
-devos-blueprint check-repo        # source/repository contracts from a temporary bundle
+devos-blueprint check-repo        # repository integrity from a temporary bundle
 devos-blueprint version           # resolve the revision that would be fetched
 devos-blueprint --ref <sha> check # validate using an explicit pinned revision
 ```
@@ -96,7 +94,7 @@ devos-blueprint --ref <sha> check # validate using an explicit pinned revision
 Recommended validation order:
 
 1. repository CI / `devos-blueprint check-repo`;
-2. fresh Gaming, Work and Laboratory KVM installs, each from a clean baseline and each followed by reboot + `devos-blueprint check` on the same pinned revision;
+2. fresh Gaming, Work, Laboratory and University KVM installs, each from a clean baseline and each followed by reboot + `devos-blueprint check` on the same pinned revision;
 3. reserved physical test partition;
 4. only after those gates pass, consider production use.
 
@@ -130,6 +128,7 @@ See:
 ## Current design decisions
 
 - The installed system does not require a persistent Blueprint Git repository; normal install/check operations use commit-pinned temporary source bundles.
+- Gaming, Work, Laboratory/Dev and University/Uni are distinct profile identities. University is not a Work alias.
 - Kitty is the single default terminal. Alacritty/Ptyxis are not part of the active profile manifests.
 - Dolphin is the single default file manager; Thunar is not part of the active manifests.
 - SDDM is the common login/display manager baseline; login-screen styling is a separate UX task.
@@ -140,6 +139,6 @@ See:
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
 - Quickshell runtime + shared-library ABI state are validated; stale Qt-linked builds are rebuilt without `--needed` and checked again afterward.
 - Caelestia fullscreen and `Env` compatibility patches are applied during restore and validated afterward.
-- TV Cast uses FluxCast/WFD + wf-recorder + Fuzzel and is shared by Gaming, Work and Laboratory; its supported mode set is fixed at exactly 1080p30, 720p60 and Low Latency 720p30/5 Mbps.
+- TV Cast uses FluxCast/WFD + wf-recorder + Fuzzel and is shared by all four profiles; its supported mode set is fixed at exactly 1080p30, 720p60 and Low Latency 720p30/5 Mbps.
 - KVM/QEMU + libvirt + virt-manager is the standard general VM stack; VirtualBox is not the Blueprint default.
 - Color/ICC tuning is not guessed on unknown displays; the Zenbook color-profile decision remains a measured/researched task.

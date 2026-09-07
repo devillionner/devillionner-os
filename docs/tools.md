@@ -59,9 +59,9 @@ The TV Cast check validates Miracast dependencies, installed helper files, shell
 
 ## Clean KVM profile-default test
 
-The KVM runbook deliberately tests the actual profile defaults rather than manually forcing virtualization state. The test may use the clone-less bootstrap while pinning one exact revision for install and post-reboot validation.
+The KVM runbook tests the actual profile defaults rather than manually forcing virtualization state, using clone-less commit-pinned source for install and post-reboot validation.
 
-Expected installation plans: Gaming = virtualization false, Work = false, Laboratory = true. See `docs/kvm-validation.md` for the full fresh-install/reboot evidence flow.
+Expected installation plans: Gaming = virtualization false, Work = false, Laboratory/Dev = true, University/Uni = false. See `docs/kvm-validation.md` for the full four-profile fresh-install/reboot evidence flow.
 
 ## Disk audit
 
@@ -77,7 +77,7 @@ The Work profile also installs Baobab for a visual disk-usage view.
 
 ## TV Cast
 
-TV Cast is installed in Gaming, Work and Laboratory.
+TV Cast is installed in Gaming, Work, Laboratory/Dev and University/Uni.
 
 ```text
 Super+P     → TV Cast menu
@@ -98,7 +98,7 @@ devos-vm list          # list guests
 devos-vm validate      # validate KVM/QEMU host support
 ```
 
-The app launcher also contains **Virtual Machines**. See `docs/virtualization.md`.
+The app launcher also contains **Virtual Machines**. Laboratory enables this feature by default; Gaming, Work and University default to off but can opt in. See `docs/virtualization.md`.
 
 ## Audio helpers
 

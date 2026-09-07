@@ -19,13 +19,14 @@ Dependencies are deliberately not recorded as owned packages. Software installed
 
 Running the installer for another profile performs a state transition rather than layering the new profile forever on top of the old one.
 
-For example:
+For example, a clone-less install can switch a managed Work VM to Gaming while keeping the same ownership rules:
 
 ```bash
-bash scripts/install --profile gaming --keyboard windows --without virtualization --vm
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
+  | bash -s -- --profile gaming --keyboard windows --without virtualization --vm
 ```
 
-on a previously managed Work VM will:
+It will:
 
 1. calculate the desired `common + gaming + tvcast` package set;
 2. compare it with the previous Blueprint-managed package set;
@@ -35,7 +36,7 @@ on a previously managed Work VM will:
 6. record the new ownership set only after package reconciliation succeeds;
 7. continue with dotfiles, profile configuration and validation.
 
-The same mechanism applies to Gaming, Work and Laboratory, with reusable features such as `tvcast` and `virtualization` included in the desired state when enabled.
+The same mechanism applies independently to Gaming, Work, Laboratory/Dev and University/Uni. University has its own ownership identity even while its current profile-specific manifests are intentionally minimal. Reusable features such as `tvcast` and `virtualization` are included in the desired state when enabled.
 
 ## Older Blueprint installs
 

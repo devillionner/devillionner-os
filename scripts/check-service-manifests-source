@@ -20,6 +20,7 @@ for file in \
     "$MAN/services-gaming.txt" \
     "$MAN/services-work.txt" \
     "$MAN/services-laboratory.txt" \
+    "$MAN/services-university.txt" \
     "$MAN/services-user-common.txt" \
     "$FEATURE_MAN/virtualization-repo.txt" \
     "$FEATURE_MAN/services-virtualization.txt" \
