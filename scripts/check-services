@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -u
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MAN="$REPO/manifests/profiles"
+FEATURE_MAN="$REPO/manifests/features"
+source "$REPO/scripts/lib/common.sh"
+
+PROFILE=""
+if [[ "${1:-}" == "--profile" && -n "${2:-}" ]]; then
+    PROFILE="$(bp_normalize_profile "$2" 2>/dev/null || true)"
+fi
+if [[ -z "$PROFILE" ]]; then
+    PROFILE="$(cat "$(bp_config_dir)/profile" 2>/dev/null || true)"
+fi
+PROFILE="$(bp_normalize_profile "$PROFILE" 2>/dev/null || printf '%s' work)"
+
+FEATURES=("tvcast")
+feature_enabled() {
+    local wanted="$1" feature
+    for feature in "${FEATURES[@]}"; do
+        [[ "$feature" == "$wanted" ]] && return 0
+    done
+    return 1
+}
+add_feature() {
+    feature_enabled "$1" || FEATURES+=("$1")
+}
+
+FEATURE_STATE="$(bp_config_dir)/features"
+if [[ -f "$FEATURE_STATE" ]]; then
+    while IFS= read -r feature; do
+        case "$feature" in
+            tvcast|virtualization) add_feature "$feature" ;;
+        esac
+    done < "$FEATURE_STATE"
+fi
+
+OK=0
+WARN=0
+FAIL=0
+ok() { printf "  [OK]   %s\n" "$*"; OK=$((OK + 1)); }
+warn() { printf "  [WARN] %s\n" "$*"; WARN=$((WARN + 1)); }
+fail() { printf "  [FAIL] %s\n" "$*"; FAIL=$((FAIL + 1)); }
+
+check_system_unit() {
+    local unit="$1"
+    if ! systemctl cat "$unit" >/dev/null 2>&1; then
+        fail "system unit unavailable: $unit"
+        return
+    fi
+    if systemctl is-enabled "$unit" >/dev/null 2>&1; then
+        ok "system unit enabled: $unit"
+    else
+        fail "system unit not enabled: $unit"
+    fi
+}
+
+check_user_unit() {
+    local unit="$1"
+    if ! systemctl --user cat "$unit" >/dev/null 2>&1; then
+        fail "user unit unavailable: $unit"
+        return
+    fi
+    if systemctl --user is-enabled "$unit" >/dev/null 2>&1; then
+        ok "user unit enabled: $unit"
+    else
+        fail "user unit not enabled: $unit"
+    fi
+}
+
+printf "\nSERVICE MANIFESTS\n"
+printf "Profile: %s\n" "$PROFILE"
+printf "Features: %s\n" "${FEATURES[*]}"
+
+mapfile -t SYSTEM_UNITS < <(
+    {
+        bp_strip_manifest "$MAN/services-common.txt"
+        bp_strip_manifest "$MAN/services-$PROFILE.txt"
+        for feature in "${FEATURES[@]}"; do
+            bp_strip_manifest "$FEATURE_MAN/services-$feature.txt"
+        done
+    } | sort -u
+)
+
+if ((${#SYSTEM_UNITS[@]})); then
+    for unit in "${SYSTEM_UNITS[@]}"; do
+        check_system_unit "$unit"
+    done
+else
+    warn "no system units selected by manifests"
+fi
+
+mapfile -t USER_UNITS < <(bp_strip_manifest "$MAN/services-user-common.txt" | sort -u)
+if ((${#USER_UNITS[@]})); then
+    for unit in "${USER_UNITS[@]}"; do
+        check_user_unit "$unit"
+    done
+else
+    warn "no user units selected by manifests"
+fi
+
+printf "Service Manifests: OK=%d WARN=%d FAIL=%d\n" "$OK" "$WARN" "$FAIL"
+((FAIL == 0))
