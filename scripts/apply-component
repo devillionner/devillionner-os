@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: devos-blueprint apply COMPONENT
+
+Safe, targeted Blueprint configurators for an existing installation.
+This does NOT run restore, reconcile packages, switch profiles, or bypass target gates.
+
+Components:
+  caelestia   merge Blueprint-owned Caelestia settings + package patches
+  cursor      configure Bibata Modern Ice cursor
+  dolphin     configure Dolphin integration and preview policy
+  hardware    configure hardware-specific audio/helper policy
+  spotify     configure managed Spotify integration
+  tvcast      install/update the shared three-mode TV Cast component
+
+Package prerequisites must already be installed. If a component needs a missing
+package, the configurator fails instead of silently performing a profile restore.
+EOF
+}
+
+[[ $EUID -ne 0 ]] || bp_die "Run this as your normal user, not root."
+
+COMPONENT="${1:-}"
+[[ -n "$COMPONENT" ]] || { usage; exit 2; }
+[[ $# -eq 1 ]] || bp_die "apply accepts exactly one component name"
+
+case "$COMPONENT" in
+    caelestia)
+        bp_info "Applying Caelestia component only"
+        bash "$REPO/scripts/configure-caelestia"
+        bash "$REPO/scripts/configure-caelestia-cli"
+        bash "$REPO/scripts/patch-caelestia-fullscreen"
+        ;;
+    cursor)
+        bp_info "Applying cursor component only"
+        bash "$REPO/scripts/configure-cursor"
+        ;;
+    dolphin)
+        bp_info "Applying Dolphin component only"
+        bash "$REPO/scripts/configure-dolphin"
+        ;;
+    hardware)
+        bp_info "Applying hardware policy only"
+        bash "$REPO/scripts/configure-hardware"
+        ;;
+    spotify)
+        bp_info "Applying Spotify component only"
+        bash "$REPO/scripts/configure-spotify"
+        ;;
+    tvcast)
+        bp_info "Applying TV Cast component only"
+        bash "$REPO/scripts/configure-tv-cast"
+        ;;
+    -h|--help|help)
+        usage
+        ;;
+    *)
+        bp_die "Unknown component: $COMPONENT"
+        ;;
+esac
+
+bp_ok "component applied: $COMPONENT"
+printf "    Re-run 'devos-blueprint check' to validate current state.\n"
