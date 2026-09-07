@@ -27,6 +27,9 @@ jobs:
       - name: Validate installer safety contract
         run: bash scripts/check-installer-safety-source
 
+      - name: Validate clone-less remote bootstrap
+        run: bash scripts/check-remote-bootstrap-source
+
       - name: Validate KVM runbook defaults
         run: bash scripts/check-kvm-runbook-source
 
