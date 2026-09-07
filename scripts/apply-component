@@ -9,7 +9,8 @@ usage() {
 Usage: devos-blueprint apply COMPONENT
 
 Safe, targeted Blueprint configurators for an existing installation.
-This does NOT run restore, reconcile packages, switch profiles, or bypass target gates.
+This does NOT run restore, reconcile packages, switch profiles, remove packages,
+or bypass target gates.
 
 Components:
   caelestia   merge Blueprint-owned Caelestia settings + package patches
@@ -29,6 +30,11 @@ EOF
 COMPONENT="${1:-}"
 [[ -n "$COMPONENT" ]] || { usage; exit 2; }
 [[ $# -eq 1 ]] || bp_die "apply accepts exactly one component name"
+
+# Existing-host component repair must not uninstall software. Some standalone
+# configurators also support cleanup migrations during a full restore; this
+# environment flag makes those migrations fail-safe when reached through apply.
+export DEVOS_NO_PACKAGE_REMOVAL=1
 
 case "$COMPONENT" in
     caelestia)
