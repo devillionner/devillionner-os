@@ -36,7 +36,11 @@ bp_info "Installing TV Cast gettext catalogs"
 while IFS= read -r po; do
     lang="$(basename "$po" .po)"
     tmp="$(mktemp)"
-    msgfmt --check -o "$tmp" "$po"
+    # Normal msgfmt compilation already rejects malformed PO syntax. Restrict
+    # extra validation to format strings here instead of --check, whose header
+    # metadata warnings drowned targeted apply output even though the catalogs
+    # were valid and installed successfully.
+    msgfmt --check-format -o "$tmp" "$po"
     sudo install -Dm644 \
         "$tmp" \
         "/usr/local/share/locale/$lang/LC_MESSAGES/tvcast.mo"
