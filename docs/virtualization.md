@@ -2,7 +2,7 @@
 
 The Blueprint uses **KVM/QEMU + libvirt + virt-manager** for general-purpose virtual machines.
 
-This is the default virtualization feature for the **Laboratory** profile. Gaming and Work can add the exact same feature during installation or later.
+This is the default virtualization feature for the **Laboratory / Dev** profile. Gaming, Work and University/Uni can add the exact same reusable feature when needed.
 
 ## Why this stack
 
@@ -16,20 +16,20 @@ VirtualBox is intentionally not the Blueprint default. It is portable, but our p
 
 ## Install behavior
 
-Laboratory defaults to virtualization = yes. Work and Gaming ask and default to no.
+Laboratory defaults to virtualization = yes. Gaming, Work and University default to no.
 
-Examples:
+With clone-less install, explicit opt-in/out remains available:
 
 ```bash
-bash scripts/install --profile laboratory
-bash scripts/install --profile work --with virtualization
-bash scripts/install --profile gaming --with virtualization
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
+  | bash -s -- --profile university --with virtualization --vm
 ```
 
 To explicitly keep Laboratory lean:
 
 ```bash
-bash scripts/install --profile laboratory --without virtualization
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
+  | bash -s -- --profile laboratory --without virtualization --vm
 ```
 
 ## Launch
@@ -63,6 +63,6 @@ For now, guest creation stays in virt-manager so CPU/RAM/disk choices remain exp
 - virtio graphics with 3D acceleration when the host supports a render node;
 - SPICE/virt-viewer for the display.
 
-The current manual clean-install procedure for Gaming, Work and Laboratory is documented in [Clean KVM validation runbook](kvm-validation.md). It intentionally keeps the three guests separate and requires a post-reboot `bash scripts/check` pass for each profile.
+The current manual clean-install procedure for Gaming, Work, Laboratory/Dev and University/Uni is documented in [Clean KVM validation runbook](kvm-validation.md). It intentionally keeps the four guests separate, uses commit-pinned temporary Blueprint sources, and requires a post-reboot `devos-blueprint check` pass for each profile.
 
-A reproducible one-command **Blueprint Test VM** template is a separate roadmap task and will be added only after the new host profiles pass that clean-install validation.
+A reproducible one-command **Blueprint Test VM** template is a separate roadmap task and will be added only after all four profiles pass that clean-install validation.
