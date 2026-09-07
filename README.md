@@ -41,7 +41,7 @@ bash scripts/install --profile gaming --with virtualization
 
 The installer also asks for keyboard layout switching: **Alt+Shift**, **Super+Space**, or the **Copilot/Menu key**.
 
-On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbook audio helpers are preserved. Other laptops/desktops receive generic audio helpers instead of Zenbook-specific ones.
+On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbook audio helpers are preserved. Other laptops/desktops use the generic `eq-audio` helper with user-managed EasyEffects presets instead of inheriting Zenbook-specific tuning.
 
 ## Safety
 
@@ -53,13 +53,14 @@ On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbo
 - GitHub pull requests run repository-integrity and desktop-contract checks before changes reach `main`.
 - Merge-managed Caelestia JSON refuses malformed existing files instead of silently overwriting them.
 - Quickshell rebuilds are checked both by runtime validation and a source-level CI contract.
+- Declared system/user service manifests are part of the aggregate runtime PASS; a failed service enablement cannot be hidden by a warning.
 
 Recommended validation order:
 
 1. repository CI / `bash scripts/check-repo`;
-2. fresh KVM VM;
+2. fresh Gaming, Work and Laboratory KVM installs, each from a clean baseline and each followed by reboot + `bash scripts/check`;
 3. reserved physical test partition;
-4. only after all three pass, consider production use.
+4. only after those gates pass, consider production use.
 
 The current evidence at each validation level is tracked explicitly in [Validation status](docs/validation-status.md).
 
@@ -68,6 +69,8 @@ The current evidence at each validation level is tracked explicitly in [Validati
 ```bash
 bash scripts/check-repo
 bash scripts/check
+bash scripts/check-display-manager
+bash scripts/check-services
 bash scripts/check-quickshell
 bash scripts/configure-caelestia
 bash scripts/configure-caelestia-cli
@@ -98,6 +101,7 @@ See:
 
 - Kitty is the single default terminal. Alacritty/Ptyxis are not part of the active profile manifests.
 - Dolphin is the single default file manager; Thunar is not part of the active manifests.
+- SDDM is the common login/display manager baseline; login-screen styling is a separate UX task.
 - Caelestia `shell.json` and `cli.json` are merge-managed so Blueprint-owned defaults can be updated without deleting unrelated user settings.
 - Spotify uses the official Arch `spotify-launcher` plus Spicetify, with a pinned upstream `text` layout and Blueprint-owned adaptive Caelestia colors.
 - Normal desktop translucency remains `0.95` in fullscreen; explicitly opaque apps and games opt out at `1.0`.

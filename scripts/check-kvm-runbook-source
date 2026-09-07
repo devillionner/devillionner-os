@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+RUNBOOK="$REPO/docs/kvm-validation.md"
+INSTALL="$REPO/scripts/install"
+
+fail() {
+    printf 'KVM runbook source contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+[[ -f "$RUNBOOK" ]] || fail "docs/kvm-validation.md missing"
+[[ -f "$INSTALL" ]] || fail "scripts/install missing"
+bash -n "$INSTALL" || fail "scripts/install Bash syntax"
+
+python3 - "$RUNBOOK" "$INSTALL" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+runbook = Path(sys.argv[1]).read_text(encoding="utf-8")
+install = Path(sys.argv[2]).read_text(encoding="utf-8")
+
+# The implementation must still have deterministic non-interactive profile
+# defaults before the runbook can meaningfully exercise them.
+required_install = [
+    '[[ "$PROFILE" == "laboratory" ]] && DEFAULT_VIRT=true || DEFAULT_VIRT=false',
+    'VIRTUALIZATION="$DEFAULT_VIRT"',
+    '[[ "$VIRTUALIZATION" == true ]] && ARGS+=(--feature virtualization)',
+]
+for needle in required_install:
+    if needle not in install:
+        raise SystemExit(f"installer default marker missing: {needle}")
+
+blocks = re.findall(r"```bash\n(.*?)```", runbook, flags=re.S)
+install_blocks = [block for block in blocks if "bash scripts/install" in block]
+
+expected = {
+    "gaming": "false",
+    "work": "false",
+    "laboratory": "true",
+}
+
+for profile, expected_value in expected.items():
+    matches = [block for block in install_blocks if f"--profile {profile}" in block]
+    if len(matches) != 1:
+        raise SystemExit(
+            f"expected exactly one clean-install command for {profile}, found {len(matches)}"
+        )
+    block = matches[0]
+    for marker in ("--keyboard windows", "--non-interactive", "--vm"):
+        if marker not in block:
+            raise SystemExit(f"{profile} KVM command missing {marker}")
+    if "--with virtualization" in block or "--without virtualization" in block:
+        raise SystemExit(
+            f"{profile} KVM command overrides virtualization instead of testing its default"
+        )
+    evidence = f"Virtualization: {expected_value}"
+    if evidence not in runbook:
+        raise SystemExit(f"runbook does not require {profile} default evidence: {evidence}")
+
+if "type `RESTORE`" not in runbook:
+    raise SystemExit("runbook no longer preserves the explicit RESTORE confirmation")
+
+if "same revision" not in runbook.lower() or "blueprint-tested-commit.txt" not in runbook:
+    raise SystemExit("runbook no longer pins install and post-reboot validation to one revision")
+PY
+
+printf 'KVM runbook source contract: PASS\n'

@@ -6,13 +6,15 @@
 bash scripts/check
 ```
 
-This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, services and Git state. It then runs the dedicated Quickshell, Caelestia, Dolphin, Spotify, cursor and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
+This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, declared service manifests and Git state. It then runs the dedicated display-manager, service-manifest, Quickshell, Caelestia, Dolphin, Spotify, cursor and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
 
 Restore uses this exact same aggregate command, so the validation contract does not change between the end of installation and the recommended post-reboot check.
 
 For focused troubleshooting, the component validators remain available individually:
 
 ```bash
+bash scripts/check-display-manager
+bash scripts/check-services
 bash scripts/check-quickshell
 bash scripts/check-caelestia
 bash scripts/check-dolphin
@@ -21,9 +23,23 @@ bash scripts/check-cursor
 bash scripts/check-tv-cast
 ```
 
+`check-display-manager` validates the SDDM package/service, enabled state and `display-manager.service` alias. `check-services` validates all system units selected by the common/profile/feature manifests plus the common user units, requiring each declared unit to exist and be enabled.
+
 The dedicated Quickshell check validates that `quickshell-git` is installed, `qs --version` succeeds and `rebuild-detector` does not report the package as linked against stale libraries.
 
 The TV Cast check validates Miracast dependencies, installed helper files, shell/Python syntax, FluxCast low-latency tuning, the exact three-mode contract, `fast_bilinear`, gettext catalogs, UFW rules and the single persistent `Super+P` bind.
+
+## Clean KVM profile-default test
+
+The KVM runbook deliberately tests the actual profile defaults rather than manually forcing virtualization state. With a fresh guest, the non-interactive profile command resolves defaults before the safety confirmation:
+
+```bash
+bash scripts/install --profile gaming --keyboard windows --non-interactive --vm
+bash scripts/install --profile work --keyboard windows --non-interactive --vm
+bash scripts/install --profile laboratory --keyboard windows --non-interactive --vm
+```
+
+Expected installation plans: Gaming = virtualization false, Work = false, Laboratory = true. See `docs/kvm-validation.md` for the full fresh-install/reboot evidence flow.
 
 ## Disk audit
 

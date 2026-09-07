@@ -27,6 +27,9 @@ jobs:
       - name: Validate installer safety contract
         run: bash scripts/check-installer-safety-source
 
+      - name: Validate KVM runbook defaults
+        run: bash scripts/check-kvm-runbook-source
+
       - name: Validate display manager contract
         run: bash scripts/check-display-manager-source
 
