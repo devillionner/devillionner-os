@@ -30,6 +30,9 @@ jobs:
       - name: Validate display manager contract
         run: bash scripts/check-display-manager-source
 
+      - name: Validate service manifest contract
+        run: bash scripts/check-service-manifests-source
+
       - name: Validate hardware audio policy
         run: bash scripts/check-hardware-audio-source
 

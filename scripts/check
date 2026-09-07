@@ -208,6 +208,7 @@ fi
 
 section "COMPONENT RUNTIME CHECKS"
 run_component_check "Display Manager" bash "$REPO/scripts/check-display-manager"
+run_component_check "Service Manifests" bash "$REPO/scripts/check-services" --profile "$PROFILE"
 run_component_check "Quickshell" bash "$REPO/scripts/check-quickshell"
 run_component_check "Caelestia" bash "$REPO/scripts/check-caelestia"
 run_component_check "Cursor" bash "$REPO/scripts/check-cursor"
