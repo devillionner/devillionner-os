@@ -4,6 +4,7 @@ set -Eeuo pipefail
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 BOOTSTRAP="$REPO/bootstrap"
 CONFIGURE="$REPO/scripts/configure-blueprint-cli"
+APPLY="$REPO/scripts/apply-component"
 RESTORE="$REPO/scripts/restore"
 CHECK="$REPO/scripts/check"
 
@@ -12,20 +13,22 @@ fail() {
     exit 1
 }
 
-for file in "$BOOTSTRAP" "$CONFIGURE" "$RESTORE" "$CHECK"; do
+for file in "$BOOTSTRAP" "$CONFIGURE" "$APPLY" "$RESTORE" "$CHECK"; do
     [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
 done
 bash -n "$BOOTSTRAP" || fail "bootstrap Bash syntax"
 bash -n "$CONFIGURE" || fail "configure-blueprint-cli Bash syntax"
+bash -n "$APPLY" || fail "apply-component Bash syntax"
 
-python3 - "$BOOTSTRAP" "$CONFIGURE" "$RESTORE" "$CHECK" <<'PY'
+python3 - "$BOOTSTRAP" "$CONFIGURE" "$APPLY" "$RESTORE" "$CHECK" <<'PY'
 from pathlib import Path
 import sys
 
 bootstrap = Path(sys.argv[1]).read_text(encoding="utf-8")
 configure = Path(sys.argv[2]).read_text(encoding="utf-8")
-restore = Path(sys.argv[3]).read_text(encoding="utf-8")
-check = Path(sys.argv[4]).read_text(encoding="utf-8")
+apply = Path(sys.argv[3]).read_text(encoding="utf-8")
+restore = Path(sys.argv[4]).read_text(encoding="utf-8")
+check = Path(sys.argv[5]).read_text(encoding="utf-8")
 
 required_bootstrap = [
     'REPOSITORY="devillionner/devillionner-os"',
@@ -38,6 +41,7 @@ required_bootstrap = [
     'STATE_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/devillionner-os/source-revision"',
     'bash "$SOURCE_ROOT/scripts/install" "$@"',
     'bash "$SOURCE_ROOT/scripts/check" "$@"',
+    'bash "$SOURCE_ROOT/scripts/apply-component" "$@"',
     'bash "$SOURCE_ROOT/scripts/configure-blueprint-cli" "$@"',
 ]
 for needle in required_bootstrap:
@@ -56,6 +60,36 @@ required_configure = [
 for needle in required_configure:
     if needle not in configure:
         raise SystemExit(f"clone-less CLI install marker missing: {needle}")
+
+# `apply` is intentionally a narrow migration/debugging tool for the current
+# installation. It may run known configurators, but it must never become a
+# profile restore/package-reconciliation bypass on the production system.
+required_components = {
+    'caelestia': ['configure-caelestia', 'configure-caelestia-cli', 'patch-caelestia-fullscreen'],
+    'cursor': ['configure-cursor'],
+    'dolphin': ['configure-dolphin'],
+    'hardware': ['configure-hardware'],
+    'spotify': ['configure-spotify'],
+    'tvcast': ['configure-tv-cast'],
+}
+for component, scripts in required_components.items():
+    if f'    {component})' not in apply:
+        raise SystemExit(f"component apply case missing: {component}")
+    for script in scripts:
+        if f'$REPO/scripts/{script}' not in apply:
+            raise SystemExit(f"component {component} no longer invokes {script}")
+
+for forbidden in (
+    'scripts/restore',
+    'reconcile-packages',
+    'pacman -S',
+    'paru -S',
+    'profile" >',
+    'keyboard-mode',
+    'features" >',
+):
+    if forbidden in apply:
+        raise SystemExit(f"targeted component apply crossed its safety boundary: {forbidden}")
 
 if '"$REPO/scripts/configure-blueprint-cli"' not in restore:
     raise SystemExit("restore does not install the clone-less Blueprint command")
