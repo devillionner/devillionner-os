@@ -45,6 +45,18 @@ test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
 
 If `main` changes while a VM test is in progress, finish or discard that test first. Update to the newer commit only before starting a new clean validation cycle.
 
+## Why the profile commands use `--non-interactive`
+
+The clean-profile tests must exercise the **actual installer defaults**, not reproduce them manually with `--with virtualization` / `--without virtualization` flags.
+
+Each command therefore supplies the profile and keyboard, uses `--non-interactive`, and deliberately omits an explicit virtualization override:
+
+- Gaming must resolve to virtualization **off** by default;
+- Work must resolve to virtualization **off** by default;
+- Laboratory must resolve to virtualization **on** by default.
+
+The destructive restore confirmation is still interactive: the user must verify the KVM target and type `RESTORE`.
+
 ## Evidence to keep
 
 For each profile, keep the tested commit plus two logs:
@@ -71,10 +83,12 @@ git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
 bash scripts/install \
   --profile gaming \
   --keyboard windows \
-  --without virtualization \
+  --non-interactive \
   --vm \
   2>&1 | tee ~/blueprint-gaming-install.log
 ```
+
+The installation plan must show `Virtualization: false`. If it shows anything else, stop the test: the Gaming default is wrong.
 
 When the restore safety prompt appears, verify the printed target says KVM/QEMU VM and then type `RESTORE`.
 
@@ -84,6 +98,7 @@ Before reboot, require:
 - a Blueprint recovery checkpoint was created and recorded;
 - profile state = `gaming`;
 - features include mandatory `tvcast` and do not include virtualization;
+- declared system/user service manifests pass validation;
 - final installer validation reports `RESULT: PASS` / `Validation: PASS` or any difference is explained and fixed before proceeding.
 
 Then reboot and run:
@@ -108,10 +123,12 @@ git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
 bash scripts/install \
   --profile work \
   --keyboard windows \
-  --without virtualization \
+  --non-interactive \
   --vm \
   2>&1 | tee ~/blueprint-work-install.log
 ```
+
+The installation plan must show `Virtualization: false`. If it does not, stop the test rather than overriding the result with a flag.
 
 Type `RESTORE` only after confirming the target is the KVM guest.
 
@@ -129,7 +146,7 @@ Spotify may legitimately warn that a first login is still required; that warning
 
 ## Laboratory
 
-Start from another fresh baseline guest. This profile must test its **default virtualization feature**, so do not pass `--without virtualization`:
+Start from another fresh baseline guest. This test must prove that Laboratory enables virtualization **by default**, so do not pass either an explicit `--with virtualization` or `--without virtualization` override:
 
 ```bash
 git clone https://github.com/devillionner/devillionner-os.git ~/devillionner-os
@@ -139,10 +156,12 @@ git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
 bash scripts/install \
   --profile laboratory \
   --keyboard windows \
-  --with virtualization \
+  --non-interactive \
   --vm \
   2>&1 | tee ~/blueprint-laboratory-install.log
 ```
+
+The installation plan must show `Virtualization: true` before restore begins. That output is part of the runtime evidence that the Laboratory default itself works.
 
 The outer guest may not expose nested `/dev/kvm`. That is acceptable only if Blueprint reports the limitation honestly instead of pretending nested acceleration is available. The package/service/configuration contract must still be reviewed.
 
@@ -160,6 +179,7 @@ Laboratory is not complete until the aggregate result and virtualization-specifi
 
 After the post-reboot aggregate passes, do a short manual sanity pass without changing configuration:
 
+- SDDM completed the reboot/login path and the intended Hyprland session starts;
 - Caelestia shell loads without ERROR-level startup failure;
 - Kitty opens;
 - `Super+E` opens Dolphin through the managed wrapper;
@@ -189,9 +209,10 @@ If the chosen update does not actually create an ABI mismatch, record the test a
 
 The KVM milestone is complete only when all of these are true:
 
-- Gaming: fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
-- Work: fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
-- Laboratory: fresh install + reboot + aggregate PASS on one pinned Blueprint revision, with virtualization state understood;
+- Gaming: its real default resolves virtualization off, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
+- Work: its real default resolves virtualization off, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
+- Laboratory: its real default resolves virtualization on, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision, with virtualization state understood;
+- declared system/user service manifests pass the aggregate contract;
 - no restore safety gate was weakened to obtain a pass;
 - each install created a usable-looking recovery-point record;
 - all unexplained WARN/FAIL output has been resolved or documented as an intentional environment limitation.
