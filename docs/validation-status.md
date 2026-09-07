@@ -16,40 +16,43 @@ This file records **what has actually been exercised**. A green source/CI check 
 | Component / gate | CI / source | Existing UX3405CA host | Fresh KVM | Physical test partition | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Repository integrity | ✅ | n/a | ⏳ | ⏳ | GitHub Actions runs repository, documentation and component source contracts. |
-| Clone-less bootstrap / source identity | ✅ | ⏳ | ⏳ | ⏳ | `bootstrap` resolves a ref to an exact commit, downloads a temporary source archive and removes it after the action. `devos-blueprint check` prefers the recorded installed revision. Source/CI is green; live host use is still pending. |
+| Clone-less bootstrap / source identity | ✅ | ✅ | ⏳ | ⏳ | `devos-blueprint setup-cli`, `version`, targeted `apply` and `check` were exercised on the host. Source was resolved to an exact commit, downloaded into a temporary directory, used successfully and removed without a persistent Git checkout. The host predates full Blueprint restore, so an installed full-system revision is intentionally not recorded yet. |
+| Targeted clone-less component apply | ✅ | ✅ | ⏳ | ⏳ | Hardware, cursor, Dolphin and TV Cast were repaired on the existing host through `devos-blueprint apply` without restore/profile switching/package reconciliation. The apply path is source-guarded against package removal. |
 | Four-profile identity | ✅ | n/a | ⏳ | ⏳ | Gaming, Work, Laboratory/Dev and University/Uni are distinct profile identities. University is not a Work alias and currently has a deliberately common-only profile-specific package layer. |
-| SDDM login/display manager | ✅ | ⏳ | ⏳ | ⏳ | Blueprint uses the CachyOS Hyprland-aligned SDDM baseline, forces the next-boot `display-manager.service` alias without restarting the current graphical session, and treats the old Blueprint GDM package as retired. |
-| Service manifests | ✅ | ⏳ | ⏳ | ⏳ | `check-services` verifies that every selected system/user unit exists and is enabled. TV Cast remains daemon-free. Runtime evidence is still pending. |
+| SDDM login/display manager | ✅ | ⚠️ migration pending | ⏳ | ⏳ | Existing host still runs GDM and has no SDDM package. Blueprint clean installs standardize on SDDM, but the live production host is deliberately not migrated before clean-KVM/reboot validation. |
+| Service manifests | ✅ | ⚠️ SDDM-only drift | ⏳ | ⏳ | All currently present common/user services passed on the existing host; the only service-manifest failure is the intentionally pending SDDM migration. |
+| Hardware-aware audio policy | ✅ | ✅ | ⏳ | ⏳ | Targeted hardware apply identified ASUS UX3405CA, restored the matching EasyEffects presets and exposed `eq-laptop`, `eq-dolby` and `eq-sony`; aggregate audio validation then passed. |
 | Quickshell runtime / ABI check | ✅ | ✅ | ⏳ | ⏳ | `check-quickshell` passed on the existing host. A deliberate real Qt-update rebuild exercise is still pending. |
 | Caelestia merge policy + package patches | ✅ | ✅ | ⏳ | ⏳ | `check-caelestia` passed after applying the managed settings and QML patches on the existing host. |
-| Dolphin | ✅ | ✅ | ⏳ | ⏳ | `check-dolphin`: 30 OK, 0 FAIL on the existing host; legacy Thunar only produced a warning. |
+| Dolphin | ✅ | ✅ | ⏳ | ⏳ | After clone-less targeted apply, `check-dolphin`: 30 OK, 0 FAIL; global previews are enabled and only legacy Thunar remains as a warning. |
 | Spotify integration | ✅ | ✅ core runtime | ⏳ | ⏳ | Themed launch, playback, `Super+M` and wallpaper-driven recolor were exercised. The latest pane-border cosmetic tweak still needs a visual recheck on the host. |
-| Bibata Modern Ice cursor | ✅ | ✅ config/runtime | ⏳ | ⏳ | `check-cursor`: 10 OK, 0 FAIL. A logout/login visual check is still needed for compositor-side XCursor refresh. |
-| TV Cast / Miracast | ✅ current three-mode source | ⚠️ previous two-mode runtime | ⏳ | ⏳ | The previously installed 1080p30/720p60 implementation passed the host check. The current **three-mode** contract, including Low Latency 720p30/5 Mbps, still needs a physical host + TV retest. |
-| Full aggregate `devos-blueprint check` | ✅ contract | ⏳ | ⏳ | ⏳ | Internally runs the canonical `scripts/check` contract from an exact temporary revision. Existing-host rerun is pending, including keyboard/state, SDDM and service-manifest differences. |
+| Bibata Modern Ice cursor | ✅ | ✅ config/runtime | ⏳ | ⏳ | After clone-less targeted apply, `check-cursor`: 10 OK, 0 FAIL including GSettings. A logout/login visual check is still needed for compositor-side XCursor refresh. |
+| TV Cast / Miracast | ✅ current three-mode source | ✅ component contract; TV retest pending | ⏳ | ⏳ | The current installed host now passes the exact 1080p30/8 Mbps, 720p60/8 Mbps and Low Latency 720p30/5 Mbps runtime contract. Actual casting through all three modes against the physical Miracast TV still needs a retest. |
+| Full aggregate `devos-blueprint check` | ✅ contract | ⚠️ 5 FAIL remain | ⏳ | ⏳ | Clone-less aggregate now reaches the live host correctly. Remaining failures are deliberate/unresolved host drift: keyboard policy, profile-dependent package identity, SDDM package/display-manager state and the corresponding SDDM service check. |
 | Gaming profile install | ✅ source wiring | — | ⏳ | ⏳ | Fresh KVM must prove virtualization defaults off, reboot, and aggregate PASS. |
-| Work profile install | ✅ source wiring | partial migration only | ⏳ | ⏳ | Existing host work-profile components are not equivalent to a fresh Work install. |
+| Work profile install | ✅ source wiring | partial migration only | ⏳ | ⏳ | Current host has no saved profile state; the fallback Work check should not be treated as proof that this physical system is intended to be Work. |
 | Laboratory / Dev profile install | ✅ source wiring | — | ⏳ | ⏳ | Clean KVM must prove virtualization defaults on and the nested-KVM limitation is reported honestly if present. |
 | University / Uni profile install | ✅ source wiring | — | ⏳ | ⏳ | Distinct University identity is wired with virtualization off by default. University-specific apps are intentionally not guessed before the real study workflow is defined. |
-| Recovery checkpoint / rollback | ✅ source wiring | ⏳ | ⏳ | ⏳ | Automatic package-manager Snapper snapshots have been observed, but the Blueprint recovery-point record and a usable rollback have not yet been validated as an installer gate. |
+| Recovery checkpoint / rollback | ✅ source wiring | ✅ record / ⏳ rollback | ⏳ | ⏳ | `devos-blueprint check` now confirms a Blueprint pre-restore recovery-point record exists on the host. A real usable rollback is still unverified. |
 | Virtualization + accelerated Linux guest | ✅ source wiring | ⏳ | ⏳ | ⏳ | Physical `/dev/kvm`, libvirt runtime and virtio/virgl vs `llvmpipe` remain pending. |
 
-Legend: ✅ exercised at that level · ⚠️ useful evidence but current code differs · ⏳ pending · — not applicable/not attempted.
+Legend: ✅ exercised at that level · ⚠️ useful evidence/current migration drift remains · ⏳ pending · — not applicable/not attempted.
 
 ## Next validation order
 
-1. On the existing ASUS host, install/test the clone-less helper, then run the current aggregate without relying on `/tmp/devillionner-os-check`.
-2. Finish the small host checks: SDDM/service state, Spotify pane border and Bibata cursor after relogin.
-3. Apply the current TV Cast component and exercise all **three** modes against the physical Miracast TV, especially Low Latency.
-4. Resolve the intended keyboard layout/switch policy, then rerun `devos-blueprint check` on the host.
-5. Fresh **Gaming** KVM → reboot → pinned `devos-blueprint check`.
-6. Fresh **Work** KVM → reboot → pinned `devos-blueprint check`.
-7. Fresh **Laboratory / Dev** KVM → reboot → pinned `devos-blueprint check`, including virtualization state.
-8. Fresh **University / Uni** KVM → reboot → pinned `devos-blueprint check` and verify the saved profile remains `university`.
-9. Exercise a real Qt update in a clean KVM and confirm automatic `quickshell-git` ABI rebuild.
-10. Validate physical-host KVM/virgl behavior.
-11. Only after all four VM profiles pass, use the reserved physical Blueprint test partition.
-12. Verify the pre-restore Snapper/Btrfs recovery point is actually usable before any production restore is considered.
+1. Decide the intended identity of the current physical host (likely candidate: Gaming), then run an explicit non-mutating `devos-blueprint check --profile <profile>` before recording profile state.
+2. Resolve the intended `EN ↔ UA` keyboard layout/switch policy on the existing host.
+3. Keep the current GDM host unchanged until SDDM has passed a clean-KVM install + reboot; only then consider an explicit live-host migration.
+4. Visually recheck the latest Spotify pane-border tweak and Bibata after logout/login.
+5. Exercise all **three** current TV Cast modes against the physical Miracast TV, especially Low Latency.
+6. Fresh **Gaming** KVM → reboot → pinned `devos-blueprint check`.
+7. Fresh **Work** KVM → reboot → pinned `devos-blueprint check`.
+8. Fresh **Laboratory / Dev** KVM → reboot → pinned `devos-blueprint check`, including virtualization state.
+9. Fresh **University / Uni** KVM → reboot → pinned `devos-blueprint check` and verify the saved profile remains `university`.
+10. Exercise a real Qt update in a clean KVM and confirm automatic `quickshell-git` ABI rebuild.
+11. Validate physical-host KVM/virgl behavior.
+12. Only after all four VM profiles pass, use the reserved physical Blueprint test partition.
+13. Verify the pre-restore Snapper/Btrfs recovery point is actually usable before any production restore is considered.
 
 ## Rule
 
