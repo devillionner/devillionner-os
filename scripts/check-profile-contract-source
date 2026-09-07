@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MAN="$REPO/manifests/profiles"
+COMMON="$REPO/scripts/lib/common.sh"
+INSTALL="$REPO/scripts/install"
+OPTIMIZE="$REPO/scripts/optimize-system"
+
+fail() {
+    printf 'Profile source contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+for file in "$COMMON" "$INSTALL" "$OPTIMIZE"; do
+    [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
+    bash -n "$file" || fail "Bash syntax: ${file#$REPO/}"
+done
+
+for profile in gaming work laboratory university; do
+    for suffix in repo aur; do
+        [[ -f "$MAN/$profile-$suffix.txt" ]] \
+            || fail "missing profile manifest: $profile-$suffix.txt"
+    done
+    [[ -f "$MAN/services-$profile.txt" ]] \
+        || fail "missing service manifest: services-$profile.txt"
+done
+
+# Source only the shared helper library; it has no runtime side effects.
+source "$COMMON"
+
+[[ "$(bp_normalize_profile gaming)" == "gaming" ]] || fail "gaming normalization"
+[[ "$(bp_normalize_profile game)" == "gaming" ]] || fail "game alias"
+[[ "$(bp_normalize_profile work)" == "work" ]] || fail "work normalization"
+[[ "$(bp_normalize_profile office)" == "work" ]] || fail "office alias"
+[[ "$(bp_normalize_profile laboratory)" == "laboratory" ]] || fail "laboratory normalization"
+[[ "$(bp_normalize_profile dev)" == "laboratory" ]] || fail "dev alias"
+[[ "$(bp_normalize_profile university)" == "university" ]] || fail "university normalization"
+[[ "$(bp_normalize_profile uni)" == "university" ]] || fail "uni alias"
+[[ "$(bp_normalize_profile study)" == "university" ]] || fail "study alias"
+
+for marker in \
+    '--profile gaming|work|laboratory|university' \
+    '4) University' \
+    '4) PROFILE="university"' \
+    '[[ "$PROFILE" == "laboratory" ]] && DEFAULT_VIRT=true || DEFAULT_VIRT=false'
+do
+    grep -Fq -- "$marker" "$INSTALL" || fail "installer profile marker missing: $marker"
+done
+
+# University is deliberately a separate profile with virtualization off by the
+# same default rule as Gaming/Work. Its package set can grow later without
+# changing its identity or accidentally becoming a Work alias.
+if grep -Eq 'university[^\n]*printf.*work|university\|uni[^\n]*printf.*work' "$COMMON"; then
+    fail "University must not normalize to Work"
+fi
+
+grep -Fq 'gaming|work|laboratory|university' "$OPTIMIZE" \
+    || fail "optimizer usage does not include University"
+
+printf 'Profile source contract: PASS\n'
