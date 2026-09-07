@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MAN="$REPO/manifests/profiles"
+FEATURE_MAN="$REPO/manifests/features"
+RESTORE="$REPO/scripts/restore"
+CHECK="$REPO/scripts/check"
+RUNTIME="$REPO/scripts/check-services"
+
+fail() {
+    printf 'Service manifest source contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+for file in \
+    "$MAN/common-repo.txt" \
+    "$MAN/gaming-repo.txt" \
+    "$MAN/services-common.txt" \
+    "$MAN/services-gaming.txt" \
+    "$MAN/services-work.txt" \
+    "$MAN/services-laboratory.txt" \
+    "$MAN/services-user-common.txt" \
+    "$FEATURE_MAN/virtualization-repo.txt" \
+    "$FEATURE_MAN/services-virtualization.txt" \
+    "$FEATURE_MAN/services-tvcast.txt" \
+    "$RESTORE" "$CHECK" "$RUNTIME"
+do
+    [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
+done
+
+bash -n "$RUNTIME" || fail "check-services Bash syntax"
+
+require_entry() {
+    local file="$1" value="$2" label="$3"
+    grep -Fqx "$value" "$file" || fail "$label missing: $value"
+}
+
+# System service -> explicit package ownership. Base/systemd-provided units such
+# as fstrim.timer and systemd-timesyncd.service are intentionally excluded from
+# this mapping because they come from the base OS contract rather than a
+# Blueprint-added package.
+require_entry "$MAN/common-repo.txt" bluez "bluetooth package"
+require_entry "$MAN/services-common.txt" bluetooth.service "bluetooth service"
+require_entry "$MAN/common-repo.txt" networkmanager "NetworkManager package"
+require_entry "$MAN/services-common.txt" NetworkManager.service "NetworkManager service"
+require_entry "$MAN/common-repo.txt" sddm "SDDM package"
+require_entry "$MAN/services-common.txt" sddm.service "SDDM service"
+require_entry "$MAN/common-repo.txt" ufw "UFW package"
+require_entry "$MAN/services-common.txt" ufw.service "UFW service"
+require_entry "$MAN/gaming-repo.txt" ananicy-cpp "Gaming ananicy package"
+require_entry "$MAN/services-gaming.txt" ananicy-cpp.service "Gaming ananicy service"
+require_entry "$FEATURE_MAN/virtualization-repo.txt" libvirt "libvirt package"
+require_entry "$FEATURE_MAN/services-virtualization.txt" libvirtd.socket "libvirt socket"
+require_entry "$FEATURE_MAN/services-virtualization.txt" virtlogd.socket "virtlogd socket"
+
+# User service -> package/repository-owned unit.
+require_entry "$MAN/common-repo.txt" gnome-keyring "gnome-keyring package"
+require_entry "$MAN/services-user-common.txt" gnome-keyring-daemon.socket "gnome-keyring user socket"
+require_entry "$MAN/common-repo.txt" pipewire "PipeWire package"
+require_entry "$MAN/services-user-common.txt" pipewire.socket "PipeWire user socket"
+require_entry "$MAN/common-repo.txt" pipewire-pulse "PipeWire Pulse package"
+require_entry "$MAN/services-user-common.txt" pipewire-pulse.socket "PipeWire Pulse user socket"
+require_entry "$MAN/common-repo.txt" wireplumber "WirePlumber package"
+require_entry "$MAN/services-user-common.txt" wireplumber.service "WirePlumber user service"
+require_entry "$MAN/common-repo.txt" xdg-user-dirs "xdg-user-dirs package"
+require_entry "$MAN/services-user-common.txt" xdg-user-dirs.service "xdg-user-dirs user service"
+require_entry "$MAN/services-user-common.txt" devos-spotify-theme.path "Spotify theme path unit"
+[[ -f "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.path" ]] \
+    || fail "repository-owned Spotify path unit missing"
+
+# TV Cast is on-demand only and must not silently acquire a permanent daemon.
+if bp_output="$(sed -E 's/[[:space:]]+#.*$//' "$FEATURE_MAN/services-tvcast.txt" | sed -E '/^[[:space:]]*(#|$)/d')" \
+    && [[ -n "$bp_output" ]]; then
+    fail "TV Cast service manifest must remain daemon-free: $bp_output"
+fi
+
+# Restore must consume every service manifest family and the aggregate runtime
+# contract must validate them afterward.
+for marker in \
+    'enable_system_manifest "$MAN/services-common.txt"' \
+    'enable_system_manifest "$MAN/services-$PROFILE.txt"' \
+    'enable_system_manifest "$FEATURE_MAN/services-$feature.txt"' \
+    'enable_user_manifest "$MAN/services-user-common.txt"'
+do
+    grep -Fq "$marker" "$RESTORE" || fail "restore service wiring missing: $marker"
+done
+
+grep -Fq '$REPO/scripts/check-services' "$CHECK" \
+    || fail "aggregate runtime check does not validate service manifests"
+
+grep -Fq 'systemctl is-enabled "$unit"' "$RUNTIME" \
+    || fail "system service enabled-state validation missing"
+grep -Fq 'systemctl --user is-enabled "$unit"' "$RUNTIME" \
+    || fail "user service enabled-state validation missing"
+
+printf 'Service manifest source contract: PASS\n'
