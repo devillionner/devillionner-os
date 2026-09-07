@@ -89,7 +89,7 @@ if ((${#UNKNOWN_FEATURES[@]})); then
 fi
 
 section "CORE"
-for cmd in fish fastfetch Hyprland easyeffects kitty git rsync wpctl; do
+for cmd in fish fastfetch Hyprland easyeffects kitty git rsync wpctl devos-blueprint; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
 
@@ -218,9 +218,30 @@ if feature_enabled tvcast; then
     run_component_check "TV Cast" bash "$REPO/scripts/check-tv-cast"
 fi
 
-section "BLUEPRINT"
-git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1 && ok "Git repository" || fail "Git repository missing"
-[[ -n "$(git -C "$REPO" status --porcelain)" ]] && warn "working tree has uncommitted changes" || ok "working tree clean"
+section "BLUEPRINT SOURCE"
+RECORDED_REVISION="$(cat "$(bp_config_dir)/source-revision" 2>/dev/null || true)"
+ACTIVE_REVISION="${DEVOS_SOURCE_REVISION:-}"
+SOURCE_IS_GIT=false
+if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    SOURCE_IS_GIT=true
+    ACTIVE_REVISION="$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)"
+    ok "local Git checkout source"
+    [[ -n "$(git -C "$REPO" status --porcelain)" ]] && warn "working tree has uncommitted changes" || ok "working tree clean"
+elif [[ "${DEVOS_SOURCE_MODE:-}" == "ephemeral" && "$ACTIVE_REVISION" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    ok "temporary remote source bundle (${ACTIVE_REVISION:0:12})"
+    ok "no persistent Git checkout required"
+else
+    fail "Blueprint source identity is unknown"
+fi
+
+if [[ "$RECORDED_REVISION" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    ok "installed Blueprint revision recorded (${RECORDED_REVISION:0:12})"
+    if [[ "$ACTIVE_REVISION" =~ ^[0-9a-fA-F]{40}$ && "${ACTIVE_REVISION,,}" != "${RECORDED_REVISION,,}" ]]; then
+        warn "validation source differs from installed revision (${ACTIVE_REVISION:0:12} != ${RECORDED_REVISION:0:12})"
+    fi
+else
+    warn "installed Blueprint revision is not recorded yet"
+fi
 
 printf "\n========================================\n"
 printf "OK: %d   WARN: %d   FAIL: %d\n" "$OK" "$WARN" "$FAIL"

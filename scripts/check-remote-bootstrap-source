@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+BOOTSTRAP="$REPO/bootstrap"
+CONFIGURE="$REPO/scripts/configure-blueprint-cli"
+RESTORE="$REPO/scripts/restore"
+CHECK="$REPO/scripts/check"
+
+fail() {
+    printf 'Remote bootstrap source contract: FAIL: %s\n' "$*" >&2
+    exit 1
+}
+
+for file in "$BOOTSTRAP" "$CONFIGURE" "$RESTORE" "$CHECK"; do
+    [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
+done
+bash -n "$BOOTSTRAP" || fail "bootstrap Bash syntax"
+bash -n "$CONFIGURE" || fail "configure-blueprint-cli Bash syntax"
+
+python3 - "$BOOTSTRAP" "$CONFIGURE" "$RESTORE" "$CHECK" <<'PY'
+from pathlib import Path
+import sys
+
+bootstrap = Path(sys.argv[1]).read_text(encoding="utf-8")
+configure = Path(sys.argv[2]).read_text(encoding="utf-8")
+restore = Path(sys.argv[3]).read_text(encoding="utf-8")
+check = Path(sys.argv[4]).read_text(encoding="utf-8")
+
+required_bootstrap = [
+    'REPOSITORY="devillionner/devillionner-os"',
+    'TMP_ROOT="$(mktemp -d -t devillionner-os.XXXXXXXX)"',
+    'trap cleanup EXIT INT TERM HUP',
+    'https://api.github.com/repos/$REPOSITORY/commits/$requested',
+    'https://codeload.github.com/$REPOSITORY/tar.gz/$REVISION',
+    'export DEVOS_SOURCE_REVISION="$REVISION"',
+    'export DEVOS_SOURCE_MODE="ephemeral"',
+    'STATE_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/devillionner-os/source-revision"',
+    'bash "$SOURCE_ROOT/scripts/install" "$@"',
+    'bash "$SOURCE_ROOT/scripts/check" "$@"',
+    'bash "$SOURCE_ROOT/scripts/configure-blueprint-cli" "$@"',
+]
+for needle in required_bootstrap:
+    if needle not in bootstrap:
+        raise SystemExit(f"bootstrap marker missing: {needle}")
+
+if 'git clone' in bootstrap:
+    raise SystemExit("remote bootstrap must not create a persistent Git checkout")
+if 'tar.gz/main' in bootstrap or 'tar.gz/$REF' in bootstrap:
+    raise SystemExit("source archive must be fetched by resolved commit SHA, not mutable ref")
+
+required_configure = [
+    'TARGET="/usr/local/bin/devos-blueprint"',
+    'sudo install -Dm755 "$SOURCE" "$TARGET"',
+]
+for needle in required_configure:
+    if needle not in configure:
+        raise SystemExit(f"clone-less CLI install marker missing: {needle}")
+
+if '"$REPO/scripts/configure-blueprint-cli"' not in restore:
+    raise SystemExit("restore does not install the clone-less Blueprint command")
+if '"$CONFIG_DIR/source-revision"' not in restore:
+    raise SystemExit("restore does not record the installed source revision")
+if "devos-blueprint check" not in restore:
+    raise SystemExit("restore still tells users to validate from a persistent repository")
+
+required_check = [
+    'devos-blueprint',
+    'DEVOS_SOURCE_MODE:-',
+    'temporary remote source bundle',
+    'no persistent Git checkout required',
+    'source-revision',
+]
+for needle in required_check:
+    if needle not in check:
+        raise SystemExit(f"aggregate clone-less validation marker missing: {needle}")
+PY
+
+printf 'Remote bootstrap source contract: PASS\n'

@@ -4,6 +4,8 @@ This runbook is the next installer gate. It deliberately uses **three separate f
 
 It is **not** the future one-command Blueprint Test VM template. Guest creation remains explicit in virt-manager until these clean-install tests pass.
 
+The validation path is clone-less: each guest resolves one exact Blueprint commit, installs from a temporary source archive, and validates that same pinned revision after reboot. No persistent Git checkout is required inside the guest.
+
 ## Host prerequisite
 
 The Linux host must have working KVM/libvirt support before starting this runbook. `devos-vm validate` can be used when the Blueprint virtualization feature is installed.
@@ -27,23 +29,22 @@ Do not reuse a guest after a Blueprint profile has already been installed when c
 
 ## Pin one Blueprint revision per test
 
-A clean-install test must use one exact repository revision from install through the post-reboot check. Do **not** `git pull` between those two stages.
-
-Immediately after cloning, record the tested revision:
+A clean-install test must use one exact repository revision from install through the post-reboot check. Resolve `main` once and save the resulting 40-character commit:
 
 ```bash
-cd ~/devillionner-os
-git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
+BOOTSTRAP_URL="https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap"
+curl -fsSL "$BOOTSTRAP_URL" \
+  | bash -s -- version \
+  | tee ~/blueprint-tested-commit.txt
 ```
 
-After reboot, verify the same revision is still checked out before validation:
+Verify the file contains exactly one commit SHA:
 
 ```bash
-cd ~/devillionner-os
-test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
+grep -Eq '^[0-9a-f]{40}$' ~/blueprint-tested-commit.txt
 ```
 
-If `main` changes while a VM test is in progress, finish or discard that test first. Update to the newer commit only before starting a new clean validation cycle.
+Every install and post-reboot check below explicitly uses that saved SHA. If `main` changes while a VM test is in progress, it does not affect the in-progress test.
 
 ## Why the profile commands use `--non-interactive`
 
@@ -67,28 +68,28 @@ For each profile, keep the tested commit plus two logs:
 ~/blueprint-<profile>-postreboot-check.log
 ```
 
-The install log proves the recovery checkpoint, package reconciliation, configurators and first aggregate check. The post-reboot log proves the resulting system survives a clean session restart and satisfies the **same revision's** runtime contract.
+The install log proves the temporary source revision, recovery checkpoint, package reconciliation, configurators and first aggregate check. The post-reboot log proves the resulting system survives a clean session restart and satisfies the **same revision's** runtime contract.
 
 A warning is not automatically a failure, but every warning must be understood before the profile is marked complete.
 
 ## Gaming
 
-From the fresh Gaming guest:
+From the fresh Gaming guest, first resolve and save the revision as described above, then:
 
 ```bash
-git clone https://github.com/devillionner/devillionner-os.git ~/devillionner-os
-cd ~/devillionner-os
-git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
+BOOTSTRAP_URL="https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap"
+REV="$(cat ~/blueprint-tested-commit.txt)"
 
-bash scripts/install \
-  --profile gaming \
-  --keyboard windows \
-  --non-interactive \
-  --vm \
+curl -fsSL "$BOOTSTRAP_URL" \
+  | bash -s -- --ref "$REV" install \
+      --profile gaming \
+      --keyboard windows \
+      --non-interactive \
+      --vm \
   2>&1 | tee ~/blueprint-gaming-install.log
 ```
 
-The installation plan must show `Virtualization: false`. If it shows anything else, stop the test: the Gaming default is wrong.
+The bootstrap must print the pinned Blueprint source revision, and the installation plan must show `Virtualization: false`. If it shows anything else, stop the test: the Gaming default is wrong.
 
 When the restore safety prompt appears, verify the printed target says KVM/QEMU VM and then type `RESTORE`.
 
@@ -98,33 +99,35 @@ Before reboot, require:
 - a Blueprint recovery checkpoint was created and recorded;
 - profile state = `gaming`;
 - features include mandatory `tvcast` and do not include virtualization;
+- `devos-blueprint` was installed without a persistent Git checkout;
 - declared system/user service manifests pass validation;
+- installed source revision matches `~/blueprint-tested-commit.txt`;
 - final installer validation reports `RESULT: PASS` / `Validation: PASS` or any difference is explained and fixed before proceeding.
 
 Then reboot and run:
 
 ```bash
-cd ~/devillionner-os
-test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
-bash scripts/check 2>&1 | tee ~/blueprint-gaming-postreboot-check.log
+REV="$(cat ~/blueprint-tested-commit.txt)"
+devos-blueprint --ref "$REV" check \
+  2>&1 | tee ~/blueprint-gaming-postreboot-check.log
 ```
 
-Gaming is not complete until the post-reboot aggregate reports `RESULT: PASS`.
+Gaming is not complete until the post-reboot aggregate reports `RESULT: PASS` and identifies the temporary remote source bundle at the same revision.
 
 ## Work
 
-Start from a separate fresh baseline guest:
+Start from a separate fresh baseline guest, resolve/save its test revision, then:
 
 ```bash
-git clone https://github.com/devillionner/devillionner-os.git ~/devillionner-os
-cd ~/devillionner-os
-git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
+BOOTSTRAP_URL="https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap"
+REV="$(cat ~/blueprint-tested-commit.txt)"
 
-bash scripts/install \
-  --profile work \
-  --keyboard windows \
-  --non-interactive \
-  --vm \
+curl -fsSL "$BOOTSTRAP_URL" \
+  | bash -s -- --ref "$REV" install \
+      --profile work \
+      --keyboard windows \
+      --non-interactive \
+      --vm \
   2>&1 | tee ~/blueprint-work-install.log
 ```
 
@@ -135,12 +138,12 @@ Type `RESTORE` only after confirming the target is the KVM guest.
 After the installer finishes, reboot and run:
 
 ```bash
-cd ~/devillionner-os
-test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
-bash scripts/check 2>&1 | tee ~/blueprint-work-postreboot-check.log
+REV="$(cat ~/blueprint-tested-commit.txt)"
+devos-blueprint --ref "$REV" check \
+  2>&1 | tee ~/blueprint-work-postreboot-check.log
 ```
 
-Work is not complete until the post-reboot aggregate reports `RESULT: PASS`.
+Work is not complete until the post-reboot aggregate reports `RESULT: PASS` on the same revision.
 
 Spotify may legitimately warn that a first login is still required; that warning does not replace the structural Spotify checks. Do not sign in just to make the clean-install test pass.
 
@@ -149,15 +152,15 @@ Spotify may legitimately warn that a first login is still required; that warning
 Start from another fresh baseline guest. This test must prove that Laboratory enables virtualization **by default**, so do not pass either an explicit `--with virtualization` or `--without virtualization` override:
 
 ```bash
-git clone https://github.com/devillionner/devillionner-os.git ~/devillionner-os
-cd ~/devillionner-os
-git rev-parse HEAD | tee ~/blueprint-tested-commit.txt
+BOOTSTRAP_URL="https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap"
+REV="$(cat ~/blueprint-tested-commit.txt)"
 
-bash scripts/install \
-  --profile laboratory \
-  --keyboard windows \
-  --non-interactive \
-  --vm \
+curl -fsSL "$BOOTSTRAP_URL" \
+  | bash -s -- --ref "$REV" install \
+      --profile laboratory \
+      --keyboard windows \
+      --non-interactive \
+      --vm \
   2>&1 | tee ~/blueprint-laboratory-install.log
 ```
 
@@ -168,9 +171,9 @@ The outer guest may not expose nested `/dev/kvm`. That is acceptable only if Blu
 After reboot:
 
 ```bash
-cd ~/devillionner-os
-test "$(git rev-parse HEAD)" = "$(cat ~/blueprint-tested-commit.txt)"
-bash scripts/check 2>&1 | tee ~/blueprint-laboratory-postreboot-check.log
+REV="$(cat ~/blueprint-tested-commit.txt)"
+devos-blueprint --ref "$REV" check \
+  2>&1 | tee ~/blueprint-laboratory-postreboot-check.log
 ```
 
 Laboratory is not complete until the aggregate result and virtualization-specific output are understood. If nested KVM is unavailable, record that separately; it does **not** satisfy the later physical-host `/dev/kvm` validation item.
@@ -201,7 +204,7 @@ Only after at least one clean profile is stable:
 4. confirm `rebuild-detector`/`checkrebuild` identifies stale `quickshell-git` when applicable;
 5. run the normal Blueprint package reconciliation/restore path rather than manually rebuilding Quickshell first;
 6. confirm the same-version-capable rebuild occurs without `--needed` blocking it;
-7. require `qs --version` and `bash scripts/check-quickshell` to pass afterward.
+7. require `qs --version` and `devos-blueprint --ref <tested-sha> check` to pass afterward.
 
 If the chosen update does not actually create an ABI mismatch, record the test as inconclusive rather than marking the rebuild path validated.
 
@@ -212,6 +215,7 @@ The KVM milestone is complete only when all of these are true:
 - Gaming: its real default resolves virtualization off, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
 - Work: its real default resolves virtualization off, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision;
 - Laboratory: its real default resolves virtualization on, then fresh install + reboot + aggregate PASS on one pinned Blueprint revision, with virtualization state understood;
+- no persistent Blueprint Git checkout is required in the guest;
 - declared system/user service manifests pass the aggregate contract;
 - no restore safety gate was weakened to obtain a pass;
 - each install created a usable-looking recovery-point record;
