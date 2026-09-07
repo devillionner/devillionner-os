@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+SOURCE="$REPO/bootstrap"
+TARGET="/usr/local/bin/devos-blueprint"
+
+[[ -f "$SOURCE" ]] || bp_die "Blueprint bootstrap source is missing."
+bash -n "$SOURCE" || bp_die "Blueprint bootstrap source has invalid Bash syntax."
+
+bp_info "Installing clone-less Blueprint command"
+sudo install -Dm755 "$SOURCE" "$TARGET"
+
+[[ -x "$TARGET" ]] || bp_die "devos-blueprint was not installed successfully."
+bp_ok "devos-blueprint installed at $TARGET"
+printf "    Use 'devos-blueprint check' without keeping a local Git repository.\n"
