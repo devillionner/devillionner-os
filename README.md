@@ -4,15 +4,30 @@ A reproducible CachyOS + Hyprland workstation blueprint focused on a clean Windo
 
 The repository restores programs, package choices, desktop configuration, services, themes and system behavior. Personal files, browser data, passwords, SSH keys and game saves are intentionally excluded.
 
-## Install
+## Install without keeping the repository
 
-Clone the repository on a fresh CachyOS install, then run:
+A normal Blueprint system does **not** need a persistent Git checkout. The public bootstrap resolves `main` to one exact commit, downloads that commit as a temporary archive under `/tmp`, runs the installer from it, and removes the source bundle when the command finishes:
 
 ```bash
-git clone https://github.com/devillionner/devillionner-os.git
-cd devillionner-os
-bash scripts/install
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap | bash
 ```
+
+Installer arguments can be forwarded without cloning the repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
+  | bash -s -- --profile work --keyboard windows --vm
+```
+
+The restore installs `/usr/local/bin/devos-blueprint`. After that, the canonical post-install validation is simply:
+
+```bash
+devos-blueprint check
+```
+
+`devos-blueprint check` automatically uses the exact installed revision recorded by Blueprint, downloads that revision temporarily, validates the system, then removes the source bundle. `--ref <40-character-commit>` can be used when an explicit revision is required.
+
+A local `git clone` remains useful for development/debugging only; it is not part of the final installed-system architecture.
 
 The installer asks for a profile:
 
@@ -32,16 +47,37 @@ Caelestia's `shell.json` and `cli.json` are merge-managed rather than blindly re
 
 Quickshell is ABI-checked after package reconciliation and restore. If `qs --version` fails or `rebuild-detector` flags `quickshell-git` after a Qt library update, Blueprint performs an intentional same-version-capable rebuild and validates the result before reporting success.
 
-Virtualization is a reusable feature, not hard-wired to one profile. Work or Gaming can enable the same KVM/libvirt/virt-manager stack during install or with:
+Virtualization is a reusable feature, not hard-wired to one profile. Work or Gaming can enable the same KVM/libvirt/virt-manager stack during install:
 
 ```bash
-bash scripts/install --profile work --with virtualization
-bash scripts/install --profile gaming --with virtualization
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
+  | bash -s -- --profile work --with virtualization --vm
+
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
+  | bash -s -- --profile gaming --with virtualization --vm
 ```
 
 The installer also asks for keyboard layout switching: **Alt+Shift**, **Super+Space**, or the **Copilot/Menu key**.
 
 On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbook audio helpers are preserved. Other laptops/desktops use the generic `eq-audio` helper with user-managed EasyEffects presets instead of inheriting Zenbook-specific tuning.
+
+## Clone-less helper
+
+On an existing system, the helper itself can be installed without cloning anything:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
+  | bash -s -- setup-cli
+```
+
+Useful remote actions:
+
+```bash
+devos-blueprint check             # validate the installed revision
+devos-blueprint check-repo        # source/repository contracts from a temporary bundle
+devos-blueprint version           # resolve the revision that would be fetched
+devos-blueprint --ref <sha> check # validate using an explicit pinned revision
+```
 
 ## Safety
 
@@ -50,6 +86,8 @@ On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbo
 - Physical restore is currently allowed only on the reserved Blueprint test partition.
 - A pre-restore Btrfs/Snapper recovery point is created before package/system changes.
 - The scripts never repartition disks or touch Windows partitions.
+- Remote bootstrap downloads the source archive by a resolved 40-character commit SHA rather than executing a mutable archive directly.
+- Temporary source bundles are removed after the requested action completes.
 - GitHub pull requests run repository-integrity and desktop-contract checks before changes reach `main`.
 - Merge-managed Caelestia JSON refuses malformed existing files instead of silently overwriting them.
 - Quickshell rebuilds are checked both by runtime validation and a source-level CI contract.
@@ -57,8 +95,8 @@ On the ASUS Zenbook UX3405CA, Copilot is the default layout switch and the Zenbo
 
 Recommended validation order:
 
-1. repository CI / `bash scripts/check-repo`;
-2. fresh Gaming, Work and Laboratory KVM installs, each from a clean baseline and each followed by reboot + `bash scripts/check`;
+1. repository CI / `devos-blueprint check-repo`;
+2. fresh Gaming, Work and Laboratory KVM installs, each from a clean baseline and each followed by reboot + `devos-blueprint check` on the same pinned revision;
 3. reserved physical test partition;
 4. only after those gates pass, consider production use.
 
@@ -67,19 +105,11 @@ The current evidence at each validation level is tracked explicitly in [Validati
 ## Useful commands
 
 ```bash
-bash scripts/check-repo
-bash scripts/check
-bash scripts/check-display-manager
-bash scripts/check-services
-bash scripts/check-quickshell
-bash scripts/configure-caelestia
-bash scripts/configure-caelestia-cli
-bash scripts/check-caelestia
-bash scripts/check-dolphin
-bash scripts/check-spotify
-bash scripts/check-cursor
-bash scripts/check-tv-cast
-bash scripts/audit-disk
+devos-blueprint check
+devos-blueprint check-repo
+bash scripts/check-display-manager      # development checkout only
+bash scripts/check-services             # development checkout only
+bash scripts/check-quickshell            # development checkout only
 devos-vm
 ```
 
@@ -99,6 +129,7 @@ See:
 
 ## Current design decisions
 
+- The installed system does not require a persistent Blueprint Git repository; normal install/check operations use commit-pinned temporary source bundles.
 - Kitty is the single default terminal. Alacritty/Ptyxis are not part of the active profile manifests.
 - Dolphin is the single default file manager; Thunar is not part of the active manifests.
 - SDDM is the common login/display manager baseline; login-screen styling is a separate UX task.
