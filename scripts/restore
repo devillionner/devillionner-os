@@ -123,6 +123,11 @@ for feature in "${FEATURES[@]}"; do
 done
 "$REPO/scripts/reconcile-packages" "${RECONCILE_ARGS[@]}"
 
+# Install the tiny remote launcher while the source bundle is available. The
+# launcher later downloads an exact temporary revision for checks/installs, so
+# the finished system does not need to keep this repository on disk.
+"$REPO/scripts/configure-blueprint-cli"
+
 # SDDM is the Blueprint login manager and also matches the fresh CachyOS
 # Hyprland baseline. Configure only the next boot/login; never restart the active
 # display manager in the middle of a restore session.
@@ -236,6 +241,18 @@ printf '%s\n' "$PROFILE" > "$CONFIG_DIR/profile"
 printf '%s\n' "$KEYBOARD" > "$CONFIG_DIR/keyboard-mode"
 printf '%s\n' "${FEATURES[@]}" > "$CONFIG_DIR/features"
 
+SOURCE_REVISION="${DEVOS_SOURCE_REVISION:-}"
+if [[ ! "$SOURCE_REVISION" =~ ^[0-9a-fA-F]{40}$ ]] \
+    && git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    SOURCE_REVISION="$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)"
+fi
+if [[ "$SOURCE_REVISION" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    printf '%s\n' "${SOURCE_REVISION,,}" > "$CONFIG_DIR/source-revision"
+    bp_ok "Blueprint source revision recorded: ${SOURCE_REVISION:0:12}"
+else
+    bp_warn "Blueprint source revision could not be recorded"
+fi
+
 bp_info "Running unified Blueprint validation"
 if "$REPO/scripts/check" --profile "$PROFILE"; then
     VALIDATION_PASS=true
@@ -257,4 +274,4 @@ else
     printf "========================================\n"
 fi
 
-printf "\nReboot, then run 'bash scripts/check' for the same complete validation contract.\n"
+printf "\nReboot, then run 'devos-blueprint check' for the same revision's complete validation contract.\n"
