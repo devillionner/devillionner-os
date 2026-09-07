@@ -1,16 +1,44 @@
 # Tools and helper commands
 
+## Clone-less Blueprint command
+
+Normal installed systems do not need to keep a Git checkout of this repository. Restore installs:
+
+```text
+/usr/local/bin/devos-blueprint
+```
+
+The command downloads an exact commit as a temporary archive, runs the requested action from that source, and removes the archive afterward.
+
+```bash
+devos-blueprint check
+devos-blueprint check-repo
+devos-blueprint version
+devos-blueprint --ref <40-character-commit> check
+```
+
+`devos-blueprint check` prefers the revision recorded in `~/.config/devillionner-os/source-revision`, so a normal post-reboot validation does not silently compare an older installed system against a newer `main`.
+
+On a machine where the helper is not installed yet, install only the helper without cloning the repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap \
+  | bash -s -- setup-cli
+```
+
+A local checkout remains useful for Blueprint development/debugging, but is not required by the installed system.
+
 ## Validation
 
 ```bash
-bash scripts/check
+devos-blueprint check
 ```
 
-This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, declared service manifests and Git state. It then runs the dedicated display-manager, service-manifest, Quickshell, Caelestia, Dolphin, Spotify, cursor and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
+This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, declared service manifests and Blueprint source identity. It then runs the dedicated display-manager, service-manifest, Quickshell, Caelestia, Dolphin, Spotify, cursor and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
 
-Restore uses this exact same aggregate command, so the validation contract does not change between the end of installation and the recommended post-reboot check.
+Restore uses this same aggregate `scripts/check` internally, then records the source commit so the installed helper can fetch the same revision later.
 
-For focused troubleshooting, the component validators remain available individually:
+For focused troubleshooting from a development checkout, the component validators remain available individually:
 
 ```bash
 bash scripts/check-display-manager
@@ -31,17 +59,13 @@ The TV Cast check validates Miracast dependencies, installed helper files, shell
 
 ## Clean KVM profile-default test
 
-The KVM runbook deliberately tests the actual profile defaults rather than manually forcing virtualization state. With a fresh guest, the non-interactive profile command resolves defaults before the safety confirmation:
-
-```bash
-bash scripts/install --profile gaming --keyboard windows --non-interactive --vm
-bash scripts/install --profile work --keyboard windows --non-interactive --vm
-bash scripts/install --profile laboratory --keyboard windows --non-interactive --vm
-```
+The KVM runbook deliberately tests the actual profile defaults rather than manually forcing virtualization state. The test may use the clone-less bootstrap while pinning one exact revision for install and post-reboot validation.
 
 Expected installation plans: Gaming = virtualization false, Work = false, Laboratory = true. See `docs/kvm-validation.md` for the full fresh-install/reboot evidence flow.
 
 ## Disk audit
+
+From a development checkout:
 
 ```bash
 bash scripts/audit-disk
