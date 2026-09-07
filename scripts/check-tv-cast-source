@@ -8,6 +8,7 @@ WAIT="$REPO/components/tv-cast/bin/cast-tv-wait-connected"
 WORKER="$REPO/components/tv-cast/lib/cast-tv-worker"
 I18N="$REPO/components/tv-cast/lib/cast-tv-i18n"
 LOCALE_DIR="$REPO/components/tv-cast/locale"
+CONFIGURE="$REPO/scripts/configure-tv-cast"
 RUNTIME_CHECK="$REPO/scripts/check-tv-cast"
 DOC="$REPO/docs/tv-cast.md"
 README="$REPO/README.md"
@@ -17,11 +18,11 @@ fail() {
     exit 1
 }
 
-for file in "$MENU" "$START" "$WAIT" "$WORKER" "$I18N" "$RUNTIME_CHECK" "$DOC" "$README"; do
+for file in "$MENU" "$START" "$WAIT" "$WORKER" "$I18N" "$CONFIGURE" "$RUNTIME_CHECK" "$DOC" "$README"; do
     [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
 done
 
-for script in "$MENU" "$START" "$WAIT" "$WORKER" "$I18N" "$RUNTIME_CHECK"; do
+for script in "$MENU" "$START" "$WAIT" "$WORKER" "$I18N" "$CONFIGURE" "$RUNTIME_CHECK"; do
     bash -n "$script" || fail "bash syntax: ${script#$REPO/}"
 done
 
@@ -81,6 +82,12 @@ while IFS= read -r po; do
         || fail "missing Low Latency connection translation in ${po#$REPO/}"
 done < <(find "$LOCALE_DIR" -maxdepth 1 -type f -name '*.po' | sort)
 ((LOCALE_COUNT > 0)) || fail "no TV Cast locale catalogs found"
+
+grep -Fq 'msgfmt --check-format -o "$tmp" "$po"' "$CONFIGURE" \
+    || fail "TV Cast configure no longer validates PO format strings quietly"
+if grep -Fq 'msgfmt --check -o "$tmp" "$po"' "$CONFIGURE"; then
+    fail "TV Cast configure reintroduced noisy PO header validation"
+fi
 
 grep -Fq 'Low Latency mode = 1280x720 / 30 FPS / 5 Mbps' "$RUNTIME_CHECK" \
     || fail "runtime check does not validate Low Latency mode"
