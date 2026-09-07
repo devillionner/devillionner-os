@@ -9,6 +9,7 @@ This is the working backlog after the v0.3 profile + reusable-feature refactor. 
 - [x] Detect and automatically rebuild stale `quickshell-git` after Qt ABI changes, with `rebuild-detector` + runtime validation.
 - [x] Make `bash scripts/check` the single full runtime contract used both by restore and post-reboot validation.
 - [x] Standardize the common login-manager baseline on **SDDM** and validate its next-boot alias instead of layering GDM onto a fresh CachyOS Hyprland install.
+- [x] Validate all selected system/user service manifests at runtime and lock their package/unit wiring in CI, so a service-enable warning cannot still produce an aggregate PASS.
 - [x] Exercise focused Quickshell, Caelestia, Dolphin, Spotify and cursor runtime checks on the existing ASUS UX3405CA host without running a production restore.
 - [ ] Re-test the **current three-mode TV Cast** contract on the physical host + Miracast TV, including Low Latency 720p30 / 5 Mbps.
 - [ ] Resolve the intended keyboard layout/switch state on the existing host and rerun the current full `bash scripts/check` aggregate.
