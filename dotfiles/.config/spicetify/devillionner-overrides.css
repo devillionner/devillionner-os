@@ -41,26 +41,42 @@
     --panel-gap: var(--devos-panel-gap) !important;
 }
 
+/* Upstream paints the pane frame with a normal border. On the physical host,
+ * inner Spotify layers visually covered the antialiased quarter-circle pixels,
+ * leaving small gaps at rounded corners even though the straight edges remained
+ * visible. Draw the frame outside the pane with a zero-blur spread shadow
+ * instead. Descendants cannot cover that outline, so all four rounded corners
+ * stay connected. */
 .Root__globalNav,
 .main-yourLibraryX-entryPoints,
 .Root__main-view,
 .main-nowPlayingBar-container,
 .Root__right-sidebar:has(aside:not(:empty)) {
+    border: 0 !important;
     border-radius: var(--devos-radius-panel) !important;
-    box-shadow: none !important;
+    box-shadow: 0 0 0 var(--border-width) var(--devos-outline) !important;
+    transition: box-shadow var(--devos-motion) !important;
 }
 
-/* Pane titles act like fieldset legends. The previous transparent-background +
- * text-shadow approach let the border leak through glyph gaps and produced tiny
- * line stubs beside Library/Main/Sidebar/Playing. Mask one compact rectangular
- * segment behind each title instead: the outline stays geometrically clean and
- * the label remains fully readable without hard-coded colors. */
+.Root__globalNav:hover,
+.main-yourLibraryX-entryPoints:hover,
+.Root__main-view:hover,
+.main-nowPlayingBar-container:hover,
+.Root__right-sidebar:has(aside:not(:empty)):hover {
+    border: 0 !important;
+    box-shadow: 0 0 0 var(--border-width) var(--devos-outline-active) !important;
+}
+
+/* Pane titles act like fieldset legends. Keep the mask far enough from the
+ * rounded corner to preserve the complete arc, then cover one compact top-edge
+ * segment behind the label. */
 .Root__globalNav::before,
 .Root__nav-bar .main-yourLibraryX-entryPoints::before,
 .Root__main-view::before,
 .main-nowPlayingBar-container::before,
 .Root__right-sidebar:has(aside:not(:empty))::before {
     background: var(--spice-main) !important;
+    margin: -10px 14px !important;
     padding: 0 4px !important;
     border-radius: 0 !important;
     box-shadow: 0 0 0 1px var(--spice-main) !important;

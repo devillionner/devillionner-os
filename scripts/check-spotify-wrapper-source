@@ -49,18 +49,24 @@ assert data["toggles"]["music"]["spotify"]["command"] == ["devos-spotify"]
 PY
 ok "Caelestia toggle uses the same PATH-resolved command"
 
-# Pane labels must mask one compact rectangular segment of the border, like a
-# fieldset legend. Transparent labels/text shadows caused the physical-host
-# border to leak between glyphs and leave short line stubs next to the titles.
-if grep -Fq 'background: var(--spice-main) !important;' "$OVERRIDES" \
+# Physical-host screenshots showed two independent frame problems: the pane
+# title could leak/stub the top line, and descendant layers could cover the
+# antialiased pixels of a normal rounded border at all four corners. Protect
+# both pieces explicitly: use an outside zero-blur semantic outline and move the
+# compact legend mask away from the rounded corner.
+if grep -Fq 'border: 0 !important;' "$OVERRIDES" \
+    && grep -Fq 'box-shadow: 0 0 0 var(--border-width) var(--devos-outline) !important;' "$OVERRIDES" \
+    && grep -Fq 'box-shadow: 0 0 0 var(--border-width) var(--devos-outline-active) !important;' "$OVERRIDES" \
+    && grep -Fq 'background: var(--spice-main) !important;' "$OVERRIDES" \
+    && grep -Fq 'margin: -10px 14px !important;' "$OVERRIDES" \
     && grep -Fq 'padding: 0 4px !important;' "$OVERRIDES" \
     && grep -Fq 'border-radius: 0 !important;' "$OVERRIDES" \
     && grep -Fq 'box-shadow: 0 0 0 1px var(--spice-main) !important;' "$OVERRIDES" \
     && grep -Fq 'text-shadow: none !important;' "$OVERRIDES" \
     && grep -Fq 'Root__right-sidebar:has(aside:not(:empty))::before' "$OVERRIDES"; then
-    ok "pane labels use clean semantic legend masks"
+    ok "pane frames use complete rounded outlines with clean legend masks"
 else
-    fail "Spotify pane-label legend-mask contract differs"
+    fail "Spotify pane frame/legend geometry contract differs"
 fi
 
 # Reproduce the physical-host palette format with GNU awk and require a silent
