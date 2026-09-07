@@ -13,6 +13,7 @@ Usage:
   bootstrap [--ref REF] [install] [installer options...]
   bootstrap [--ref REF] check [--profile PROFILE]
   bootstrap [--ref REF] check-repo
+  bootstrap [--ref REF] apply COMPONENT
   bootstrap [--ref REF] setup-cli
   bootstrap [--ref REF] version
 
@@ -20,6 +21,9 @@ Examples:
   curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap | bash
   curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap | bash -s -- --profile work --keyboard windows --vm
   curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/bootstrap | bash -s -- check
+  devos-blueprint apply cursor
+  devos-blueprint apply dolphin
+  devos-blueprint apply tvcast
 
 The source bundle is downloaded to a temporary directory and removed when the
 command finishes. No persistent Git checkout is required.
@@ -34,7 +38,7 @@ while (($#)); do
             REF_EXPLICIT=true
             shift 2
             ;;
-        install|check|check-repo|setup-cli|version)
+        install|check|check-repo|apply|setup-cli|version)
             ACTION="$1"
             shift
             break
@@ -154,6 +158,9 @@ case "$ACTION" in
         ;;
     check-repo)
         bash "$SOURCE_ROOT/scripts/check-repo" "$@"
+        ;;
+    apply)
+        bash "$SOURCE_ROOT/scripts/apply-component" "$@"
         ;;
     setup-cli)
         bash "$SOURCE_ROOT/scripts/configure-blueprint-cli" "$@"
