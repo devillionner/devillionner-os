@@ -49,17 +49,18 @@ assert data["toggles"]["music"]["spotify"]["command"] == ["devos-spotify"]
 PY
 ok "Caelestia toggle uses the same PATH-resolved command"
 
-# The pinned upstream text theme paints an opaque background behind the pane
-# labels, which visually cuts the highlighted pane border. Blueprint overrides
-# must leave that label background transparent and use a semantic text shadow
-# instead, so the outline stays continuous without hard-coded colors.
-if grep -Fq 'background: transparent !important;' "$OVERRIDES" \
-    && grep -Fq 'text-shadow:' "$OVERRIDES" \
-    && grep -Fq -- '-2px 0 var(--spice-main)' "$OVERRIDES" \
+# Pane labels must mask one compact rectangular segment of the border, like a
+# fieldset legend. Transparent labels/text shadows caused the physical-host
+# border to leak between glyphs and leave short line stubs next to the titles.
+if grep -Fq 'background: var(--spice-main) !important;' "$OVERRIDES" \
+    && grep -Fq 'padding: 0 4px !important;' "$OVERRIDES" \
+    && grep -Fq 'border-radius: 0 !important;' "$OVERRIDES" \
+    && grep -Fq 'box-shadow: 0 0 0 1px var(--spice-main) !important;' "$OVERRIDES" \
+    && grep -Fq 'text-shadow: none !important;' "$OVERRIDES" \
     && grep -Fq 'Root__right-sidebar:has(aside:not(:empty))::before' "$OVERRIDES"; then
-    ok "pane labels preserve continuous semantic borders"
+    ok "pane labels use clean semantic legend masks"
 else
-    fail "Spotify pane-label border continuity contract differs"
+    fail "Spotify pane-label legend-mask contract differs"
 fi
 
 # Reproduce the physical-host palette format with GNU awk and require a silent
