@@ -1,0 +1,3 @@
+# University profile
+# Intentionally common-only for now. University-specific packages will be
+# selected from the real study workflow instead of guessed in advance.
