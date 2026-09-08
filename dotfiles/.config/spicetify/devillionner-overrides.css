@@ -41,46 +41,69 @@
     --panel-gap: var(--devos-panel-gap) !important;
 }
 
-/* Upstream paints the pane frame with a normal border. On the physical host,
- * inner Spotify layers visually covered the antialiased quarter-circle pixels,
- * leaving small gaps at rounded corners even though the straight edges remained
- * visible. Draw the frame outside the pane with a zero-blur spread shadow
- * instead. Descendants cannot cover that outline, so all four rounded corners
- * stay connected. */
+/* Upstream text-theme couples each pane's border and label to the same element.
+ * That made the border vulnerable to descendant painting/overflow and produced
+ * the broken corner/stub states seen on the physical host. Neutralize the
+ * upstream border completely and draw one independent top-most frame in ::after. */
 .Root__globalNav,
 .main-yourLibraryX-entryPoints,
 .Root__main-view,
 .main-nowPlayingBar-container,
 .Root__right-sidebar:has(aside:not(:empty)) {
+    position: relative !important;
     border: 0 !important;
     border-radius: var(--devos-radius-panel) !important;
-    box-shadow: 0 0 0 var(--border-width) var(--devos-outline) !important;
-    transition: box-shadow var(--devos-motion) !important;
+    box-shadow: none !important;
 }
 
-.Root__globalNav:hover,
-.main-yourLibraryX-entryPoints:hover,
-.Root__main-view:hover,
-.main-nowPlayingBar-container:hover,
-.Root__right-sidebar:has(aside:not(:empty)):hover {
-    border: 0 !important;
-    box-shadow: 0 0 0 var(--border-width) var(--devos-outline-active) !important;
+.Root__globalNav::after,
+.main-yourLibraryX-entryPoints::after,
+.Root__main-view::after,
+.main-nowPlayingBar-container::after,
+.Root__right-sidebar:has(aside:not(:empty))::after {
+    content: "" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: var(--border-width) solid var(--devos-outline) !important;
+    border-radius: var(--devos-radius-panel) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+    z-index: 100 !important;
+    transition: border-color var(--devos-motion) !important;
 }
 
-/* Pane titles act like fieldset legends. Keep the mask far enough from the
- * rounded corner to preserve the complete arc, then cover one compact top-edge
- * segment behind the label. */
+.Root__globalNav:hover::after,
+.main-yourLibraryX-entryPoints:hover::after,
+.Root__main-view:hover::after,
+.main-nowPlayingBar-container:hover::after,
+.Root__right-sidebar:has(aside:not(:empty)):hover::after {
+    border-color: var(--devos-outline-active) !important;
+}
+
+/* Keep upstream's semantic title text (Nav/Library/Main/Sidebar/Playing), but
+ * own its geometry. The title masks only a straight segment of the top edge and
+ * sits above the frame, so it cannot damage any rounded corner. */
 .Root__globalNav::before,
 .Root__nav-bar .main-yourLibraryX-entryPoints::before,
 .Root__main-view::before,
 .main-nowPlayingBar-container::before,
 .Root__right-sidebar:has(aside:not(:empty))::before {
+    position: absolute !important;
+    top: 0 !important;
+    left: 22px !important;
+    margin: 0 !important;
+    transform: translateY(-50%) !important;
     background: var(--spice-main) !important;
-    margin: -10px 14px !important;
-    padding: 0 4px !important;
+    padding: 0 6px !important;
+    border: 0 !important;
     border-radius: 0 !important;
-    box-shadow: 0 0 0 1px var(--spice-main) !important;
+    box-shadow: none !important;
     text-shadow: none !important;
+    z-index: 101 !important;
 }
 
 /* Elevated controls use surfaceContainer / surfaceContainerHigh from the
