@@ -1,44 +1,52 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PIN="3f55a3702bd6d87799dc97023e0fe2b11d88c704"
+PIN="654cfed682b94613b0029997ffafc1eadccc5bef"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-sleek"
+THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-bloom"
 REVISION="$THEME_DIR/upstream-revision"
 BASE="$THEME_DIR/upstream-theme"
 CSS="$THEME_DIR/user.css"
-URL="https://raw.githubusercontent.com/spicetify/spicetify-themes/$PIN/Sleek/user.css"
+JS="$THEME_DIR/theme.js"
+BASE_URL="https://raw.githubusercontent.com/nimsandu/spicetify-bloom/$PIN/src"
 
 mkdir -p "$THEME_DIR"
 command -v curl >/dev/null 2>&1 || {
-    printf 'devos-spotify: curl is required to bootstrap Sleek\n' >&2
+    printf 'devos-spotify: curl is required to bootstrap Bloom\n' >&2
     exit 1
 }
 
 if [[ -f "$CSS" \
+    && -f "$JS" \
     && -f "$REVISION" \
     && -f "$BASE" \
     && "$(cat "$REVISION")" == "$PIN" \
-    && "$(cat "$BASE")" == "Sleek" ]]; then
+    && "$(cat "$BASE")" == "Bloom" ]]; then
     exit 0
 fi
 
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+tmp_css="$(mktemp)"
+tmp_js="$(mktemp)"
+trap 'rm -f "$tmp_css" "$tmp_js"' EXIT
 
-# Keep the community theme itself untouched. Blueprint owns only the pin and
-# the generated Caelestia color.ini; it no longer patches Spotify pane geometry.
-curl -fsSL "$URL" -o "$tmp"
-[[ -s "$tmp" ]] || {
-    printf 'devos-spotify: downloaded Sleek CSS is empty\n' >&2
+# Keep Bloom's visual implementation intact. Blueprint owns only the pinned
+# upstream revision and the generated adaptive color.ini; no pane geometry is
+# patched locally anymore.
+curl -fsSL "$BASE_URL/user.css" -o "$tmp_css"
+curl -fsSL "$BASE_URL/theme.js" -o "$tmp_js"
+[[ -s "$tmp_css" && -s "$tmp_js" ]] || {
+    printf 'devos-spotify: downloaded Bloom theme is incomplete\n' >&2
     exit 1
 }
 
-install -m644 "$tmp" "$CSS"
+install -m644 "$tmp_css" "$CSS"
+install -m644 "$tmp_js" "$JS"
 printf '%s\n' "$PIN" > "$REVISION"
-printf '%s\n' "Sleek" > "$BASE"
+printf '%s\n' "Bloom" > "$BASE"
 
-# Retire the old Blueprint-patched text-theme cache only after the replacement
-# has been built successfully. This path was fully Blueprint-owned.
-rm -rf "$CONFIG_HOME/spicetify/Themes/devillionner-text"
+# Retire previous Blueprint-owned theme experiments only after Bloom has been
+# built successfully. User-installed Marketplace/community themes are untouched.
+rm -rf \
+    "$CONFIG_HOME/spicetify/Themes/devillionner-text" \
+    "$CONFIG_HOME/spicetify/Themes/devillionner-sleek"
 rm -f "$CONFIG_HOME/spicetify/devillionner-overrides.css"
