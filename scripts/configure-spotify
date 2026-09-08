@@ -9,21 +9,25 @@ command -v spicetify >/dev/null 2>&1 || bp_die "spicetify is missing"
 
 bash "$REPO/scripts/configure-caelestia-cli"
 
-bp_info "Installing adaptive Spotify integration"
+bp_info "Installing Spotify + Spicetify integration (theme remains user-managed)"
 
 sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" /usr/local/bin/devos-spotify
 mkdir -p "$HOME/.local/bin"
 ln -sfn /usr/local/bin/devos-spotify "$HOME/.local/bin/devos-spotify"
-
-install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap" "$HOME/.local/bin/devos-spotify-theme-bootstrap"
-install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-theme-sync" "$HOME/.local/bin/devos-spotify-theme-sync"
-install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.path" "$HOME/.config/systemd/user/devos-spotify-theme.path"
-install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.service" "$HOME/.config/systemd/user/devos-spotify-theme.service"
 install -Dm644 "$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop" "$HOME/.local/share/applications/spotify-launcher.desktop"
 
-# The former Blueprint-owned pane/layout override is retired. Bloom now owns the
-# visual geometry; only the generated Caelestia palette remains Blueprint-owned.
-rm -f "$HOME/.config/spicetify/devillionner-overrides.css"
+# Retire every historical Blueprint-owned visual layer without touching themes
+# installed by the user/Marketplace (Lucid, Bloom, etc.).
+systemctl --user disable --now devos-spotify-theme.path >/dev/null 2>&1 || true
+systemctl --user disable --now devos-spotify-theme.service >/dev/null 2>&1 || true
+rm -f \
+    "$HOME/.config/systemd/user/devos-spotify-theme.path" \
+    "$HOME/.config/systemd/user/devos-spotify-theme.service" \
+    "$HOME/.local/bin/devos-spotify-theme-bootstrap" \
+    "$HOME/.local/bin/devos-spotify-theme-sync" \
+    "$HOME/.config/spicetify/devillionner-overrides.css"
+rm -rf "$HOME/.config/spicetify/Themes/devillionner-bloom"
+systemctl --user daemon-reload
 
 python - "$HOME/.config/mimeapps.list" <<'PY'
 from configparser import RawConfigParser
@@ -37,11 +41,7 @@ if path.exists():
     cfg.read(path, encoding="utf-8")
 if not cfg.has_section("Default Applications"):
     cfg.add_section("Default Applications")
-cfg.set(
-    "Default Applications",
-    "x-scheme-handler/spotify",
-    "spotify-launcher.desktop",
-)
+cfg.set("Default Applications", "x-scheme-handler/spotify", "spotify-launcher.desktop")
 path.parent.mkdir(parents=True, exist_ok=True)
 with path.open("w", encoding="utf-8") as handle:
     cfg.write(handle, space_around_delimiters=False)
@@ -49,20 +49,23 @@ PY
 
 install -Dm644 "$REPO/dotfiles/.config/hypr/hyprland/rules.lua" "$HOME/.config/hypr/hyprland/rules.lua"
 
-"$HOME/.local/bin/devos-spotify-theme-bootstrap"
-"$HOME/.local/bin/devos-spotify-theme-sync"
-
 spotify-launcher --no-exec >/dev/null 2>&1 || bp_warn "spotify-launcher could not prefetch/update Spotify"
 
-systemctl --user daemon-reload
-systemctl --user enable --now devos-spotify-theme.path >/dev/null
+SPOTIFY_ROOT="$HOME/.local/share/spotify-launcher/install/usr/share/spotify"
+PREFS="$HOME/.config/spotify/prefs"
+if [[ -f "$PREFS" && -d "$SPOTIFY_ROOT" ]]; then
+    # Only own the application paths. Never set current_theme/color_scheme or
+    # overwrite Marketplace/user theme files.
+    spicetify config spotify_path "$SPOTIFY_ROOT" prefs_path "$PREFS" >/dev/null || \
+        bp_warn "Spicetify paths could not be refreshed"
+else
+    bp_warn "Spotify needs one normal first launch/login before Spicetify can apply themes."
+fi
+
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 
 if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 2>&1; then
     hyprctl reload >/dev/null 2>&1 || true
 fi
 
-if [[ ! -f "$HOME/.config/spotify/prefs" ]]; then
-    bp_warn "Spotify needs one normal first launch/login (~60 seconds) before Spicetify can apply."
-fi
-bp_ok "Spotify integration ready: pinned Bloom UI, Caelestia-adaptive palette, live recolor, spotify: links and persistent 0.95 fullscreen opacity"
+bp_ok "Spotify integration ready: user-managed Spicetify theme, Super+M, spotify: links, single-instance launcher and Hyprland window policy"
