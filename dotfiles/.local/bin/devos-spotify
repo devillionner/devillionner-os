@@ -55,9 +55,7 @@ open_spotify_uri() {
 }
 
 if [[ -n "$SPOTIFY_URI" ]] && pgrep -x spotify >/dev/null 2>&1; then
-    if open_spotify_uri; then
-        exit 0
-    fi
+    open_spotify_uri && exit 0
     launch_vanilla
 fi
 
@@ -82,14 +80,8 @@ fi
 
 spotify-launcher --no-exec >>"$LOG" 2>&1 || true
 
-if ! "$HOME/.local/bin/devos-spotify-theme-bootstrap" >>"$LOG" 2>&1; then
-    notify "Bloom theme bootstrap failed; opening Spotify without it"
-    launch_vanilla
-fi
-"$HOME/.local/bin/devos-spotify-theme-sync" >>"$LOG" 2>&1 || true
-
 if [[ ! -f "$PREFS" ]]; then
-    notify "First launch: sign in and leave Spotify open about a minute, then reopen it for the adaptive theme"
+    notify "First launch: sign in and leave Spotify open about a minute, then close it before applying a Spicetify theme"
     launch_vanilla
 fi
 
@@ -98,20 +90,12 @@ if ! command -v spicetify >/dev/null 2>&1 || [[ ! -d "$SPOTIFY_ROOT" ]]; then
     launch_vanilla
 fi
 
-spicetify config \
-    spotify_path "$SPOTIFY_ROOT" \
-    prefs_path "$PREFS" \
-    current_theme devillionner-bloom \
-    color_scheme Devillionner \
-    inject_css 1 \
-    replace_colors 1 \
-    overwrite_assets 1 \
-    inject_theme_js 1 \
-    spotify_launch_flags '--remote-debugging-port=9222|--remote-allow-origins=*' \
-    >>"$LOG" 2>&1 || {
-        notify "Spicetify configuration failed; opening Spotify normally"
-        launch_vanilla
-    }
+# Blueprint owns only the Spotify installation paths. current_theme,
+# color_scheme, Marketplace content and all theme files remain user-owned.
+spicetify config spotify_path "$SPOTIFY_ROOT" prefs_path "$PREFS" >>"$LOG" 2>&1 || {
+    notify "Spicetify configuration failed; opening Spotify normally"
+    launch_vanilla
+}
 
 if ! spicetify -q auto >>"$LOG" 2>&1; then
     notify "Spicetify apply failed; opening Spotify normally"
@@ -130,19 +114,6 @@ fi
 if [[ -n "$SPOTIFY_URI" ]] && ! open_spotify_uri; then
     spotify-launcher --skip-update "$SPOTIFY_URI" >>"$LOG" 2>&1 &
 fi
-
-for _ in $(seq 1 80); do
-    curl -fsS http://127.0.0.1:9222/json/version >/dev/null 2>&1 && break
-    sleep 0.1
-done
-
-spicetify watch -s >>"$LOG" 2>&1 &
-watch_pid=$!
-cleanup() {
-    kill "$watch_pid" >/dev/null 2>&1 || true
-    wait "$watch_pid" >/dev/null 2>&1 || true
-}
-trap cleanup EXIT INT TERM
 
 while pgrep -x spotify >/dev/null 2>&1; do
     sleep 2
