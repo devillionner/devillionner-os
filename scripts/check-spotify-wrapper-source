@@ -49,24 +49,36 @@ assert data["toggles"]["music"]["spotify"]["command"] == ["devos-spotify"]
 PY
 ok "Caelestia toggle uses the same PATH-resolved command"
 
-# Physical-host screenshots showed two independent frame problems: the pane
-# title could leak/stub the top line, and descendant layers could cover the
-# antialiased pixels of a normal rounded border at all four corners. Protect
-# both pieces explicitly: use an outside zero-blur semantic outline and move the
-# compact legend mask away from the rounded corner.
-if grep -Fq 'border: 0 !important;' "$OVERRIDES" \
-    && grep -Fq 'box-shadow: 0 0 0 var(--border-width) var(--devos-outline) !important;' "$OVERRIDES" \
-    && grep -Fq 'box-shadow: 0 0 0 var(--border-width) var(--devos-outline-active) !important;' "$OVERRIDES" \
+# Pane geometry is now intentionally split into two independent pseudo layers:
+# ::after owns the complete rounded frame above descendant painting; ::before
+# owns only the semantic title and masks a straight top-edge segment. This avoids
+# coupling the label to the frame, which caused the repeated corner/stub defects
+# observed on the physical host.
+if grep -Fq '.Root__globalNav::after,' "$OVERRIDES" \
+    && grep -Fq '.main-yourLibraryX-entryPoints::after,' "$OVERRIDES" \
+    && grep -Fq '.Root__main-view::after,' "$OVERRIDES" \
+    && grep -Fq '.main-nowPlayingBar-container::after,' "$OVERRIDES" \
+    && grep -Fq '.Root__right-sidebar:has(aside:not(:empty))::after {' "$OVERRIDES" \
+    && grep -Fq 'inset: 0 !important;' "$OVERRIDES" \
+    && grep -Fq 'border: var(--border-width) solid var(--devos-outline) !important;' "$OVERRIDES" \
+    && grep -Fq 'border-radius: var(--devos-radius-panel) !important;' "$OVERRIDES" \
+    && grep -Fq 'pointer-events: none !important;' "$OVERRIDES" \
+    && grep -Fq 'z-index: 100 !important;' "$OVERRIDES" \
+    && grep -Fq 'border-color: var(--devos-outline-active) !important;' "$OVERRIDES" \
+    && grep -Fq 'left: 22px !important;' "$OVERRIDES" \
+    && grep -Fq 'transform: translateY(-50%) !important;' "$OVERRIDES" \
     && grep -Fq 'background: var(--spice-main) !important;' "$OVERRIDES" \
-    && grep -Fq 'margin: -10px 14px !important;' "$OVERRIDES" \
-    && grep -Fq 'padding: 0 4px !important;' "$OVERRIDES" \
-    && grep -Fq 'border-radius: 0 !important;' "$OVERRIDES" \
-    && grep -Fq 'box-shadow: 0 0 0 1px var(--spice-main) !important;' "$OVERRIDES" \
-    && grep -Fq 'text-shadow: none !important;' "$OVERRIDES" \
-    && grep -Fq 'Root__right-sidebar:has(aside:not(:empty))::before' "$OVERRIDES"; then
-    ok "pane frames use complete rounded outlines with clean legend masks"
+    && grep -Fq 'z-index: 101 !important;' "$OVERRIDES"; then
+    ok "pane frames and semantic labels use independent geometry layers"
 else
-    fail "Spotify pane frame/legend geometry contract differs"
+    fail "Spotify pane frame-layer contract differs"
+fi
+
+# Do not regress to drawing the pane outline with the pane's own box-shadow.
+if grep -Fq 'box-shadow: 0 0 0 var(--border-width) var(--devos-outline) !important;' "$OVERRIDES"; then
+    fail "legacy pane box-shadow frame is still present"
+else
+    ok "legacy pane box-shadow frame removed"
 fi
 
 # Reproduce the physical-host palette format with GNU awk and require a silent
