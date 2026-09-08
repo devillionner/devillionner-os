@@ -54,10 +54,6 @@ open_spotify_uri() {
     return 1
 }
 
-# When Spotify is already alive, opening a spotify: link should not re-run
-# Spicetify or disturb the themed client. Prefer the standard MPRIS OpenUri
-# method; if the player has not exposed MPRIS, fall back to spotify-launcher's
-# native positional URI support.
 if [[ -n "$SPOTIFY_URI" ]] && pgrep -x spotify >/dev/null 2>&1; then
     if open_spotify_uri; then
         exit 0
@@ -65,10 +61,6 @@ if [[ -n "$SPOTIFY_URI" ]] && pgrep -x spotify >/dev/null 2>&1; then
     launch_vanilla
 fi
 
-# Keep exactly one managed launcher alive for the lifetime of Spotify. This
-# launcher owns `spicetify watch -s`; without the lock, repeated menu/hotkey
-# clicks could create multiple watchers for the same client. A URI launch that
-# races with initial startup waits for the first instance to expose MPRIS.
 if command -v flock >/dev/null 2>&1; then
     exec 9>"$LOCK"
     if ! flock -n 9; then
@@ -81,9 +73,6 @@ else
     notify "flock is unavailable; Spotify single-instance guard is disabled"
 fi
 
-# Re-check after acquiring the lock: Spotify may have appeared while this
-# wrapper was being scheduled. A normal duplicate launch should become a no-op;
-# a URI launch should be forwarded to the running client.
 if pgrep -x spotify >/dev/null 2>&1; then
     if [[ -n "$SPOTIFY_URI" ]]; then
         open_spotify_uri || launch_vanilla
@@ -91,19 +80,14 @@ if pgrep -x spotify >/dev/null 2>&1; then
     exit 0
 fi
 
-# spotify-launcher owns updates/downloads; Spicetify then operates on its
-# per-user Spotify tree.
 spotify-launcher --no-exec >>"$LOG" 2>&1 || true
 
 if ! "$HOME/.local/bin/devos-spotify-theme-bootstrap" >>"$LOG" 2>&1; then
-    notify "Adaptive theme bootstrap failed; opening Spotify without it"
+    notify "Bloom theme bootstrap failed; opening Spotify without it"
     launch_vanilla
 fi
 "$HOME/.local/bin/devos-spotify-theme-sync" >>"$LOG" 2>&1 || true
 
-# Spicetify requires Spotify to have generated prefs first. Keep first launch
-# vanilla and functional, then the next launch becomes themed automatically.
-# spotify-launcher itself accepts one positional URI and converts it to --uri=.
 if [[ ! -f "$PREFS" ]]; then
     notify "First launch: sign in and leave Spotify open about a minute, then reopen it for the adaptive theme"
     launch_vanilla
@@ -117,20 +101,18 @@ fi
 spicetify config \
     spotify_path "$SPOTIFY_ROOT" \
     prefs_path "$PREFS" \
-    current_theme devillionner-text \
+    current_theme devillionner-bloom \
     color_scheme Devillionner \
     inject_css 1 \
     replace_colors 1 \
-    overwrite_assets 0 \
+    overwrite_assets 1 \
+    inject_theme_js 1 \
     spotify_launch_flags '--remote-debugging-port=9222|--remote-allow-origins=*' \
     >>"$LOG" 2>&1 || {
         notify "Spicetify configuration failed; opening Spotify normally"
         launch_vanilla
     }
 
-# `auto` handles first backup, Spotify upgrades and applying the theme, then
-# starts Spotify. Remote debugging is enabled only so `watch -s` can hot-reload
-# color.ini when Caelestia changes the wallpaper palette.
 if ! spicetify -q auto >>"$LOG" 2>&1; then
     notify "Spicetify apply failed; opening Spotify normally"
     launch_vanilla
@@ -146,14 +128,9 @@ if ! pgrep -x spotify >/dev/null 2>&1; then
 fi
 
 if [[ -n "$SPOTIFY_URI" ]] && ! open_spotify_uri; then
-    # MPRIS is optional and may come up late. spotify-launcher has native URI
-    # forwarding, so use it as the final compatibility fallback without
-    # changing the Spicetify launch flags stored for later sessions.
     spotify-launcher --skip-update "$SPOTIFY_URI" >>"$LOG" 2>&1 &
 fi
 
-# Give the remote-debugging endpoint a moment to appear. If it is still late,
-# Spicetify watch can recover by restarting Spotify itself.
 for _ in $(seq 1 80); do
     curl -fsS http://127.0.0.1:9222/json/version >/dev/null 2>&1 && break
     sleep 0.1
