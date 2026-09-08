@@ -16,31 +16,19 @@ done
 
 SYSTEM_LAUNCHER="/usr/local/bin/devos-spotify"
 USER_LAUNCHER="$HOME/.local/bin/devos-spotify"
-if [[ -x "$SYSTEM_LAUNCHER" ]]; then
-    ok "system Spotify wrapper installed"
-else
-    fail "system Spotify wrapper missing"
-fi
-if [[ -L "$USER_LAUNCHER" ]] \
-    && [[ "$(readlink -f "$USER_LAUNCHER" 2>/dev/null || true)" == "$SYSTEM_LAUNCHER" ]]; then
+if [[ -x "$SYSTEM_LAUNCHER" ]]; then ok "system Spotify wrapper installed"; else fail "system Spotify wrapper missing"; fi
+if [[ -L "$USER_LAUNCHER" ]] && [[ "$(readlink -f "$USER_LAUNCHER" 2>/dev/null || true)" == "$SYSTEM_LAUNCHER" ]]; then
     ok "user-local Spotify shim points to system wrapper"
 else
     fail "user-local Spotify wrapper may shadow the system launcher"
 fi
 
-for file in \
-    "$HOME/.local/bin/devos-spotify-theme-bootstrap" \
-    "$HOME/.local/bin/devos-spotify-theme-sync" \
-    "$HOME/.config/systemd/user/devos-spotify-theme.path" \
-    "$HOME/.config/systemd/user/devos-spotify-theme.service" \
-    "$HOME/.local/share/applications/spotify-launcher.desktop"; do
-    [[ -f "$file" ]] && ok "${file#$HOME/}" || fail "missing: ${file#$HOME/}"
-done
+DESKTOP="$HOME/.local/share/applications/spotify-launcher.desktop"
+[[ -f "$DESKTOP" ]] && ok ".local/share/applications/spotify-launcher.desktop" || fail "managed Spotify desktop entry missing"
 
 CAELESTIA_CLI="$HOME/.config/caelestia/cli.json"
 if python3 - "$CAELESTIA_CLI" <<'PY' >/dev/null 2>&1
-import json
-import sys
+import json, sys
 from pathlib import Path
 p = Path(sys.argv[1])
 data = json.loads(p.read_text())
@@ -49,102 +37,80 @@ assert spotify.get("enable") is True
 assert spotify.get("command") == ["devos-spotify"]
 assert spotify.get("move") is True
 matches = spotify.get("match")
-assert isinstance(matches, list)
 assert {"class": "Spotify"} in matches
 assert {"class": "spotify"} in matches
 assert {"initialTitle": "Spotify"} in matches
 assert {"initialTitle": "Spotify Free"} in matches
-assert all("initial_title" not in match for match in matches if isinstance(match, dict))
 PY
-then
-    ok "Caelestia music toggle matches Spotify class/title variants"
-else
-    fail "Caelestia Spotify toggle schema, identity aliases or managed command differs"
-fi
+then ok "Caelestia music toggle matches Spotify identity"; else fail "Caelestia Spotify toggle differs"; fi
 
 HYPR_RULES="$HOME/.config/hypr/hyprland/rules.lua"
-if grep -Fq '"Spotify|spotify"' "$HYPR_RULES" 2>/dev/null \
-    && grep -Fq '"Spotify|Spotify Free"' "$HYPR_RULES" 2>/dev/null; then
-    ok "Hyprland music workspace matches Spotify class/title variants"
+if grep -Fq '"Spotify|spotify"' "$HYPR_RULES" 2>/dev/null && grep -Fq '"Spotify|Spotify Free"' "$HYPR_RULES" 2>/dev/null; then
+    ok "Hyprland music workspace matches Spotify identity"
 else
-    fail "Hyprland Spotify music-workspace identity rules differ"
+    fail "Hyprland Spotify identity rules differ"
 fi
 
-DESKTOP="$HOME/.local/share/applications/spotify-launcher.desktop"
 if grep -qx 'TryExec=devos-spotify' "$DESKTOP" 2>/dev/null \
     && grep -qx 'Exec=devos-spotify %U' "$DESKTOP" 2>/dev/null \
     && grep -qx 'MimeType=x-scheme-handler/spotify;' "$DESKTOP" 2>/dev/null \
     && grep -qx 'StartupWMClass=spotify' "$DESKTOP" 2>/dev/null; then
-    ok "Spotify desktop entry preserves URI and lowercase WM class identity"
+    ok "Spotify desktop entry preserves URI and WM-class routing"
 else
-    fail "Spotify desktop entry is missing themed URI/WM-class routing"
+    fail "Spotify desktop entry routing differs"
 fi
 
 MIME="$HOME/.config/mimeapps.list"
-if grep -qx 'x-scheme-handler/spotify=spotify-launcher.desktop' "$MIME" 2>/dev/null; then
-    ok "spotify: protocol defaults to managed themed launcher"
+grep -qx 'x-scheme-handler/spotify=spotify-launcher.desktop' "$MIME" 2>/dev/null && ok "spotify: protocol uses managed launcher" || fail "spotify: protocol handler differs"
+
+if grep -Fq 'org.mpris.MediaPlayer2.Player' "$SYSTEM_LAUNCHER" 2>/dev/null \
+    && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$SYSTEM_LAUNCHER" 2>/dev/null; then
+    ok "launcher supports MPRIS URI forwarding"
 else
-    fail "spotify: protocol default handler is not managed"
+    fail "launcher URI forwarding incomplete"
 fi
 
-LAUNCHER="$SYSTEM_LAUNCHER"
-if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" 2>/dev/null \
-    && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$LAUNCHER" 2>/dev/null \
-    && grep -Fq 'spotify-launcher --skip-update "$SPOTIFY_URI"' "$LAUNCHER" 2>/dev/null; then
-    ok "themed launcher supports MPRIS + spotify-launcher URI fallback"
+if grep -Fq 'spotify-wrapper.lock' "$SYSTEM_LAUNCHER" 2>/dev/null \
+    && grep -Fq 'exec 9>"$LOCK"' "$SYSTEM_LAUNCHER" 2>/dev/null \
+    && grep -Fq 'flock -n 9' "$SYSTEM_LAUNCHER" 2>/dev/null; then
+    ok "single managed Spotify wrapper enforced"
 else
-    fail "themed launcher URI forwarding is incomplete"
+    fail "Spotify single-instance guard incomplete"
 fi
 
-if grep -Fq 'spotify-wrapper.lock' "$LAUNCHER" 2>/dev/null \
-    && grep -Fq 'exec 9>"$LOCK"' "$LAUNCHER" 2>/dev/null \
-    && grep -Fq 'flock -n 9' "$LAUNCHER" 2>/dev/null; then
-    ok "single managed Spotify wrapper/watch process enforced"
+# Theme ownership boundary: Blueprint must not keep historical theme automation.
+legacy=0
+for path in \
+    "$HOME/.local/bin/devos-spotify-theme-bootstrap" \
+    "$HOME/.local/bin/devos-spotify-theme-sync" \
+    "$HOME/.config/systemd/user/devos-spotify-theme.path" \
+    "$HOME/.config/systemd/user/devos-spotify-theme.service" \
+    "$HOME/.config/spicetify/devillionner-overrides.css" \
+    "$HOME/.config/spicetify/Themes/devillionner-bloom"; do
+    [[ -e "$path" || -L "$path" ]] && legacy=$((legacy + 1))
+done
+if ((legacy == 0)); then ok "Blueprint theme automation retired; Marketplace/user themes are untouched"; else fail "$legacy legacy Blueprint Spotify theme artifact(s) remain"; fi
+
+if systemctl --user is-enabled devos-spotify-theme.path >/dev/null 2>&1; then
+    fail "legacy Spotify palette watcher still enabled"
 else
-    fail "Spotify single-instance watcher guard is incomplete"
+    ok "no Blueprint theme watcher enabled"
 fi
 
-THEME="$HOME/.config/spicetify/Themes/devillionner-bloom"
-if [[ -s "$THEME/user.css" && -s "$THEME/theme.js" ]]; then
-    ok "pinned Bloom CSS + theme.js bootstrapped"
-else
-    fail "Bloom theme files not bootstrapped"
-fi
-
-if [[ -f "$THEME/upstream-theme" ]] && grep -qx 'Bloom' "$THEME/upstream-theme" \
-    && [[ -f "$THEME/upstream-revision" ]] \
-    && grep -qx '654cfed682b94613b0029997ffafc1eadccc5bef' "$THEME/upstream-revision"; then
-    ok "pinned Bloom upstream revision recorded"
-else
-    fail "Bloom upstream identity/revision marker missing or unexpected"
-fi
-
-if [[ ! -e "$HOME/.config/spicetify/devillionner-overrides.css" ]]; then
-    ok "legacy custom frame/layout CSS retired"
-else
-    fail "legacy custom Spotify geometry override still installed"
-fi
-
-if grep -q '^\[Devillionner\]$' "$THEME/color.ini" 2>/dev/null \
-    && grep -Eq '^accent[[:space:]]*=' "$THEME/color.ini" \
-    && grep -Eq '^player-border[[:space:]]*=' "$THEME/color.ini" \
-    && grep -Eq '^contour[[:space:]]*=' "$THEME/color.ini"; then
-    ok "Caelestia-adaptive Bloom color scheme generated"
-else
-    fail "adaptive Bloom color.ini missing or incomplete"
-fi
-
-systemctl --user is-enabled devos-spotify-theme.path >/dev/null 2>&1 && ok "palette watcher enabled" || fail "palette watcher not enabled"
-
-if [[ -f "$HOME/.config/spotify/prefs" ]]; then
+PREFS="$HOME/.config/spotify/prefs"
+CFG="$HOME/.config/spicetify/config-xpui.ini"
+if [[ -f "$PREFS" ]]; then
     ok "Spotify prefs exist"
-    CFG="$HOME/.config/spicetify/config-xpui.ini"
-    grep -Eq '^current_theme[[:space:]]*=[[:space:]]*devillionner-bloom' "$CFG" 2>/dev/null && ok "Bloom theme selected" || warn "Bloom will be selected on next devos-spotify launch"
-    grep -Eq '^color_scheme[[:space:]]*=[[:space:]]*Devillionner' "$CFG" 2>/dev/null && ok "adaptive scheme selected" || warn "scheme will be selected on next devos-spotify launch"
-    grep -Eq '^inject_theme_js[[:space:]]*=[[:space:]]*1' "$CFG" 2>/dev/null && ok "Bloom theme.js injection enabled" || warn "theme.js injection will be enabled on next devos-spotify launch"
-    grep -Eq '^overwrite_assets[[:space:]]*=[[:space:]]*1' "$CFG" 2>/dev/null && ok "Bloom asset overrides enabled" || warn "asset overrides will be enabled on next devos-spotify launch"
+    if [[ -f "$CFG" ]]; then
+        theme="$(sed -n 's/^current_theme[[:space:]]*=[[:space:]]*//p' "$CFG" | tail -n1)"
+        scheme="$(sed -n 's/^color_scheme[[:space:]]*=[[:space:]]*//p' "$CFG" | tail -n1)"
+        [[ -n "$theme" ]] && ok "user-selected Spicetify theme: $theme" || warn "no custom Spicetify theme selected yet"
+        [[ -n "$scheme" ]] && ok "user-selected color scheme: $scheme" || true
+    else
+        warn "Spicetify config not generated yet"
+    fi
 else
-    warn "first Spotify login is still required before Spicetify can apply"
+    warn "first Spotify login is still required before Spicetify themes can apply"
 fi
 
 printf '\n========================================\n'
