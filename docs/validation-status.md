@@ -25,7 +25,7 @@ This file records **what has actually been exercised**. A green source/CI check 
 | Quickshell runtime / ABI check | ✅ | ✅ | ⏳ | ⏳ | `check-quickshell` passed on the existing host. A deliberate real Qt-update rebuild exercise is still pending. |
 | Caelestia merge policy + package patches | ✅ | ✅ | ⏳ | ⏳ | `check-caelestia` passed after applying the managed settings and QML patches on the existing host. |
 | Dolphin | ✅ | ✅ | ⏳ | ⏳ | After clone-less targeted apply, `check-dolphin`: 30 OK, 0 FAIL; global previews are enabled and only legacy Thunar remains as a warning. |
-| Spotify integration | ✅ | ✅ core runtime | ⏳ | ⏳ | Themed launch, playback, `Super+M` and wallpaper-driven recolor were exercised. The latest pane-border cosmetic tweak still needs a visual recheck on the host. |
+| Spotify integration | ✅ Bloom source | ⚠️ previous text-theme runtime / Bloom retest pending | ⏳ | ⏳ | Launcher, playback, `Super+M`, URI routing and wallpaper-driven recolor were exercised with the previous text-theme implementation. Blueprint now uses pinned Bloom UI code and has retired the custom pane/frame CSS; Bloom must be applied and visually/runtime-validated on the host before this row returns to ✅. |
 | Bibata Modern Ice cursor | ✅ | ✅ config/runtime | ⏳ | ⏳ | After clone-less targeted apply, `check-cursor`: 10 OK, 0 FAIL including GSettings. A logout/login visual check is still needed for compositor-side XCursor refresh. |
 | TV Cast / Miracast | ✅ current three-mode source | ✅ component contract; TV retest pending | ⏳ | ⏳ | The current installed host now passes the exact 1080p30/8 Mbps, 720p60/8 Mbps and Low Latency 720p30/5 Mbps runtime contract. Actual casting through all three modes against the physical Miracast TV still needs a retest. |
 | Full aggregate `devos-blueprint check` | ✅ contract | ⚠️ 5 FAIL remain | ⏳ | ⏳ | Clone-less aggregate now reaches the live host correctly. Remaining failures are deliberate/unresolved host drift: keyboard policy, profile-dependent package identity, SDDM package/display-manager state and the corresponding SDDM service check. |
@@ -40,19 +40,20 @@ Legend: ✅ exercised at that level · ⚠️ useful evidence/current migration 
 
 ## Next validation order
 
-1. Decide the intended identity of the current physical host (likely candidate: Gaming), then run an explicit non-mutating `devos-blueprint check --profile <profile>` before recording profile state.
-2. Resolve the intended `EN ↔ UA` keyboard layout/switch policy on the existing host.
-3. Keep the current GDM host unchanged until SDDM has passed a clean-KVM install + reboot; only then consider an explicit live-host migration.
-4. Visually recheck the latest Spotify pane-border tweak and Bibata after logout/login.
-5. Exercise all **three** current TV Cast modes against the physical Miracast TV, especially Low Latency.
-6. Fresh **Gaming** KVM → reboot → pinned `devos-blueprint check`.
-7. Fresh **Work** KVM → reboot → pinned `devos-blueprint check`.
-8. Fresh **Laboratory / Dev** KVM → reboot → pinned `devos-blueprint check`, including virtualization state.
-9. Fresh **University / Uni** KVM → reboot → pinned `devos-blueprint check` and verify the saved profile remains `university`.
-10. Exercise a real Qt update in a clean KVM and confirm automatic `quickshell-git` ABI rebuild.
-11. Validate physical-host KVM/virgl behavior.
-12. Only after all four VM profiles pass, use the reserved physical Blueprint test partition.
-13. Verify the pre-restore Snapper/Btrfs recovery point is actually usable before any production restore is considered.
+1. Apply the new pinned Bloom Spotify component on the physical host and visually/runtime-validate launch, playback, `Super+M`, URI routing, single-instance behavior and Caelestia recolor.
+2. Decide the intended identity of the current physical host (likely candidate: Gaming), then run an explicit non-mutating `devos-blueprint check --profile <profile>` before recording profile state.
+3. Resolve the intended `EN ↔ UA` keyboard layout/switch policy on the existing host.
+4. Keep the current GDM host unchanged until SDDM has passed a clean-KVM install + reboot; only then consider an explicit live-host migration.
+5. Confirm Bibata visually after logout/login.
+6. Exercise all **three** current TV Cast modes against the physical Miracast TV, especially Low Latency.
+7. Fresh **Gaming** KVM → reboot → pinned `devos-blueprint check`.
+8. Fresh **Work** KVM → reboot → pinned `devos-blueprint check`.
+9. Fresh **Laboratory / Dev** KVM → reboot → pinned `devos-blueprint check`, including virtualization state.
+10. Fresh **University / Uni** KVM → reboot → pinned `devos-blueprint check` and verify the saved profile remains `university`.
+11. Exercise a real Qt update in a clean KVM and confirm automatic `quickshell-git` ABI rebuild.
+12. Validate physical-host KVM/virgl behavior.
+13. Only after all four VM profiles pass, use the reserved physical Blueprint test partition.
+14. Verify the pre-restore Snapper/Btrfs recovery point is actually usable before any production restore is considered.
 
 ## Rule
 

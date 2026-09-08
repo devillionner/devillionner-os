@@ -1,55 +1,52 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PIN="3f55a3702bd6d87799dc97023e0fe2b11d88c704"
+PIN="654cfed682b94613b0029997ffafc1eadccc5bef"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-text"
-OVERRIDES="$CONFIG_HOME/spicetify/devillionner-overrides.css"
+THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-bloom"
 REVISION="$THEME_DIR/upstream-revision"
-OVERRIDES_REVISION="$THEME_DIR/overrides-sha256"
+BASE="$THEME_DIR/upstream-theme"
 CSS="$THEME_DIR/user.css"
-URL="https://raw.githubusercontent.com/spicetify/spicetify-themes/$PIN/text/user.css"
+JS="$THEME_DIR/theme.js"
+BASE_URL="https://raw.githubusercontent.com/nimsandu/spicetify-bloom/$PIN/src"
 
 mkdir -p "$THEME_DIR"
-
-[[ -f "$OVERRIDES" ]] || {
-    printf 'devos-spotify: missing overrides: %s\n' "$OVERRIDES" >&2
-    exit 1
-}
 command -v curl >/dev/null 2>&1 || {
-    printf 'devos-spotify: curl is required to bootstrap the theme\n' >&2
-    exit 1
-}
-command -v sha256sum >/dev/null 2>&1 || {
-    printf 'devos-spotify: sha256sum is required to track Blueprint theme changes\n' >&2
+    printf 'devos-spotify: curl is required to bootstrap Bloom\n' >&2
     exit 1
 }
 
-overrides_hash="$(sha256sum "$OVERRIDES" | awk '{print $1}')"
 if [[ -f "$CSS" \
+    && -f "$JS" \
     && -f "$REVISION" \
-    && -f "$OVERRIDES_REVISION" \
+    && -f "$BASE" \
     && "$(cat "$REVISION")" == "$PIN" \
-    && "$(cat "$OVERRIDES_REVISION")" == "$overrides_hash" ]]; then
+    && "$(cat "$BASE")" == "Bloom" ]]; then
     exit 0
 fi
 
-tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$tmp.clean" "$tmp.final"' EXIT
+tmp_css="$(mktemp)"
+tmp_js="$(mktemp)"
+trap 'rm -f "$tmp_css" "$tmp_js"' EXIT
 
-curl -fsSL "$URL" -o "$tmp"
-# The Blueprint already ships JetBrains Mono Nerd Font. Drop remote font imports
-# so the theme has no Google Fonts/CDN dependency at runtime.
-sed '/^[[:space:]]*@import url(/d' "$tmp" > "$tmp.clean"
-{
-    cat "$tmp.clean"
-    printf '\n\n/* devillionner-os overrides; upstream text theme pinned at %s */\n' "$PIN"
-    cat "$OVERRIDES"
-} > "$tmp.final"
+# Keep Bloom's visual implementation intact. Blueprint owns only the pinned
+# upstream revision and the generated adaptive color.ini; no pane geometry is
+# patched locally anymore.
+curl -fsSL "$BASE_URL/user.css" -o "$tmp_css"
+curl -fsSL "$BASE_URL/theme.js" -o "$tmp_js"
+[[ -s "$tmp_css" && -s "$tmp_js" ]] || {
+    printf 'devos-spotify: downloaded Bloom theme is incomplete\n' >&2
+    exit 1
+}
 
-# Build completely in temporary files first, then replace the generated CSS.
-# The two revision markers make both upstream changes and Blueprint-owned CSS
-# changes invalidate the cache independently.
-cat "$tmp.final" > "$CSS"
+install -m644 "$tmp_css" "$CSS"
+install -m644 "$tmp_js" "$JS"
 printf '%s\n' "$PIN" > "$REVISION"
-printf '%s\n' "$overrides_hash" > "$OVERRIDES_REVISION"
+printf '%s\n' "Bloom" > "$BASE"
+
+# Retire previous Blueprint-owned theme experiments only after Bloom has been
+# built successfully. User-installed Marketplace/community themes are untouched.
+rm -rf \
+    "$CONFIG_HOME/spicetify/Themes/devillionner-text" \
+    "$CONFIG_HOME/spicetify/Themes/devillionner-sleek"
+rm -f "$CONFIG_HOME/spicetify/devillionner-overrides.css"

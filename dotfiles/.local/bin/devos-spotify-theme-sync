@@ -4,7 +4,7 @@ set -Eeuo pipefail
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 SCHEME="$CONFIG_HOME/hypr/scheme/current.lua"
 FALLBACK_SCHEME="$CONFIG_HOME/hypr/scheme/default.lua"
-THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-text"
+THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-bloom"
 COLOR_FILE="$THEME_DIR/color.ini"
 
 [[ -f "$SCHEME" ]] || SCHEME="$FALLBACK_SCHEME"
@@ -38,19 +38,33 @@ tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 cat > "$tmp" <<EOF
 [Devillionner]
-accent             = $primary
-accent-active      = $primary
-accent-inactive    = $surface_high
-banner             = $primary
-border-active      = $primary
-border-inactive    = $outline_variant
-header             = $surface_container
-highlight          = $surface_high
+text               = $on_surface
+subtext            = $on_surface_variant
+alt-text           = $surface
 main               = $surface
+sidebar            = $surface
+player             = $surface_container
+player-border      = $outline_variant
+player-bar-shadow  = $surface
+player-bar-bg      = $surface_high
+card               = $surface_container
+shadow             = $surface
+selected-row       = $surface_high
+button             = $primary
+button-active      = $primary
+button-disabled    = $surface_high
+tab-active         = $surface_container
 notification       = $secondary
 notification-error = $error
-subtext            = $on_surface_variant
-text               = $on_surface
+notif-bubble-info  = $surface_container
+notif-bubble-error = $surface_container
+misc               = $on_surface_variant
+not-selected       = $on_surface_variant
+accent             = $primary
+layer-shadow       = $surface
+contour            = $outline_variant
+dark-border        = $surface
+light-border       = $outline_variant
 EOF
 
 if [[ -f "$COLOR_FILE" ]] && cmp -s "$tmp" "$COLOR_FILE"; then

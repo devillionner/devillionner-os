@@ -33,8 +33,9 @@ This is the working backlog after the profile + reusable-feature refactor. See `
 - [ ] Tasks on the top menu.
 - [ ] Fix the “5 строчками” issue after reproducing it on the clean profile.
 - [ ] Customize/replace the current SDDM login screen without changing the validated login-manager baseline accidentally.
-- [x] Standardize music on Spotify + Spicetify with a Caelestia-adaptive theme and managed launcher.
-- [ ] Visually recheck the latest Spotify continuous pane-border tweak on the physical host.
+- [x] Keep Spotify on the managed `devos-spotify` launcher with Caelestia-adaptive colors, `Super+M`, URI routing and 0.95 compositor opacity.
+- [x] Replace the unstable custom text-theme pane/frame CSS with pinned upstream **Bloom** UI code.
+- [ ] Apply Bloom on the physical host and visually/runtime-validate it before marking the new visual base complete.
 - [x] Complete Dolphin preview UX: Information panel, global thumbnails and image/video/document preview backends.
 - [x] Standardize the cursor on **Bibata Modern Ice** at 24 px while keeping **Colloid-Dark** as the current common icon theme.
 - [ ] Confirm Bibata Modern Ice visually across the compositor/XWayland after the next logout/login.
@@ -95,7 +96,7 @@ This is the working backlog after the profile + reusable-feature refactor. See `
 - [x] Helper commands documented.
 - [x] Caelestia shell policy documented.
 - [x] Quickshell ABI recovery documented.
-- [x] Adaptive Spotify integration documented.
+- [x] Bloom-based adaptive Spotify integration documented.
 - [x] Repository CI / source-integrity validation documented.
 - [x] Validate repository-local documentation links and referenced `docs/*.md` paths in CI.
 - [x] Track validation level separately for CI/source, existing host, fresh KVM and physical test partition.

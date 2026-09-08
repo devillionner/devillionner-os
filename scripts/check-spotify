@@ -31,7 +31,6 @@ fi
 for file in \
     "$HOME/.local/bin/devos-spotify-theme-bootstrap" \
     "$HOME/.local/bin/devos-spotify-theme-sync" \
-    "$HOME/.config/spicetify/devillionner-overrides.css" \
     "$HOME/.config/systemd/user/devos-spotify-theme.path" \
     "$HOME/.config/systemd/user/devos-spotify-theme.service" \
     "$HOME/.local/share/applications/spotify-launcher.desktop"; do
@@ -43,7 +42,6 @@ if python3 - "$CAELESTIA_CLI" <<'PY' >/dev/null 2>&1
 import json
 import sys
 from pathlib import Path
-
 p = Path(sys.argv[1])
 data = json.loads(p.read_text())
 spotify = data["toggles"]["music"]["spotify"]
@@ -106,49 +104,34 @@ else
     fail "Spotify single-instance watcher guard is incomplete"
 fi
 
-THEME="$HOME/.config/spicetify/Themes/devillionner-text"
-OVERRIDES="$HOME/.config/spicetify/devillionner-overrides.css"
-if [[ -f "$THEME/user.css" ]]; then
-    ok "pinned text-theme CSS bootstrapped"
+THEME="$HOME/.config/spicetify/Themes/devillionner-bloom"
+if [[ -s "$THEME/user.css" && -s "$THEME/theme.js" ]]; then
+    ok "pinned Bloom CSS + theme.js bootstrapped"
 else
-    fail "theme CSS not bootstrapped"
+    fail "Bloom theme files not bootstrapped"
 fi
 
-if grep -Fq -- '--devos-surface: var(--spice-header);' "$OVERRIDES" 2>/dev/null \
-    && grep -Fq -- '--devos-surface-high: var(--spice-highlight);' "$OVERRIDES" 2>/dev/null \
-    && grep -Fq -- '--devos-accent: var(--spice-accent);' "$OVERRIDES" 2>/dev/null \
-    && grep -Fq -- '--panel-gap: var(--devos-panel-gap) !important;' "$OVERRIDES" 2>/dev/null; then
-    ok "Caelestia semantic surface layer installed"
+if [[ -f "$THEME/upstream-theme" ]] && grep -qx 'Bloom' "$THEME/upstream-theme" \
+    && [[ -f "$THEME/upstream-revision" ]] \
+    && grep -qx '654cfed682b94613b0029997ffafc1eadccc5bef' "$THEME/upstream-revision"; then
+    ok "pinned Bloom upstream revision recorded"
 else
-    fail "Spotify Caelestia surface layer is incomplete"
+    fail "Bloom upstream identity/revision marker missing or unexpected"
 fi
 
-if grep -Eq '#[[:xdigit:]]{3,8}|(rgb|hsl)a?\(' "$OVERRIDES" 2>/dev/null; then
-    fail "Spotify overrides contain a hard-coded color; palette must stay Caelestia-driven"
+if [[ ! -e "$HOME/.config/spicetify/devillionner-overrides.css" ]]; then
+    ok "legacy custom frame/layout CSS retired"
 else
-    ok "Spotify layout layer has no hard-coded colors"
+    fail "legacy custom Spotify geometry override still installed"
 fi
 
-grep -q '^\[Devillionner\]$' "$THEME/color.ini" 2>/dev/null && ok "adaptive color scheme generated" || fail "adaptive color.ini missing"
-
-if command -v sha256sum >/dev/null 2>&1 \
-    && [[ -f "$OVERRIDES" && -f "$THEME/overrides-sha256" ]]; then
-    EXPECTED_HASH="$(sha256sum "$OVERRIDES" | awk '{print $1}')"
-    STORED_HASH="$(cat "$THEME/overrides-sha256" 2>/dev/null || true)"
-    if [[ "$EXPECTED_HASH" == "$STORED_HASH" ]]; then
-        ok "latest Blueprint Spotify overrides are applied"
-    else
-        fail "generated Spotify CSS is stale; rerun configure-spotify or devos-spotify"
-    fi
+if grep -q '^\[Devillionner\]$' "$THEME/color.ini" 2>/dev/null \
+    && grep -Eq '^accent[[:space:]]*=' "$THEME/color.ini" \
+    && grep -Eq '^player-border[[:space:]]*=' "$THEME/color.ini" \
+    && grep -Eq '^contour[[:space:]]*=' "$THEME/color.ini"; then
+    ok "Caelestia-adaptive Bloom color scheme generated"
 else
-    fail "Spotify override fingerprint missing"
-fi
-
-if [[ -f "$THEME/upstream-revision" ]] \
-    && grep -qx '3f55a3702bd6d87799dc97023e0fe2b11d88c704' "$THEME/upstream-revision"; then
-    ok "pinned upstream text-theme revision recorded"
-else
-    fail "upstream Spotify theme revision marker missing or unexpected"
+    fail "adaptive Bloom color.ini missing or incomplete"
 fi
 
 systemctl --user is-enabled devos-spotify-theme.path >/dev/null 2>&1 && ok "palette watcher enabled" || fail "palette watcher not enabled"
@@ -156,8 +139,10 @@ systemctl --user is-enabled devos-spotify-theme.path >/dev/null 2>&1 && ok "pale
 if [[ -f "$HOME/.config/spotify/prefs" ]]; then
     ok "Spotify prefs exist"
     CFG="$HOME/.config/spicetify/config-xpui.ini"
-    grep -Eq '^current_theme[[:space:]]*=[[:space:]]*devillionner-text' "$CFG" 2>/dev/null && ok "Spicetify theme selected" || warn "theme will be selected on next devos-spotify launch"
+    grep -Eq '^current_theme[[:space:]]*=[[:space:]]*devillionner-bloom' "$CFG" 2>/dev/null && ok "Bloom theme selected" || warn "Bloom will be selected on next devos-spotify launch"
     grep -Eq '^color_scheme[[:space:]]*=[[:space:]]*Devillionner' "$CFG" 2>/dev/null && ok "adaptive scheme selected" || warn "scheme will be selected on next devos-spotify launch"
+    grep -Eq '^inject_theme_js[[:space:]]*=[[:space:]]*1' "$CFG" 2>/dev/null && ok "Bloom theme.js injection enabled" || warn "theme.js injection will be enabled on next devos-spotify launch"
+    grep -Eq '^overwrite_assets[[:space:]]*=[[:space:]]*1' "$CFG" 2>/dev/null && ok "Bloom asset overrides enabled" || warn "asset overrides will be enabled on next devos-spotify launch"
 else
     warn "first Spotify login is still required before Spicetify can apply"
 fi
