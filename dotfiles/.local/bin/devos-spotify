@@ -81,7 +81,7 @@ fi
 spotify-launcher --no-exec >>"$LOG" 2>&1 || true
 
 if [[ ! -f "$PREFS" ]]; then
-    notify "First launch: sign in and leave Spotify open about a minute, then close it before applying a Spicetify theme"
+    notify "First launch: sign in and leave Spotify open about a minute. The next launch configures Lucid and ivLyrics automatically."
     launch_vanilla
 fi
 
@@ -90,12 +90,15 @@ if ! command -v spicetify >/dev/null 2>&1 || [[ ! -d "$SPOTIFY_ROOT" ]]; then
     launch_vanilla
 fi
 
-# Blueprint owns only the Spotify installation paths. current_theme,
-# color_scheme, Marketplace content and all theme files remain user-owned.
-spicetify config spotify_path "$SPOTIFY_ROOT" prefs_path "$PREFS" >>"$LOG" 2>&1 || {
-    notify "Spicetify configuration failed; opening Spotify normally"
+if ! command -v devos-spotify-experience >/dev/null 2>&1; then
+    notify "Spotify experience helper is missing; opening Spotify normally"
     launch_vanilla
-}
+fi
+
+if ! DEVOS_SPOTIFY_QUIET=1 devos-spotify-experience >>"$LOG" 2>&1; then
+    notify "Spotify experience setup failed; opening Spotify normally"
+    launch_vanilla
+fi
 
 if ! spicetify -q auto >>"$LOG" 2>&1; then
     notify "Spicetify apply failed; opening Spotify normally"
