@@ -100,6 +100,7 @@ required_paths=(
     dotfiles/.local/bin/devos-spotify
     dotfiles/.local/bin/devos-spotify-experience
     dotfiles/.config/spicetify/Extensions/devos-clean-ui.js
+    dotfiles/.config/spotify-launcher.conf
     dotfiles/.local/share/applications/spotify-launcher.desktop
 )
 for path in "${required_paths[@]}"; do

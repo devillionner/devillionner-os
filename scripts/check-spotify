@@ -19,6 +19,7 @@ USER_LAUNCHER="$HOME/.local/bin/devos-spotify"
 SYSTEM_EXPERIENCE="/usr/local/bin/devos-spotify-experience"
 USER_EXPERIENCE="$HOME/.local/bin/devos-spotify-experience"
 SYSTEM_UI="/usr/local/share/devos/spotify/devos-clean-ui.js"
+LAUNCHER_CONFIG="$HOME/.config/spotify-launcher.conf"
 
 [[ -x "$SYSTEM_LAUNCHER" ]] && ok "system Spotify wrapper installed" || fail "system Spotify wrapper missing"
 if [[ -L "$USER_LAUNCHER" ]] && [[ "$(readlink -f "$USER_LAUNCHER" 2>/dev/null || true)" == "$SYSTEM_LAUNCHER" ]]; then
@@ -33,6 +34,14 @@ else
     fail "user-local Spotify experience helper differs"
 fi
 [[ -s "$SYSTEM_UI" ]] && ok "curated Spotify UI extension installed" || fail "curated Spotify UI extension missing"
+
+if [[ -f "$LAUNCHER_CONFIG" ]] \
+    && grep -Fqx '[spotify]' "$LAUNCHER_CONFIG" \
+    && grep -Fqx 'extra_arguments = ["--enable-features=UseOzonePlatform", "--ozone-platform=wayland"]' "$LAUNCHER_CONFIG"; then
+    ok "spotify-launcher is pinned to native Wayland"
+else
+    fail "spotify-launcher native Wayland config differs"
+fi
 
 DESKTOP="$HOME/.local/share/applications/spotify-launcher.desktop"
 [[ -f "$DESKTOP" ]] && ok ".local/share/applications/spotify-launcher.desktop" || fail "managed Spotify desktop entry missing"
@@ -132,7 +141,7 @@ if [[ -f "$PREFS" ]]; then
     fi
 
     if [[ -s "$USER_UI" ]] && cmp -s "$SYSTEM_UI" "$USER_UI"; then
-        ok "curated cleanup/wave/Oneko extension matches Blueprint"
+        ok "curated cleanup/native-progress/Oneko extension matches Blueprint"
     else
         fail "curated Spotify UI extension differs"
     fi

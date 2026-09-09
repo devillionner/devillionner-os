@@ -9,6 +9,7 @@ CLI="$REPO/dotfiles/.config/caelestia/cli.json"
 LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"
 EXPERIENCE="$REPO/dotfiles/.local/bin/devos-spotify-experience"
 UI="$REPO/dotfiles/.config/spicetify/Extensions/devos-clean-ui.js"
+LAUNCHER_CONFIG="$REPO/dotfiles/.config/spotify-launcher.conf"
 
 FAIL=0
 OK=0
@@ -22,7 +23,8 @@ printf '========================================\n'
 if grep -Fq 'sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" /usr/local/bin/devos-spotify' "$CONFIG" \
     && grep -Fq 'ln -sfn /usr/local/bin/devos-spotify "$HOME/.local/bin/devos-spotify"' "$CONFIG" \
     && grep -Fq 'sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-experience" /usr/local/bin/devos-spotify-experience' "$CONFIG" \
-    && grep -Fq '/usr/local/share/devos/spotify/devos-clean-ui.js' "$CONFIG"; then
+    && grep -Fq '/usr/local/share/devos/spotify/devos-clean-ui.js' "$CONFIG" \
+    && grep -Fq 'install -Dm644 "$REPO/dotfiles/.config/spotify-launcher.conf" "$HOME/.config/spotify-launcher.conf"' "$CONFIG"; then
     ok "wrapper, experience helper and UI extension have canonical install paths"
 else
     fail "Spotify canonical installation contract differs"
@@ -34,6 +36,14 @@ if grep -Fq 'SYSTEM_LAUNCHER="/usr/local/bin/devos-spotify"' "$CHECK" \
     ok "runtime check validates all managed Spotify entry points"
 else
     fail "Spotify runtime source check misses managed entry points"
+fi
+
+if grep -Fqx '[spotify]' "$LAUNCHER_CONFIG" \
+    && grep -Fqx 'extra_arguments = ["--enable-features=UseOzonePlatform", "--ozone-platform=wayland"]' "$LAUNCHER_CONFIG" \
+    && grep -Fq 'LAUNCHER_CONFIG="$HOME/.config/spotify-launcher.conf"' "$CHECK"; then
+    ok "spotify-launcher native Wayland contract is source-managed"
+else
+    fail "spotify-launcher native Wayland source contract differs"
 fi
 
 if grep -Fqx 'TryExec=devos-spotify' "$DESKTOP" \

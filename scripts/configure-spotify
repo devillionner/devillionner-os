@@ -23,6 +23,7 @@ mkdir -p "$HOME/.local/bin"
 ln -sfn /usr/local/bin/devos-spotify "$HOME/.local/bin/devos-spotify"
 ln -sfn /usr/local/bin/devos-spotify-experience "$HOME/.local/bin/devos-spotify-experience"
 install -Dm644 "$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop" "$HOME/.local/share/applications/spotify-launcher.desktop"
+install -Dm644 "$REPO/dotfiles/.config/spotify-launcher.conf" "$HOME/.config/spotify-launcher.conf"
 
 # Retire all historical Blueprint-owned Bloom/palette automation before the new
 # Lucid-based experience is installed.
@@ -75,4 +76,4 @@ if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 
     hyprctl reload >/dev/null 2>&1 || true
 fi
 
-bp_ok "Spotify integration ready: Lucid, ivLyrics, clean UI, wave progress, Oneko, Super+M, spotify: links and single-instance routing"
+bp_ok "Spotify integration ready: Lucid, ivLyrics, exact native progress, Oneko, native Wayland, Super+M, spotify: links and single-instance routing"
