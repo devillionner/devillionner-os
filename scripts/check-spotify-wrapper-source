@@ -87,8 +87,10 @@ if grep -Fq 'LUCID_PIN="5c5bead49d5dad971e0bb38d64e7dee88463cf83"' "$EXPERIENCE"
     && grep -Fq 'current_theme Lucid' "$EXPERIENCE" \
     && grep -Fq 'color_scheme dark' "$EXPERIENCE" \
     && grep -Fq 'spicetify config extensions devos-clean-ui.js' "$EXPERIENCE" \
-    && grep -Fq 'spicetify config custom_apps ivLyrics' "$EXPERIENCE"; then
-    ok "Lucid + pinned ivLyrics experience identity is reproducible"
+    && grep -Fq 'spicetify config custom_apps ivLyrics' "$EXPERIENCE" \
+    && grep -Fq 'spicetify -q -n apply' "$EXPERIENCE" \
+    && ! grep -Fq 'spicetify apply >/dev/null' "$EXPERIENCE"; then
+    ok "Lucid + pinned ivLyrics experience identity and restart-free apply are reproducible"
 else
     fail "Spotify experience source identity/configuration differs"
 fi
