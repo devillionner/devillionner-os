@@ -4,42 +4,26 @@ set -Eeuo pipefail
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO/scripts/lib/common.sh"
 
-DESC="${1:-devillionner-os pre-restore}"
-FSTYPE="$(findmnt -no FSTYPE /)"
-STAMP="$(date +%Y%m%d-%H%M%S)"
+[[ $EUID -ne 0 ]] || bp_die "Run recovery creation as the restore user, not root."
+for cmd in python3 btrfs findmnt sudo; do
+    command -v "$cmd" >/dev/null || bp_die "Recovery prerequisite missing: $cmd"
+done
+[[ "${XDG_CONFIG_HOME:-$HOME/.config}" == "$HOME/.config" \
+    && "${XDG_STATE_HOME:-$HOME/.local/state}" == "$HOME/.local/state" \
+    && "${XDG_DATA_HOME:-$HOME/.local/share}" == "$HOME/.local/share" ]] \
+    || bp_die "Relocated XDG directories require a separately validated recovery plan."
+
 STATE_DIR="$(bp_state_dir)"
 mkdir -p "$STATE_DIR"
-
-[[ "$FSTYPE" == "btrfs" ]] \
-    || bp_die "Automatic recovery points currently require a Btrfs root (found: $FSTYPE)."
-
-bp_info "Creating pre-restore recovery point"
-
-if command -v snapper >/dev/null 2>&1 \
-    && sudo snapper -c root get-config >/dev/null 2>&1; then
-    NUMBER="$(
-        sudo snapper -c root create \
-            --type single \
-            --description "$DESC" \
-            --userdata "important=yes" \
-            --print-number
-    )"
-    printf 'snapper:%s\n' "$NUMBER" > "$STATE_DIR/last-checkpoint"
-    bp_ok "Snapper checkpoint #$NUMBER"
-    exit 0
-fi
-
-command -v btrfs >/dev/null 2>&1 \
-    || bp_die "Neither a working root Snapper config nor btrfs command is available."
-
-sudo btrfs subvolume show / >/dev/null 2>&1 \
-    || bp_die "Root is Btrfs but / is not a subvolume; refusing to continue without a rollback point."
-
-BASE="/.snapshots/devillionner-os"
-TARGET="$BASE/pre-restore-$STAMP"
-
-sudo mkdir -p "$BASE"
-sudo btrfs subvolume snapshot -r / "$TARGET"
-
-printf 'btrfs:%s\n' "$TARGET" > "$STATE_DIR/last-checkpoint"
-bp_ok "Read-only Btrfs checkpoint: $TARGET"
+bp_info "Creating coordinated root/home recovery point"
+# Only publish after all snapshots and the manifest validate. Failure leaves
+# the previous last-checkpoint untouched and stops restore before mutation.
+MANIFEST="$(sudo python3 "$REPO/scripts/lib/recovery.py" create "$HOME" \
+    "${1:-devillionner-os pre-restore}")"
+[[ "$MANIFEST" == /.snapshots/devillionner-os/*/manifest.json ]] \
+    || bp_die "Recovery helper returned an invalid manifest path"
+TMP="$(mktemp "$STATE_DIR/.checkpoint.XXXXXXXX")"
+trap 'rm -f -- "$TMP"' EXIT
+printf 'bundle:%s\n' "$MANIFEST" > "$TMP"
+mv -f -- "$TMP" "$STATE_DIR/last-checkpoint"
+bp_ok "Verified recovery bundle: $MANIFEST"

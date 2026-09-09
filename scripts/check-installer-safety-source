@@ -16,6 +16,8 @@ for file in "$INSTALL" "$RESTORE" "$RECOVERY" "$RECONCILE"; do
     [[ -f "$file" ]] || fail "missing ${file#$REPO/}"
     bash -n "$file" || fail "bash syntax: ${file#$REPO/}"
 done
+[[ -f "$REPO/scripts/lib/recovery.py" ]] || fail "missing scripts/lib/recovery.py"
+python3 -m py_compile "$REPO/scripts/lib/recovery.py" || fail "Python syntax: scripts/lib/recovery.py"
 
 python3 - "$INSTALL" "$RESTORE" "$RECOVERY" <<'PY'
 from pathlib import Path
@@ -146,19 +148,15 @@ if not max(state_profile, state_keyboard, state_features) < aggregate:
     raise SystemExit("aggregate validation runs before Blueprint state is fully recorded")
 
 # Recovery helper must fail closed when it cannot create a Btrfs/Snapper checkpoint.
-require(
-    recovery,
-    'Automatic recovery points currently require a Btrfs root',
-    "non-Btrfs recovery hard stop",
-)
-require(recovery, 'sudo snapper -c root create', "Snapper checkpoint path")
-require(recovery, 'sudo btrfs subvolume snapshot -r / "$TARGET"', "Btrfs fallback checkpoint")
+require(recovery, 'coordinated root/home recovery point', "coordinated recovery invocation")
+require(recovery, 'MANIFEST="$(sudo python3 "$REPO/scripts/lib/recovery.py" create "$HOME"', "recovery helper invocation")
 require(recovery, 'last-checkpoint', "checkpoint state record")
-require(
-    recovery,
-    'Neither a working root Snapper config nor btrfs command is available.',
-    "missing recovery backend hard stop",
-)
+require(recovery, 'Only publish after all snapshots and the manifest validate', "atomic checkpoint publication")
+recovery_py = Path(sys.argv[3]).parent / "lib" / "recovery.py"
+if '"subvolume", "snapshot"' not in recovery_py.read_text(encoding="utf-8"):
+    raise SystemExit("coordinated helper does not create Btrfs snapshots")
+if "source\": \"/home\"" not in recovery_py.read_text(encoding="utf-8"):
+    raise SystemExit("coordinated helper does not model separate /home coverage")
 PY
 
 # The package reconciler must remain explicit-ownership based and never remove
