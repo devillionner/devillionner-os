@@ -36,6 +36,18 @@ launch_vanilla() {
     exec spotify-launcher --skip-update
 }
 
+spotify_main_running() {
+    local pid argv
+    while IFS= read -r pid; do
+        [[ -r "/proc/$pid/cmdline" ]] || continue
+        argv="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+        [[ "$argv" == "$SPOTIFY_ROOT/spotify" || "$argv" == "$SPOTIFY_ROOT/spotify "* ]] || continue
+        [[ "$argv" == *" --type="* ]] && continue
+        return 0
+    done < <(pgrep -x spotify 2>/dev/null || true)
+    return 1
+}
+
 open_spotify_uri() {
     [[ -n "$SPOTIFY_URI" ]] || return 0
     command -v busctl >/dev/null 2>&1 || return 1
@@ -54,7 +66,7 @@ open_spotify_uri() {
     return 1
 }
 
-if [[ -n "$SPOTIFY_URI" ]] && pgrep -x spotify >/dev/null 2>&1; then
+if [[ -n "$SPOTIFY_URI" ]] && spotify_main_running; then
     open_spotify_uri && exit 0
     launch_vanilla
 fi
@@ -71,7 +83,7 @@ else
     notify "flock is unavailable; Spotify single-instance guard is disabled"
 fi
 
-if pgrep -x spotify >/dev/null 2>&1; then
+if spotify_main_running; then
     if [[ -n "$SPOTIFY_URI" ]]; then
         open_spotify_uri || launch_vanilla
     fi

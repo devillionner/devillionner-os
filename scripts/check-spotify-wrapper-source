@@ -87,6 +87,17 @@ else
     fail "Caelestia Spotify command differs"
 fi
 
+if grep -Fq 'spotify_main_running()' "$LAUNCHER" \
+    && grep -Fq '"/proc/$pid/cmdline"' "$LAUNCHER" \
+    && grep -Fq '" --type="' "$LAUNCHER" \
+    && grep -Fq 'spotify_main_running; then' "$LAUNCHER" \
+    && ! grep -Fq '&& pgrep -x spotify' "$LAUNCHER" \
+    && ! grep -Fq 'if pgrep -x spotify' "$LAUNCHER"; then
+    ok "wrapper distinguishes Spotify main process from Chromium subprocesses"
+else
+    fail "Spotify main-process detection contract differs"
+fi
+
 if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" \
     && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$LAUNCHER" \
     && grep -Fq 'spotify-wrapper.lock' "$LAUNCHER" \
