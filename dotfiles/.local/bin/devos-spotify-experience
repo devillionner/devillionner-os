@@ -15,6 +15,9 @@ SYSTEM_EXTENSION="/usr/local/share/devos/spotify/devos-clean-ui.js"
 
 LUCID_PIN="5c5bead49d5dad971e0bb38d64e7dee88463cf83"
 LUCID_BASE="https://spicetify-lucid.sanooj.uk/spice"
+LUCID_USER_CSS_SHA256="ef437d56022bae8cbec03ce66368b986075d38e541b4fe33c954f7980075a9ba"
+LUCID_COLOR_INI_SHA256="895c5504ed47bc8d2dac7b30ec60b7b041afc8ecc71d376446fa6ac9faa57159"
+LUCID_THEME_JS_SHA256="f86649f9da821bac1b2a8d1632b66b0d2a6504da47eebdcb84c31ae09498c511"
 IVLYRICS_VERSION="6.6.13"
 IVLYRICS_URL="https://github.com/ivLis-Studio/ivLyrics/releases/download/v${IVLYRICS_VERSION}/ivLyrics.zip"
 IVLYRICS_SHA256="b3e77eaaf0f1d25276a009beefbfa30ab0478c9468712f8a96c7641f5ea2c476"
@@ -47,18 +50,33 @@ download() {
     [[ -s "$output" ]]
 }
 
-# Lucid is installed exactly as its current Marketplace manifest specifies:
-# user.css + color.ini + theme.js. The manifest/source identity is pinned here;
-# Lucid's hosted build remains upstream-owned.
-if [[ ! -s "$THEME_DIR/user.css" \
-    || ! -s "$THEME_DIR/color.ini" \
-    || ! -s "$THEME_DIR/theme.js" \
-    || ! -f "$THEME_DIR/.devos-upstream-revision" \
-    || "$(cat "$THEME_DIR/.devos-upstream-revision" 2>/dev/null || true)" != "$LUCID_PIN" ]]; then
-    log "installing Lucid"
+verify_sha256() {
+    local expected="$1" path="$2"
+    printf '%s  %s\n' "$expected" "$path" | sha256sum -c - >/dev/null
+}
+
+lucid_assets_match() {
+    [[ -s "$THEME_DIR/user.css" ]] \
+        && [[ -s "$THEME_DIR/color.ini" ]] \
+        && [[ -s "$THEME_DIR/theme.js" ]] \
+        && verify_sha256 "$LUCID_USER_CSS_SHA256" "$THEME_DIR/user.css" \
+        && verify_sha256 "$LUCID_COLOR_INI_SHA256" "$THEME_DIR/color.ini" \
+        && verify_sha256 "$LUCID_THEME_JS_SHA256" "$THEME_DIR/theme.js"
+}
+
+# The Lucid Marketplace manifest uses mutable hosted URLs. Keep the upstream
+# source identity for traceability, but also pin the exact hosted build bytes
+# that passed the physical-host acceptance test.
+if ! lucid_assets_match \
+    || [[ ! -f "$THEME_DIR/.devos-upstream-revision" ]] \
+    || [[ "$(cat "$THEME_DIR/.devos-upstream-revision" 2>/dev/null || true)" != "$LUCID_PIN" ]]; then
+    log "installing pinned Lucid build"
     download "$LUCID_BASE/user.css" "$tmp/lucid-user.css"
     download "$LUCID_BASE/color.ini" "$tmp/lucid-color.ini"
     download "$LUCID_BASE/theme.js" "$tmp/lucid-theme.js"
+    verify_sha256 "$LUCID_USER_CSS_SHA256" "$tmp/lucid-user.css" || { log "Lucid user.css checksum mismatch"; exit 1; }
+    verify_sha256 "$LUCID_COLOR_INI_SHA256" "$tmp/lucid-color.ini" || { log "Lucid color.ini checksum mismatch"; exit 1; }
+    verify_sha256 "$LUCID_THEME_JS_SHA256" "$tmp/lucid-theme.js" || { log "Lucid theme.js checksum mismatch"; exit 1; }
     install -m644 "$tmp/lucid-user.css" "$THEME_DIR/user.css"
     install -m644 "$tmp/lucid-color.ini" "$THEME_DIR/color.ini"
     install -m644 "$tmp/lucid-theme.js" "$THEME_DIR/theme.js"
@@ -76,7 +94,7 @@ installed_iv="$(tr -d '[:space:]' < "$APP_DIR/version.txt" 2>/dev/null || true)"
 if [[ "$installed_iv" != "$IVLYRICS_VERSION" || ! -s "$APP_DIR/index.js" || ! -s "$APP_DIR/manifest.json" ]]; then
     log "installing ivLyrics $IVLYRICS_VERSION"
     download "$IVLYRICS_URL" "$tmp/ivLyrics.zip"
-    printf '%s  %s\n' "$IVLYRICS_SHA256" "$tmp/ivLyrics.zip" | sha256sum -c - >/dev/null
+    verify_sha256 "$IVLYRICS_SHA256" "$tmp/ivLyrics.zip"
     mkdir -p "$tmp/ivLyrics-extract"
     python3 - "$tmp/ivLyrics.zip" "$tmp/ivLyrics-extract" <<'PY'
 from pathlib import Path
