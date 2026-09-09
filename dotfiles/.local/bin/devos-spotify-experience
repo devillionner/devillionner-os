@@ -49,7 +49,7 @@ download() {
 
 # Lucid is installed exactly as its current Marketplace manifest specifies:
 # user.css + color.ini + theme.js. The manifest/source identity is pinned here;
-# Lucid's own hosted build remains upstream-owned.
+# Lucid's hosted build remains upstream-owned.
 if [[ ! -s "$THEME_DIR/user.css" \
     || ! -s "$THEME_DIR/color.ini" \
     || ! -s "$THEME_DIR/theme.js" \
@@ -72,7 +72,7 @@ if [[ ! -f "$EXT_DIR/devos-clean-ui.js" ]] || ! cmp -s "$SYSTEM_EXTENSION" "$EXT
     changed=1
 fi
 
-installed_iv="$(cat "$APP_DIR/version.txt" 2>/dev/null | tr -d '\r\n[:space:]' || true)"
+installed_iv="$(tr -d '[:space:]' < "$APP_DIR/version.txt" 2>/dev/null || true)"
 if [[ "$installed_iv" != "$IVLYRICS_VERSION" || ! -s "$APP_DIR/index.js" || ! -s "$APP_DIR/manifest.json" ]]; then
     log "installing ivLyrics $IVLYRICS_VERSION"
     download "$IVLYRICS_URL" "$tmp/ivLyrics.zip"
@@ -102,14 +102,14 @@ PY
     changed=1
 fi
 
-# Configure only the selected experience. Array fields are additive in
-# Spicetify, so unrelated user extensions/custom apps are preserved.
+# Configure only this curated experience. Spicetify treats extensions and
+# custom_apps as additive fields, so unrelated user entries remain intact.
 needs_config=0
 if [[ ! -f "$CONFIG_FILE" ]] \
     || ! grep -Eq '^current_theme[[:space:]]*=[[:space:]]*Lucid[[:space:]]*$' "$CONFIG_FILE" \
     || ! grep -Eq '^color_scheme[[:space:]]*=[[:space:]]*dark[[:space:]]*$' "$CONFIG_FILE" \
-    || ! grep -Eq '^extensions[[:space:]]*=.*(^|\|)devos-clean-ui\.js(\||$)' "$CONFIG_FILE" \
-    || ! grep -Eq '^custom_apps[[:space:]]*=.*(^|\|)ivLyrics(\||$)' "$CONFIG_FILE"; then
+    || ! grep -Eq '^extensions[[:space:]]*=.*devos-clean-ui\.js' "$CONFIG_FILE" \
+    || ! grep -Eq '^custom_apps[[:space:]]*=.*ivLyrics' "$CONFIG_FILE"; then
     needs_config=1
 fi
 
