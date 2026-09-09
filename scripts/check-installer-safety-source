@@ -153,7 +153,9 @@ require(recovery, 'MANIFEST="$(sudo python3 "$REPO/scripts/lib/recovery.py" crea
 require(recovery, 'last-checkpoint', "checkpoint state record")
 require(recovery, 'Only publish after all snapshots and the manifest validate', "atomic checkpoint publication")
 recovery_py = Path(sys.argv[3]).parent / "lib" / "recovery.py"
-if '"subvolume", "snapshot"' not in recovery_py.read_text(encoding="utf-8"):
+if '"subvolume", "snapshot"' not in recovery_py.read_text(encoding="utf-8") or '"snapper", "-c", "root", "create"' not in recovery_py.read_text(encoding="utf-8"):
+    raise SystemExit("coordinated helper does not use safe root Snapper and home Btrfs snapshots")
+if '"source": "/home"' not in recovery_py.read_text(encoding="utf-8"):
     raise SystemExit("coordinated helper does not create Btrfs snapshots")
 if "source\": \"/home\"" not in recovery_py.read_text(encoding="utf-8"):
     raise SystemExit("coordinated helper does not model separate /home coverage")
