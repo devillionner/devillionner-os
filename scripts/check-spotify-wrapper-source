@@ -38,6 +38,25 @@ else
     fail "Spotify runtime source check misses managed entry points"
 fi
 
+if grep -Fq 'SOURCE_LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"' "$CHECK" \
+    && grep -Fq 'SOURCE_EXPERIENCE="$REPO/dotfiles/.local/bin/devos-spotify-experience"' "$CHECK" \
+    && grep -Fq 'SOURCE_UI="$REPO/dotfiles/.config/spicetify/Extensions/devos-clean-ui.js"' "$CHECK" \
+    && grep -Fq 'cmp -s "$SOURCE_LAUNCHER" "$SYSTEM_LAUNCHER"' "$CHECK" \
+    && grep -Fq 'cmp -s "$SOURCE_EXPERIENCE" "$SYSTEM_EXPERIENCE"' "$CHECK" \
+    && grep -Fq 'cmp -s "$SOURCE_UI" "$SYSTEM_UI"' "$CHECK"; then
+    ok "runtime check detects stale root-managed Spotify files"
+else
+    fail "Spotify runtime check does not compare managed files with Blueprint source"
+fi
+
+if grep -Fq 'spicetify -q -n auto' "$CHECK" \
+    && grep -Fq 'spicetify -q -n apply' "$CHECK" \
+    && grep -Fq 'client restart ownership' "$CHECK"; then
+    ok "runtime check validates deterministic no-restart Spotify lifecycle"
+else
+    fail "Spotify runtime lifecycle validation is incomplete"
+fi
+
 if grep -Fqx '[spotify]' "$LAUNCHER_CONFIG" \
     && grep -Fqx 'extra_arguments = ["--enable-features=UseOzonePlatform", "--ozone-platform=wayland"]' "$LAUNCHER_CONFIG" \
     && grep -Fq 'LAUNCHER_CONFIG="$HOME/.config/spotify-launcher.conf"' "$CHECK"; then
