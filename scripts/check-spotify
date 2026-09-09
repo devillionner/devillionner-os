@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -u
 
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
 OK=0; WARN=0; FAIL=0
 ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
 warn() { printf '  [WARN] %s\n' "$*"; WARN=$((WARN + 1)); }
@@ -19,21 +21,39 @@ USER_LAUNCHER="$HOME/.local/bin/devos-spotify"
 SYSTEM_EXPERIENCE="/usr/local/bin/devos-spotify-experience"
 USER_EXPERIENCE="$HOME/.local/bin/devos-spotify-experience"
 SYSTEM_UI="/usr/local/share/devos/spotify/devos-clean-ui.js"
+SOURCE_LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"
+SOURCE_EXPERIENCE="$REPO/dotfiles/.local/bin/devos-spotify-experience"
+SOURCE_UI="$REPO/dotfiles/.config/spicetify/Extensions/devos-clean-ui.js"
 LAUNCHER_CONFIG="$HOME/.config/spotify-launcher.conf"
 
 [[ -x "$SYSTEM_LAUNCHER" ]] && ok "system Spotify wrapper installed" || fail "system Spotify wrapper missing"
+if [[ -x "$SYSTEM_LAUNCHER" && -f "$SOURCE_LAUNCHER" ]] && cmp -s "$SOURCE_LAUNCHER" "$SYSTEM_LAUNCHER"; then
+    ok "system Spotify wrapper matches Blueprint"
+else
+    fail "system Spotify wrapper is stale or differs from Blueprint"
+fi
 if [[ -L "$USER_LAUNCHER" ]] && [[ "$(readlink -f "$USER_LAUNCHER" 2>/dev/null || true)" == "$SYSTEM_LAUNCHER" ]]; then
     ok "user-local Spotify shim points to system wrapper"
 else
     fail "user-local Spotify wrapper may shadow the system launcher"
 fi
 [[ -x "$SYSTEM_EXPERIENCE" ]] && ok "Spotify experience helper installed" || fail "Spotify experience helper missing"
+if [[ -x "$SYSTEM_EXPERIENCE" && -f "$SOURCE_EXPERIENCE" ]] && cmp -s "$SOURCE_EXPERIENCE" "$SYSTEM_EXPERIENCE"; then
+    ok "system Spotify experience helper matches Blueprint"
+else
+    fail "system Spotify experience helper is stale or differs from Blueprint"
+fi
 if [[ -L "$USER_EXPERIENCE" ]] && [[ "$(readlink -f "$USER_EXPERIENCE" 2>/dev/null || true)" == "$SYSTEM_EXPERIENCE" ]]; then
     ok "user-local experience shim points to system helper"
 else
     fail "user-local Spotify experience helper differs"
 fi
 [[ -s "$SYSTEM_UI" ]] && ok "curated Spotify UI extension installed" || fail "curated Spotify UI extension missing"
+if [[ -s "$SYSTEM_UI" && -s "$SOURCE_UI" ]] && cmp -s "$SOURCE_UI" "$SYSTEM_UI"; then
+    ok "system Spotify UI extension matches Blueprint"
+else
+    fail "system Spotify UI extension is stale or differs from Blueprint"
+fi
 
 if [[ -f "$LAUNCHER_CONFIG" ]] \
     && grep -Fqx '[spotify]' "$LAUNCHER_CONFIG" \
@@ -93,10 +113,19 @@ fi
 if grep -Fq 'spotify-wrapper.lock' "$SYSTEM_LAUNCHER" 2>/dev/null \
     && grep -Fq 'exec 9>"$LOCK"' "$SYSTEM_LAUNCHER" 2>/dev/null \
     && grep -Fq 'flock -n 9' "$SYSTEM_LAUNCHER" 2>/dev/null \
-    && grep -Fq 'devos-spotify-experience' "$SYSTEM_LAUNCHER" 2>/dev/null; then
-    ok "single managed wrapper auto-prepares the Spotify experience"
+    && grep -Fq 'devos-spotify-experience' "$SYSTEM_LAUNCHER" 2>/dev/null \
+    && grep -Fq 'spicetify -q -n auto' "$SYSTEM_LAUNCHER" 2>/dev/null \
+    && ! grep -Fq 'spicetify -q auto' "$SYSTEM_LAUNCHER" 2>/dev/null; then
+    ok "single managed wrapper owns launch after restart-free Spicetify auto"
 else
     fail "Spotify wrapper lifecycle/experience hook incomplete"
+fi
+
+if grep -Fq 'spicetify -q -n apply' "$SYSTEM_EXPERIENCE" 2>/dev/null \
+    && ! grep -Fq 'spicetify apply >/dev/null' "$SYSTEM_EXPERIENCE" 2>/dev/null; then
+    ok "Spotify experience apply keeps client restart ownership with managed launcher"
+else
+    fail "Spotify experience apply may restart the client independently"
 fi
 
 legacy=0
