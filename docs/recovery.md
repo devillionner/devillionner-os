@@ -1,57 +1,32 @@
 # Recovery points
 
-Before a profile restore changes packages or dotfiles, `scripts/create-recovery-point` creates a rollback point.
+Before a profile restore changes packages or dotfiles, `scripts/create-recovery-point` creates and verifies a recovery bundle.
 
-Preferred path:
+The helper requires Btrfs and an existing Snapper `root` configuration. Root is snapshotted through Snapper, which stores the read-only root snapshot outside the live root subvolume. If `/home` is a separate subvolume on the same Btrfs filesystem, the helper creates a second read-only Btrfs snapshot for `/home` in the root-side recovery bundle.
 
-1. use the existing Snapper `root` configuration;
-2. otherwise, on a Btrfs root subvolume, create a read-only Btrfs snapshot.
-
-The last created checkpoint is recorded in:
+The last checkpoint is recorded only after both snapshots and their manifest validate:
 
 ```text
-~/.local/state/devillionner-os/last-checkpoint
+bundle:/.snapshots/devillionner-os/<bundle-id>/manifest.json
 ```
 
-Examples:
+The manifest records source and snapshot UUIDs, the filesystem UUID, read-only state, home coverage, and explicit limits. If preflight or verification fails, the previous checkpoint record remains unchanged and restore stops before package or dotfile mutation.
 
-```text
-snapper:42
-btrfs:/.snapshots/devillionner-os/pre-restore-20260823-200000
-```
+## Why restore requires this
 
-## Why restore currently requires Btrfs
+A Blueprint profile can touch hundreds of packages and system/UI files. A clean recovery point is required before restore. Unsupported filesystems, separate home filesystems, relocated XDG directories, nested mounts in Blueprint-owned paths and unsupported nested home layouts fail closed.
 
-A Blueprint profile can touch hundreds of packages and system/UI files. A clean rollback point is more valuable than pretending an unsupported filesystem has equivalent recovery.
-
-If the root filesystem is not Btrfs, the installer stops before the profile restore.
+The root and home snapshots are created sequentially, so this is a recovery point rather than an application-consistent transaction. Btrfs snapshots are local recovery points, not protection from disk or filesystem failure; use an external backup for that.
 
 ## Rollback
 
-For a Snapper checkpoint, inspect snapshots first:
+Inspect a recorded bundle before recovery:
 
 ```bash
+sudo python3 /usr/local/share/devos/recovery.py verify /path/to/manifest.json
 sudo snapper -c root list
 ```
 
-For full boot/root rollback, use the normal CachyOS/Snapper recovery flow rather than deleting or replacing the live root while it is mounted.
+The Blueprint does not automate destructive rollback. Use the normal CachyOS/Snapper recovery flow, and validate it on the reserved physical test partition after all clean-KVM gates.
 
-The Blueprint intentionally does not automate destructive rollback.
-
-## Coverage limits found on the existing host
-
-The 2026-09-09 read-only audit found root on `/@` and `/home` on the
-separate `/@home` subvolume. Only the Snapper `root` config is present.
-Btrfs snapshots do not recursively capture nested/separate subvolumes: the
-current root-only recovery helper therefore does **not** protect the user's
-home dotfiles on this layout. A root snapshot must not be described as a
-complete package-and-dotfile rollback point.
-
-The host records `snapper:223`; snapshot existence and contents still require
-privileged verification. A nonempty `last-checkpoint` file proves only that an
-identifier was recorded. No rollback was attempted.
-
-Before production restore, implement and validate coordinated recovery for all
-modified subvolumes (including home), verify the recorded snapshots still
-exist, and exercise recovery on the reserved test environment after the KVM
-gates. Do not use the production partition to develop or test rollback.
+The existing host audit found root on `/@` and `/home` on the separate `/@home` subvolume. That topology is now covered by the coordinated bundle design, but no production snapshot or rollback has been attempted.
