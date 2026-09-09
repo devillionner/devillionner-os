@@ -132,8 +132,8 @@ fi
 
 if [[ "$APPLY" == true ]]; then
     pkill -x spotify >/dev/null 2>&1 || true
-    spicetify -q -n apply >/dev/null
-    log "Lucid + ivLyrics + clean UI applied; managed launcher owns the next Spotify start"
+    spicetify -q -n auto >/dev/null
+    log "Lucid + ivLyrics + clean UI backup/apply complete; managed launcher owns the next Spotify start"
 elif ((changed)); then
     log "experience prepared; next managed Spotify launch will apply it"
 fi
