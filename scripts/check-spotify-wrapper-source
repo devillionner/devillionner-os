@@ -58,6 +58,18 @@ else
     fail "Spotify runtime lifecycle validation is incomplete"
 fi
 
+if grep -Fq 'LUCID_USER_CSS_SHA256="ef437d56022bae8cbec03ce66368b986075d38e541b4fe33c954f7980075a9ba"' "$EXPERIENCE" \
+    && grep -Fq 'LUCID_COLOR_INI_SHA256="895c5504ed47bc8d2dac7b30ec60b7b041afc8ecc71d376446fa6ac9faa57159"' "$EXPERIENCE" \
+    && grep -Fq 'LUCID_THEME_JS_SHA256="f86649f9da821bac1b2a8d1632b66b0d2a6504da47eebdcb84c31ae09498c511"' "$EXPERIENCE" \
+    && grep -Fq 'verify_sha256 "$LUCID_USER_CSS_SHA256"' "$EXPERIENCE" \
+    && grep -Fq 'verify_sha256 "$LUCID_COLOR_INI_SHA256"' "$EXPERIENCE" \
+    && grep -Fq 'verify_sha256 "$LUCID_THEME_JS_SHA256"' "$EXPERIENCE" \
+    && grep -Fq 'Lucid theme assets match the pinned physical-host build' "$CHECK"; then
+    ok "tested Lucid hosted build is checksum-pinned and runtime-validated"
+else
+    fail "Lucid hosted build checksum contract differs"
+fi
+
 if grep -Fqx '[spotify]' "$LAUNCHER_CONFIG" \
     && grep -Fqx 'extra_arguments = ["--enable-features=UseOzonePlatform", "--ozone-platform=wayland"]' "$LAUNCHER_CONFIG" \
     && grep -Fq 'LAUNCHER_CONFIG="$HOME/.config/spotify-launcher.conf"' "$CHECK"; then
