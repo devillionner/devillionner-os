@@ -75,29 +75,27 @@ button:has(path[d='M16 2.45c0-.8-.65-1.45-1.45-1.45H1.45C.65 1 0 1.65 0 2.45v11.
     display: none !important;
 }
 
-/* Keep Spotify/Lucid's native progress geometry so elapsed fill remains exact.
- * The pet is anchored to Spotify's own slider, so it cannot drift from playback.
+/* Keep Spotify/Lucid's native fill untouched. Oneko is positioned by
+ * Spotify's own --progress-bar-transform; sliderArea still clips only the fill.
  */
-.player-controls .playback-progressbar .progress-bar__slider,
-.playback-bar .progress-bar__slider {
+.player-controls .playback-progressbar .progress-bar,
+.playback-bar .progress-bar {
     position: relative !important;
-    opacity: 1 !important;
-    width: 8px !important;
-    height: 8px !important;
+    overflow: visible !important;
 }
-.player-controls .playback-progressbar .progress-bar__slider::after,
-.playback-bar .progress-bar__slider::after {
+.player-controls .playback-progressbar .progress-bar::after,
+.playback-bar .progress-bar::after {
     content: '';
     position: absolute;
     width: 32px;
     height: 32px;
-    left: 50%;
-    bottom: 5px;
-    transform: translateX(-50%);
+    left: var(--progress-bar-transform, 0%);
+    top: 50%;
+    transform: translate(-50%, -82%);
     image-rendering: pixelated;
     background-image: url('https://raw.githubusercontent.com/adryd325/oneko.js/14bab15a755d0e35cd4ae19c931d96d306f99f42/oneko.gif');
     pointer-events: none;
-    z-index: 5;
+    z-index: 101;
     animation: devos-oneko 1s infinite;
 }
 @keyframes devos-oneko {
