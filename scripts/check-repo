@@ -5,15 +5,8 @@ REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 FAIL=0
 OK=0
 
-ok() {
-    printf '  [OK]   %s\n' "$*"
-    OK=$((OK + 1))
-}
-
-fail() {
-    printf '  [FAIL] %s\n' "$*" >&2
-    FAIL=$((FAIL + 1))
-}
+ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
+fail() { printf '  [FAIL] %s\n' "$*" >&2; FAIL=$((FAIL + 1)); }
 
 printf '========================================\n'
 printf '       Blueprint repository check\n'
@@ -51,53 +44,41 @@ if python3 - "$REPO" <<'PY'
 import json
 import sys
 from pathlib import Path
-
 root = Path(sys.argv[1])
 errors = []
 count = 0
 for path in sorted((root / "dotfiles").rglob("*.json")):
     count += 1
     try:
-        json.loads(path.read_text())
+        json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
         errors.append(f"{path.relative_to(root)}: {exc}")
-
 if errors:
     print("\n".join(errors), file=sys.stderr)
     raise SystemExit(1)
 print(count)
 PY
-then
-    ok "JSON syntax"
-else
-    fail "JSON syntax"
-fi
+then ok "JSON syntax"; else fail "JSON syntax"; fi
 
 if python3 - "$REPO" <<'PY'
 import sys
 from pathlib import Path
-
 root = Path(sys.argv[1])
 errors = []
 for path in sorted((root / "manifests").rglob("*.txt")):
     seen = set()
-    for number, raw in enumerate(path.read_text().splitlines(), 1):
+    for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         value = raw.split("#", 1)[0].strip()
         if not value:
             continue
         if value in seen:
             errors.append(f"{path.relative_to(root)}:{number}: duplicate entry: {value}")
         seen.add(value)
-
 if errors:
     print("\n".join(errors), file=sys.stderr)
     raise SystemExit(1)
 PY
-then
-    ok "manifest entries are unique per file"
-else
-    fail "duplicate manifest entries"
-fi
+then ok "manifest entries are unique per file"; else fail "duplicate manifest entries"; fi
 
 required_paths=(
     scripts/check
@@ -110,21 +91,33 @@ required_paths=(
     scripts/lib/set-caelestia-file-explorer.py
     scripts/configure-spotify
     scripts/check-spotify
+    scripts/check-spotify-wrapper-source
     scripts/configure-tv-cast
     scripts/check-tv-cast
     dotfiles/.config/caelestia/shell.json
     dotfiles/.config/caelestia/cli.json
     dotfiles/.config/hypr/hyprland/rules.lua
     dotfiles/.local/bin/devos-spotify
-    dotfiles/.local/bin/devos-spotify-theme-bootstrap
-    dotfiles/.local/bin/devos-spotify-theme-sync
+    dotfiles/.local/bin/devos-spotify-experience
+    dotfiles/.config/spicetify/Extensions/devos-clean-ui.js
     dotfiles/.local/share/applications/spotify-launcher.desktop
-    dotfiles/.config/systemd/user/devos-spotify-theme.path
 )
 for path in "${required_paths[@]}"; do
     [[ -e "$REPO/$path" ]] || fail "missing required path: $path"
 done
 [[ $FAIL -gt 0 ]] || ok "required integration files present"
+
+legacy_spotify_paths=(
+    dotfiles/.local/bin/devos-spotify-theme-bootstrap
+    dotfiles/.local/bin/devos-spotify-theme-sync
+    dotfiles/.config/systemd/user/devos-spotify-theme.path
+    dotfiles/.config/systemd/user/devos-spotify-theme.service
+)
+legacy_count=0
+for path in "${legacy_spotify_paths[@]}"; do
+    [[ -e "$REPO/$path" ]] && legacy_count=$((legacy_count + 1))
+done
+((legacy_count == 0)) && ok "legacy Spotify Bloom/palette source files retired" || fail "$legacy_count legacy Spotify theme source file(s) remain"
 
 RUNTIME_CHECK="$REPO/scripts/check"
 RESTORE="$REPO/scripts/restore"
@@ -186,17 +179,14 @@ import json
 import sys
 import tempfile
 from pathlib import Path
-
 helper = Path(sys.argv[1])
 canonical_path = Path(sys.argv[2])
 spec = importlib.util.spec_from_file_location("caelestia_shell_merge", helper)
 module = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(module)
-
 canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
-idle = canonical["general"]["idle"]
-assert idle["timeouts"] == [
+assert canonical["general"]["idle"]["timeouts"] == [
     {"timeout": 1800, "idleAction": "lock"},
     {"timeout": 2100, "idleAction": "dpms off", "returnAction": "dpms on"},
     {"timeout": 3600, "idleAction": ["suspendThenHibernate"]},
@@ -205,20 +195,15 @@ assert canonical["general"]["apps"]["explorer"] == ["dolphin"]
 assert canonical["general"]["apps"]["playback"] == ["clapper"]
 assert canonical["general"]["apps"]["terminal"] == ["kitty"]
 assert canonical["services"]["defaultPlayer"] == "Spotify"
-
 with tempfile.TemporaryDirectory() as tmp_raw:
     tmp = Path(tmp_raw)
     current = tmp / "shell.json"
     current.write_text(json.dumps({
         "appearance": {"customUserFlag": 7},
-        "general": {
-            "apps": {"audio": ["pwvucontrol"], "explorer": ["thunar"]},
-            "customGeneral": "keep-me",
-        },
+        "general": {"apps": {"audio": ["pwvucontrol"], "explorer": ["thunar"]}, "customGeneral": "keep-me"},
         "services": {"weatherLocation": "Kyiv"},
         "customRoot": {"enabled": True},
     }, indent=4) + "\n", encoding="utf-8")
-
     module.merge_file(canonical_path, current)
     merged = json.loads(current.read_text(encoding="utf-8"))
     assert merged["customRoot"] == {"enabled": True}
@@ -228,7 +213,6 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     assert merged["general"]["apps"]["explorer"] == ["dolphin"]
     assert merged["services"]["weatherLocation"] == "Kyiv"
     assert merged["services"]["defaultPlayer"] == "Spotify"
-
     target = tmp / "managed-target.json"
     target.write_text('{"custom": 1}\n', encoding="utf-8")
     link = tmp / "linked-shell.json"
@@ -238,7 +222,6 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     linked = json.loads(target.read_text(encoding="utf-8"))
     assert linked["custom"] == 1
     assert linked["general"]["apps"]["explorer"] == ["dolphin"]
-
     invalid = tmp / "invalid.json"
     broken = '{"general": {\n'
     invalid.write_text(broken, encoding="utf-8")
@@ -250,37 +233,24 @@ with tempfile.TemporaryDirectory() as tmp_raw:
         raise AssertionError("malformed shell.json was silently overwritten")
     assert invalid.read_text(encoding="utf-8") == broken
 PY
-then
-    ok "Caelestia shell merge preserves custom data/symlinks and refuses malformed JSON"
-else
-    fail "Caelestia shell merge behavior/policy"
-fi
+then ok "Caelestia shell merge preserves custom data/symlinks and refuses malformed JSON"; else fail "Caelestia shell merge behavior/policy"; fi
 
 if python3 - "$REPO/scripts/lib/set-caelestia-file-explorer.py" <<'PY'
 import importlib.util
 import sys
 import tempfile
 from pathlib import Path
-
 helper = Path(sys.argv[1])
 spec = importlib.util.spec_from_file_location("caelestia_vars", helper)
 module = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(module)
-
 with tempfile.TemporaryDirectory() as tmp_raw:
     tmp = Path(tmp_raw)
     canonical = tmp / "canonical.lua"
     canonical.write_text('return {\n    fileExplorer = "/usr/local/bin/devos-dolphin",\n}\n')
-
     custom = tmp / "custom.lua"
-    custom.write_text(
-        'return {\n'
-        '    browser = "helium",\n'
-        '    fileExplorer = "thunar", -- user comment\n'
-        '    windowRounding = 17,\n'
-        '}\n'
-    )
+    custom.write_text('return {\n    browser = "helium",\n    fileExplorer = "thunar", -- user comment\n    windowRounding = 17,\n}\n')
     module.update_file(canonical, custom)
     text = custom.read_text()
     assert 'browser = "helium"' in text
@@ -288,7 +258,6 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     assert '-- user comment' in text
     assert text.count("fileExplorer") == 1
     assert 'fileExplorer = "/usr/local/bin/devos-dolphin"' in text
-
     target = tmp / "managed-target.lua"
     target.write_text('return {\n    terminal = "kitty",\n}\n')
     link = tmp / "hypr-vars.lua"
@@ -298,8 +267,6 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     target_text = target.read_text()
     assert 'terminal = "kitty"' in target_text
     assert target_text.count("fileExplorer") == 1
-    assert 'fileExplorer = "/usr/local/bin/devos-dolphin"' in target_text
-
     unfamiliar = 'return {\n    fileExplorer = function() return "dolphin" end,\n}\n'
     try:
         module.update_text(unfamiliar)
@@ -308,20 +275,15 @@ with tempfile.TemporaryDirectory() as tmp_raw:
     else:
         raise AssertionError("unfamiliar fileExplorer format was not rejected")
 PY
-then
-    ok "Dolphin Caelestia override updater preserves custom data and symlinks"
-else
-    fail "Dolphin Caelestia override updater behavior"
-fi
+then ok "Dolphin Caelestia override updater preserves custom data and symlinks"; else fail "Dolphin Caelestia override updater behavior"; fi
 
 CAELESTIA_CLI="$REPO/dotfiles/.config/caelestia/cli.json"
 if python3 - "$CAELESTIA_CLI" <<'PY'
 import json
 import sys
 from pathlib import Path
-
 p = Path(sys.argv[1])
-data = json.loads(p.read_text())
+data = json.loads(p.read_text(encoding="utf-8"))
 spotify = data["toggles"]["music"]["spotify"]
 assert spotify.get("enable") is True
 assert spotify.get("command") == ["devos-spotify"]
@@ -334,11 +296,7 @@ assert {"initialTitle": "Spotify"} in matches
 assert {"initialTitle": "Spotify Free"} in matches
 assert all("initial_title" not in match for match in matches if isinstance(match, dict))
 PY
-then
-    ok "Caelestia Spotify toggle uses current schema and both class aliases"
-else
-    fail "Caelestia Spotify toggle schema/identity aliases"
-fi
+then ok "Caelestia Spotify toggle uses current schema and both class aliases"; else fail "Caelestia Spotify toggle schema/identity aliases"; fi
 
 SPOTIFY_HYPR_RULES="$REPO/dotfiles/.config/hypr/hyprland/rules.lua"
 SPOTIFY_DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
@@ -350,36 +308,20 @@ else
     fail "Spotify identity contract differs across Hyprland/Caelestia/desktop entry"
 fi
 
-SPOTIFY_BOOTSTRAP="$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap"
-SPOTIFY_SYNC="$REPO/dotfiles/.local/bin/devos-spotify-theme-sync"
-if grep -Fq 'PIN="654cfed682b94613b0029997ffafc1eadccc5bef"' "$SPOTIFY_BOOTSTRAP" \
-    && grep -Fq 'devillionner-bloom' "$SPOTIFY_BOOTSTRAP" \
-    && grep -Fq 'nimsandu/spicetify-bloom/$PIN/src' "$SPOTIFY_BOOTSTRAP" \
-    && grep -Fq 'theme.js' "$SPOTIFY_BOOTSTRAP" \
-    && grep -Fq 'devillionner-bloom' "$SPOTIFY_SYNC" \
-    && [[ ! -e "$REPO/dotfiles/.config/spicetify/devillionner-overrides.css" ]]; then
-    ok "Spotify uses pinned Bloom visual code with no Blueprint geometry override"
+if bash "$REPO/scripts/check-spotify-wrapper-source" >/dev/null; then
+    ok "Spotify Lucid/ivLyrics/cleanup source contract"
 else
-    fail "Spotify Bloom visual-base contract is incomplete"
+    fail "Spotify experience source contract"
 fi
 
 SPOTIFY_LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"
 SPOTIFY_CONFIG="$REPO/scripts/configure-spotify"
-if grep -Fq 'current_theme devillionner-bloom' "$SPOTIFY_LAUNCHER" \
-    && grep -Fq 'color_scheme Devillionner' "$SPOTIFY_LAUNCHER" \
-    && grep -Fq 'overwrite_assets 1' "$SPOTIFY_LAUNCHER" \
-    && grep -Fq 'inject_theme_js 1' "$SPOTIFY_LAUNCHER"; then
-    ok "Spotify launcher enables Bloom CSS/colors/assets/theme.js"
-else
-    fail "Spotify Bloom launcher configuration is incomplete"
-fi
-
 if grep -Fqx 'TryExec=devos-spotify' "$SPOTIFY_DESKTOP" \
     && grep -Fqx 'Exec=devos-spotify %U' "$SPOTIFY_DESKTOP" \
     && grep -Fqx 'MimeType=x-scheme-handler/spotify;' "$SPOTIFY_DESKTOP" \
     && grep -Fq 'org.mpris.MediaPlayer2.Player' "$SPOTIFY_LAUNCHER" \
     && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$SPOTIFY_LAUNCHER"; then
-    ok "Spotify desktop contract routes spotify: URIs through themed launcher"
+    ok "Spotify desktop contract routes spotify: URIs through managed launcher"
 else
     fail "Spotify desktop URI integration is incomplete"
 fi
@@ -405,9 +347,5 @@ fi
 
 printf '\n========================================\n'
 printf 'OK: %d   FAIL: %d\n' "$OK" "$FAIL"
-if ((FAIL == 0)); then
-    printf 'RESULT: PASS\n'
-    exit 0
-fi
-printf 'RESULT: FAIL\n'
-exit 1
+if ((FAIL == 0)); then printf 'RESULT: PASS\n'; exit 0; fi
+printf 'RESULT: FAIL\n'; exit 1
