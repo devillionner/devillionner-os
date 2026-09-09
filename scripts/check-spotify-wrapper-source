@@ -6,9 +6,9 @@ CONFIG="$REPO/scripts/configure-spotify"
 CHECK="$REPO/scripts/check-spotify"
 DESKTOP="$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop"
 CLI="$REPO/dotfiles/.config/caelestia/cli.json"
-SYNC="$REPO/dotfiles/.local/bin/devos-spotify-theme-sync"
-BOOTSTRAP="$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap"
 LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"
+EXPERIENCE="$REPO/dotfiles/.local/bin/devos-spotify-experience"
+UI="$REPO/dotfiles/.config/spicetify/Extensions/devos-clean-ui.js"
 
 FAIL=0
 OK=0
@@ -16,31 +16,34 @@ ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
 fail() { printf '  [FAIL] %s\n' "$*" >&2; FAIL=$((FAIL + 1)); }
 
 printf '========================================\n'
-printf '    Spotify wrapper path source check\n'
+printf '    Spotify experience source check\n'
 printf '========================================\n'
 
 if grep -Fq 'sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" /usr/local/bin/devos-spotify' "$CONFIG" \
-    && grep -Fq 'ln -sfn /usr/local/bin/devos-spotify "$HOME/.local/bin/devos-spotify"' "$CONFIG"; then
-    ok "canonical wrapper is system-visible with a user-local migration shim"
+    && grep -Fq 'ln -sfn /usr/local/bin/devos-spotify "$HOME/.local/bin/devos-spotify"' "$CONFIG" \
+    && grep -Fq 'sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-experience" /usr/local/bin/devos-spotify-experience' "$CONFIG" \
+    && grep -Fq '/usr/local/share/devos/spotify/devos-clean-ui.js' "$CONFIG"; then
+    ok "wrapper, experience helper and UI extension have canonical install paths"
 else
-    fail "Spotify wrapper install path contract differs"
+    fail "Spotify canonical installation contract differs"
 fi
 
 if grep -Fq 'SYSTEM_LAUNCHER="/usr/local/bin/devos-spotify"' "$CHECK" \
-    && grep -Fq 'user-local Spotify shim points to system wrapper' "$CHECK"; then
-    ok "runtime check validates canonical wrapper + shadow prevention"
+    && grep -Fq 'SYSTEM_EXPERIENCE="/usr/local/bin/devos-spotify-experience"' "$CHECK" \
+    && grep -Fq 'SYSTEM_UI="/usr/local/share/devos/spotify/devos-clean-ui.js"' "$CHECK"; then
+    ok "runtime check validates all managed Spotify entry points"
 else
-    fail "Spotify runtime check does not validate wrapper path contract"
+    fail "Spotify runtime source check misses managed entry points"
 fi
 
 if grep -Fqx 'TryExec=devos-spotify' "$DESKTOP" \
     && grep -Fqx 'Exec=devos-spotify %U' "$DESKTOP"; then
-    ok "desktop entry resolves wrapper through normal PATH"
+    ok "desktop entry resolves the managed wrapper through PATH"
 else
     fail "Spotify desktop entry launcher contract differs"
 fi
 
-python3 - "$CLI" <<'PY'
+if python3 - "$CLI" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -48,65 +51,61 @@ p = Path(sys.argv[1])
 data = json.loads(p.read_text(encoding="utf-8"))
 assert data["toggles"]["music"]["spotify"]["command"] == ["devos-spotify"]
 PY
-ok "Caelestia toggle uses the same PATH-resolved command"
-
-# Bloom is the visual owner. Blueprint pins its exact upstream revision and does
-# not append local pane/frame geometry CSS anymore.
-if grep -Fq 'PIN="654cfed682b94613b0029997ffafc1eadccc5bef"' "$BOOTSTRAP" \
-    && grep -Fq 'THEME_DIR="$CONFIG_HOME/spicetify/Themes/devillionner-bloom"' "$BOOTSTRAP" \
-    && grep -Fq 'nimsandu/spicetify-bloom/$PIN/src' "$BOOTSTRAP" \
-    && grep -Fq 'curl -fsSL "$BASE_URL/user.css"' "$BOOTSTRAP" \
-    && grep -Fq 'curl -fsSL "$BASE_URL/theme.js"' "$BOOTSTRAP" \
-    && grep -Fq 'printf '\''%s\n'\'' "Bloom" > "$BASE"' "$BOOTSTRAP"; then
-    ok "Bloom visual base is pinned and bootstraps CSS + theme.js"
+then
+    ok "Caelestia music toggle uses the managed wrapper"
 else
-    fail "Bloom bootstrap source contract differs"
+    fail "Caelestia Spotify command differs"
 fi
 
-if [[ ! -e "$REPO/dotfiles/.config/spicetify/devillionner-overrides.css" ]] \
-    && grep -Fq 'rm -f "$HOME/.config/spicetify/devillionner-overrides.css"' "$CONFIG"; then
-    ok "legacy Blueprint Spotify geometry layer is retired"
+if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" \
+    && grep -Fq 'OpenUri s "$SPOTIFY_URI"' "$LAUNCHER" \
+    && grep -Fq 'spotify-wrapper.lock' "$LAUNCHER" \
+    && grep -Fq 'flock -n 9' "$LAUNCHER" \
+    && grep -Fq 'devos-spotify-experience' "$LAUNCHER" \
+    && grep -Fq 'spicetify -q auto' "$LAUNCHER"; then
+    ok "wrapper preserves URI routing, single-instance guard and automatic experience apply"
 else
-    fail "legacy custom Spotify geometry CSS is still source-managed"
+    fail "Spotify wrapper lifecycle contract differs"
 fi
 
-if grep -Fq 'current_theme devillionner-bloom' "$LAUNCHER" \
-    && grep -Fq 'color_scheme Devillionner' "$LAUNCHER" \
-    && grep -Fq 'overwrite_assets 1' "$LAUNCHER" \
-    && grep -Fq 'inject_theme_js 1' "$LAUNCHER"; then
-    ok "launcher selects Bloom with required CSS/assets/theme.js injection"
+if grep -Fq 'LUCID_PIN="5c5bead49d5dad971e0bb38d64e7dee88463cf83"' "$EXPERIENCE" \
+    && grep -Fq 'LUCID_BASE="https://spicetify-lucid.sanooj.uk/spice"' "$EXPERIENCE" \
+    && grep -Fq 'IVLYRICS_VERSION="6.6.13"' "$EXPERIENCE" \
+    && grep -Fq 'IVLYRICS_SHA256="b3e77eaaf0f1d25276a009beefbfa30ab0478c9468712f8a96c7641f5ea2c476"' "$EXPERIENCE" \
+    && grep -Fq 'current_theme Lucid' "$EXPERIENCE" \
+    && grep -Fq 'color_scheme dark' "$EXPERIENCE" \
+    && grep -Fq 'spicetify config extensions devos-clean-ui.js' "$EXPERIENCE" \
+    && grep -Fq 'spicetify config custom_apps ivLyrics' "$EXPERIENCE"; then
+    ok "Lucid + pinned ivLyrics experience identity is reproducible"
 else
-    fail "Bloom launcher configuration differs"
+    fail "Spotify experience source identity/configuration differs"
 fi
 
-# Reproduce the physical-host palette format with GNU awk and verify the Bloom
-# key set is generated silently from Caelestia colors.
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/hypr/scheme"
-cat > "$TMP/hypr/scheme/current.lua" <<'EOF'
-primary = "112233",
-surface = "223344",
-surfaceContainer = "334455",
-surfaceContainerHigh = "445566",
-onSurface = "556677",
-onSurfaceVariant = "667788",
-outlineVariant = "778899",
-secondary = "8899aa",
-error = "99aabb",
-EOF
-ERR="$TMP/stderr"
-if XDG_CONFIG_HOME="$TMP" bash "$SYNC" 2>"$ERR" \
-    && [[ ! -s "$ERR" ]] \
-    && grep -Fqx 'accent             = 112233' "$TMP/spicetify/Themes/devillionner-bloom/color.ini" \
-    && grep -Fqx 'main               = 223344' "$TMP/spicetify/Themes/devillionner-bloom/color.ini" \
-    && grep -Fqx 'player             = 334455' "$TMP/spicetify/Themes/devillionner-bloom/color.ini" \
-    && grep -Fqx 'player-border      = 778899' "$TMP/spicetify/Themes/devillionner-bloom/color.ini" \
-    && grep -Fqx 'notification-error = 99aabb' "$TMP/spicetify/Themes/devillionner-bloom/color.ini"; then
-    ok "Bloom palette parser is warning-free and preserves Caelestia colors"
+if grep -Fq 'lucid:settings' "$UI" \
+    && grep -Fq 'getProgressPercent' "$UI" \
+    && grep -Fq 'mask-image:' "$UI" \
+    && grep -Fq 'adryd325/oneko.js/14bab15a755d0e35cd4ae19c931d96d306f99f42/oneko.gif' "$UI" \
+    && grep -Fq "button[aria-label='Podcasts']" "$UI" \
+    && grep -Fq 'fullscreen-mode-button' "$UI" \
+    && grep -Fq 'main-actionBar-exploreButton' "$UI" \
+    && grep -Fq 'main-nowPlayingView-section:not(.main-nowPlayingView-queue):not(.lyrics-npv-card)' "$UI"; then
+    ok "curated cleanup, Lucid preset, wave progress and Oneko are source-managed"
 else
-    [[ -s "$ERR" ]] && cat "$ERR" >&2
-    fail "Bloom palette parser emitted warnings or generated wrong colors"
+    fail "curated Spotify UI extension contract differs"
+fi
+
+legacy_found=0
+for path in \
+    "$REPO/dotfiles/.local/bin/devos-spotify-theme-bootstrap" \
+    "$REPO/dotfiles/.local/bin/devos-spotify-theme-sync" \
+    "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.path" \
+    "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.service"; do
+    [[ -e "$path" ]] && legacy_found=$((legacy_found + 1))
+done
+if ((legacy_found == 0)); then
+    ok "legacy Bloom/palette watcher source files are retired"
+else
+    fail "$legacy_found legacy Spotify theme source file(s) still present"
 fi
 
 printf '\nOK: %d   FAIL: %d\n' "$OK" "$FAIL"
