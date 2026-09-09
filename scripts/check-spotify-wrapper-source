@@ -50,9 +50,10 @@ else
 fi
 
 if grep -Fq 'spicetify -q -n auto' "$CHECK" \
-    && grep -Fq 'spicetify -q -n apply' "$CHECK" \
-    && grep -Fq 'client restart ownership' "$CHECK"; then
-    ok "runtime check validates deterministic no-restart Spotify lifecycle"
+    && grep -Fq 'spicetify -q -n auto' "$EXPERIENCE" \
+    && grep -Fq 'backup-safe restart-free auto' "$CHECK" \
+    && ! grep -Fq 'spicetify -q -n apply' "$EXPERIENCE"; then
+    ok "runtime check validates unified backup-safe no-restart Spotify lifecycle"
 else
     fail "Spotify runtime lifecycle validation is incomplete"
 fi
@@ -94,7 +95,7 @@ if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" \
     && grep -Fq 'spicetify -q -n auto' "$LAUNCHER" \
     && grep -Fq 'launch_vanilla' "$LAUNCHER" \
     && ! grep -Fq 'spicetify -q auto' "$LAUNCHER"; then
-    ok "wrapper preserves URI routing, single-instance guard and deterministic launcher ownership after no-restart Spicetify apply"
+    ok "wrapper preserves URI routing, single-instance guard and deterministic launcher ownership after no-restart Spicetify auto"
 else
     fail "Spotify wrapper lifecycle contract differs"
 fi
@@ -107,9 +108,10 @@ if grep -Fq 'LUCID_PIN="5c5bead49d5dad971e0bb38d64e7dee88463cf83"' "$EXPERIENCE"
     && grep -Fq 'color_scheme dark' "$EXPERIENCE" \
     && grep -Fq 'spicetify config extensions devos-clean-ui.js' "$EXPERIENCE" \
     && grep -Fq 'spicetify config custom_apps ivLyrics' "$EXPERIENCE" \
-    && grep -Fq 'spicetify -q -n apply' "$EXPERIENCE" \
+    && grep -Fq 'spicetify -q -n auto' "$EXPERIENCE" \
+    && ! grep -Fq 'spicetify -q -n apply' "$EXPERIENCE" \
     && ! grep -Fq 'spicetify apply >/dev/null' "$EXPERIENCE"; then
-    ok "Lucid + pinned ivLyrics experience identity and restart-free apply are reproducible"
+    ok "Lucid + pinned ivLyrics experience identity and backup-safe restart-free apply are reproducible"
 else
     fail "Spotify experience source identity/configuration differs"
 fi
