@@ -66,9 +66,15 @@ require_entry "$MAN/common-repo.txt" wireplumber "WirePlumber package"
 require_entry "$MAN/services-user-common.txt" wireplumber.service "WirePlumber user service"
 require_entry "$MAN/common-repo.txt" xdg-user-dirs "xdg-user-dirs package"
 require_entry "$MAN/services-user-common.txt" xdg-user-dirs.service "xdg-user-dirs user service"
-require_entry "$MAN/services-user-common.txt" devos-spotify-theme.path "Spotify theme path unit"
-[[ -f "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.path" ]] \
-    || fail "repository-owned Spotify path unit missing"
+
+# Spotify's former palette watcher is intentionally retired. The current
+# Lucid/ivLyrics experience is prepared synchronously by devos-spotify and must
+# not reintroduce a persistent user service.
+if grep -Fqx 'devos-spotify-theme.path' "$MAN/services-user-common.txt" \
+    || [[ -e "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.path" ]] \
+    || [[ -e "$REPO/dotfiles/.config/systemd/user/devos-spotify-theme.service" ]]; then
+    fail "legacy Spotify theme watcher must remain absent"
+fi
 
 # TV Cast is on-demand only and must not silently acquire a permanent daemon.
 if bp_output="$(sed -E 's/[[:space:]]+#.*$//' "$FEATURE_MAN/services-tvcast.txt" | sed -E '/^[[:space:]]*(#|$)/d')" \

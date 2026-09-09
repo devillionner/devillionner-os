@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+SPICETIFY_DIR="$CONFIG_HOME/spicetify"
+THEME_DIR="$SPICETIFY_DIR/Themes/Lucid"
+EXT_DIR="$SPICETIFY_DIR/Extensions"
+APP_ROOT="$SPICETIFY_DIR/CustomApps"
+APP_DIR="$APP_ROOT/ivLyrics"
+CONFIG_FILE="$SPICETIFY_DIR/config-xpui.ini"
+SPOTIFY_ROOT="$DATA_HOME/spotify-launcher/install/usr/share/spotify"
+PREFS="$CONFIG_HOME/spotify/prefs"
+SYSTEM_EXTENSION="/usr/local/share/devos/spotify/devos-clean-ui.js"
+
+LUCID_PIN="5c5bead49d5dad971e0bb38d64e7dee88463cf83"
+LUCID_BASE="https://spicetify-lucid.sanooj.uk/spice"
+IVLYRICS_VERSION="6.6.13"
+IVLYRICS_URL="https://github.com/ivLis-Studio/ivLyrics/releases/download/v${IVLYRICS_VERSION}/ivLyrics.zip"
+IVLYRICS_SHA256="b3e77eaaf0f1d25276a009beefbfa30ab0478c9468712f8a96c7641f5ea2c476"
+
+APPLY=false
+[[ "${1:-}" == "--apply" ]] && APPLY=true
+
+log() {
+    [[ "${DEVOS_SPOTIFY_QUIET:-0}" == "1" ]] || printf 'devos-spotify: %s\n' "$*"
+}
+
+command -v curl >/dev/null 2>&1 || { log "curl is required"; exit 1; }
+command -v python3 >/dev/null 2>&1 || { log "python3 is required"; exit 1; }
+command -v sha256sum >/dev/null 2>&1 || { log "sha256sum is required"; exit 1; }
+command -v spicetify >/dev/null 2>&1 || { log "spicetify is required"; exit 1; }
+[[ -f "$PREFS" && -d "$SPOTIFY_ROOT" ]] || { log "Spotify first login is not complete yet"; exit 2; }
+[[ -s "$SYSTEM_EXTENSION" ]] || { log "managed UI extension source is missing"; exit 1; }
+
+mkdir -p "$THEME_DIR" "$EXT_DIR" "$APP_ROOT"
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/devos-spotify.XXXXXX")"
+trap 'rm -rf -- "$tmp"' EXIT HUP INT TERM
+
+changed=0
+
+download() {
+    local url="$1" output="$2"
+    curl --fail --silent --show-error --location \
+        --proto '=https' --tlsv1.2 --connect-timeout 10 \
+        "$url" -o "$output"
+    [[ -s "$output" ]]
+}
+
+# Lucid is installed exactly as its current Marketplace manifest specifies:
+# user.css + color.ini + theme.js. The manifest/source identity is pinned here;
+# Lucid's hosted build remains upstream-owned.
+if [[ ! -s "$THEME_DIR/user.css" \
+    || ! -s "$THEME_DIR/color.ini" \
+    || ! -s "$THEME_DIR/theme.js" \
+    || ! -f "$THEME_DIR/.devos-upstream-revision" \
+    || "$(cat "$THEME_DIR/.devos-upstream-revision" 2>/dev/null || true)" != "$LUCID_PIN" ]]; then
+    log "installing Lucid"
+    download "$LUCID_BASE/user.css" "$tmp/lucid-user.css"
+    download "$LUCID_BASE/color.ini" "$tmp/lucid-color.ini"
+    download "$LUCID_BASE/theme.js" "$tmp/lucid-theme.js"
+    install -m644 "$tmp/lucid-user.css" "$THEME_DIR/user.css"
+    install -m644 "$tmp/lucid-color.ini" "$THEME_DIR/color.ini"
+    install -m644 "$tmp/lucid-theme.js" "$THEME_DIR/theme.js"
+    printf '%s\n' "$LUCID_PIN" > "$THEME_DIR/.devos-upstream-revision"
+    changed=1
+fi
+
+if [[ ! -f "$EXT_DIR/devos-clean-ui.js" ]] || ! cmp -s "$SYSTEM_EXTENSION" "$EXT_DIR/devos-clean-ui.js"; then
+    log "installing curated cleanup + wave progress extension"
+    install -m644 "$SYSTEM_EXTENSION" "$EXT_DIR/devos-clean-ui.js"
+    changed=1
+fi
+
+installed_iv="$(tr -d '[:space:]' < "$APP_DIR/version.txt" 2>/dev/null || true)"
+if [[ "$installed_iv" != "$IVLYRICS_VERSION" || ! -s "$APP_DIR/index.js" || ! -s "$APP_DIR/manifest.json" ]]; then
+    log "installing ivLyrics $IVLYRICS_VERSION"
+    download "$IVLYRICS_URL" "$tmp/ivLyrics.zip"
+    printf '%s  %s\n' "$IVLYRICS_SHA256" "$tmp/ivLyrics.zip" | sha256sum -c - >/dev/null
+    mkdir -p "$tmp/ivLyrics-extract"
+    python3 - "$tmp/ivLyrics.zip" "$tmp/ivLyrics-extract" <<'PY'
+from pathlib import Path
+import sys
+import zipfile
+
+archive = Path(sys.argv[1])
+out = Path(sys.argv[2]).resolve()
+with zipfile.ZipFile(archive) as zf:
+    for member in zf.infolist():
+        target = (out / member.filename).resolve()
+        if out not in target.parents and target != out:
+            raise SystemExit(f"unsafe zip member: {member.filename}")
+    zf.extractall(out)
+PY
+    extracted="$(find "$tmp/ivLyrics-extract" -maxdepth 1 -mindepth 1 -type d -print -quit)"
+    [[ -n "$extracted" && -s "$extracted/index.js" && -s "$extracted/manifest.json" ]] || {
+        log "ivLyrics archive layout is unexpected"
+        exit 1
+    }
+    rm -rf "$APP_DIR"
+    mv "$extracted" "$APP_DIR"
+    changed=1
+fi
+
+# Configure only this curated experience. Spicetify treats extensions and
+# custom_apps as additive fields, so unrelated user entries remain intact.
+needs_config=0
+if [[ ! -f "$CONFIG_FILE" ]] \
+    || ! grep -Eq '^current_theme[[:space:]]*=[[:space:]]*Lucid[[:space:]]*$' "$CONFIG_FILE" \
+    || ! grep -Eq '^color_scheme[[:space:]]*=[[:space:]]*dark[[:space:]]*$' "$CONFIG_FILE" \
+    || ! grep -Eq '^extensions[[:space:]]*=.*devos-clean-ui\.js' "$CONFIG_FILE" \
+    || ! grep -Eq '^custom_apps[[:space:]]*=.*ivLyrics' "$CONFIG_FILE"; then
+    needs_config=1
+fi
+
+spicetify config \
+    spotify_path "$SPOTIFY_ROOT" \
+    prefs_path "$PREFS" \
+    current_theme Lucid \
+    color_scheme dark \
+    inject_css 1 \
+    replace_colors 1 \
+    overwrite_assets 1 \
+    inject_theme_js 1 \
+    >/dev/null
+spicetify config extensions devos-clean-ui.js >/dev/null
+spicetify config custom_apps ivLyrics >/dev/null
+
+if ((needs_config)); then
+    changed=1
+fi
+
+if [[ "$APPLY" == true ]]; then
+    pkill -x spotify >/dev/null 2>&1 || true
+    spicetify apply >/dev/null
+    log "Lucid + ivLyrics + clean UI applied"
+elif ((changed)); then
+    log "experience prepared; next managed Spotify launch will apply it"
+fi

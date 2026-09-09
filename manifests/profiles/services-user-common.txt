@@ -1,4 +1,3 @@
-devos-spotify-theme.path
 gnome-keyring-daemon.socket
 pipewire-pulse.socket
 pipewire.socket

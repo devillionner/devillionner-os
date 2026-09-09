@@ -1,95 +1,90 @@
-# Adaptive Spotify
+# Spotify experience
 
-The Blueprint uses the official Arch `spotify-launcher` package together with `spicetify-cli`.
+Blueprint uses the Arch `spotify-launcher` package together with `spicetify-cli`, then prepares one curated desktop experience automatically after Spotify has created its normal `prefs` file.
 
-## Visual base: Bloom
+## Visual base: current Lucid
 
-Spotify now uses **Bloom** by `nimsandu/spicetify-bloom` as the visual/layout base, pinned to commit `654cfed682b94613b0029997ffafc1eadccc5bef`.
+The visual base is the **current Lucid** theme by `sanoojes/spicetify-lucid`, not the unmaintained `Lucid V2 (Legacy)` entry. Blueprint records the upstream manifest/source identity at commit `5c5bead49d5dad971e0bb38d64e7dee88463cf83` and installs the same three assets exposed by Lucid's Marketplace manifest: `user.css`, `color.ini` and `theme.js`.
 
-`devos-spotify-theme-bootstrap` downloads only Bloom's pinned `user.css` and `theme.js` into the Blueprint-owned `devillionner-bloom` theme directory. The former custom `text`-theme pane/frame override has been retired completely: Blueprint no longer redraws Spotify panel borders, labels or corner geometry.
+Lucid owns the main visual language. Blueprint applies a restrained preset rather than redrawing Lucid's panes:
 
-Bloom remains the visual owner; Blueprint owns only:
+- page mode: `default`;
+- panel gap: `0`;
+- player: default, non-floating, no auto-hide;
+- next-song card: enabled but non-floating;
+- library/right sidebar/global navigation: no auto-hide;
+- global navigation: non-floating;
+- colors: dynamic dark/tinted.
 
-- the exact upstream revision pin;
-- the generated Caelestia-adaptive `color.ini`;
-- the managed launcher/protocol integration;
-- Hyprland window policy;
-- live palette synchronization.
+The preset is stored through Lucid's own persisted `lucid:settings` state and is applied once by the managed extension.
 
-Bloom recommends the Segoe UI family. Blueprint deliberately does not redistribute or silently download Microsoft's font files. On Linux Bloom therefore uses its normal CSS fallback when Segoe UI is not already installed. Font choice can be revisited separately after the theme itself is validated on the real host.
+## Lyrics: ivLyrics
 
-Bloom requires CSS color replacement, asset overrides and its theme JavaScript. `devos-spotify` therefore selects:
+Blueprint installs **ivLyrics 6.6.13** as a Spicetify custom app. Its release ZIP is pinned by SHA-256:
 
-- `current_theme = devillionner-bloom`
-- `color_scheme = Devillionner`
-- `inject_css = 1`
-- `replace_colors = 1`
-- `overwrite_assets = 1`
-- `inject_theme_js = 1`
+`b3e77eaaf0f1d25276a009beefbfa30ab0478c9468712f8a96c7641f5ea2c476`
 
-## Caelestia colors
+The app provides the dedicated lyrics experience, including synchronized/karaoke-style presentation and its own fullscreen view. Optional AI translation remains optional and is not configured with a secret by Blueprint.
 
-`devos-spotify-theme-sync` reads `~/.config/hypr/scheme/current.lua`, the same Material palette consumed by the Hyprland/Caelestia configuration, and writes a Bloom-compatible `[Devillionner]` scheme.
+## Curated cleanup + playback detail
 
-The main mapping is:
+`devos-clean-ui.js` is the only Blueprint-owned Spotify visual extension. It deliberately stays narrow and layers on top of Lucid. The cleanup is based on the corresponding Spicetify Marketplace snippets at Marketplace revision `ec6f772891bad4bf08b645447c2ade6b06c4f991`.
 
-- Bloom `accent`, `button`, `button-active`, playback accent -> Caelestia `primary`
-- main background -> `surface`
-- player/card/elevated surfaces -> `surfaceContainer`
-- selected/disabled surfaces -> `surfaceContainerHigh`
-- contour/player border -> `outlineVariant`
-- text -> `onSurface`
-- secondary text -> `onSurfaceVariant`
-- notification -> `secondary`
-- error -> `error`
+It currently:
 
-`devos-spotify-theme.path` watches the Caelestia/Hypr scheme directory. When wallpaper-derived colors change, it rewrites Bloom's `color.ini`. Spotify is launched through `devos-spotify`, which keeps `spicetify watch -s` attached while Spotify is running, so the active client can hot-reload palette changes.
+- removes Popular shelves from Home;
+- hides Recently Played Home sections;
+- hides Podcasts and What's New buttons;
+- hides Mini Player and Spotify fullscreen buttons;
+- hides the album/playlist “Scroll through previews” action;
+- keeps the video action but makes it compact;
+- removes Artists/Credits cards from Now Playing while preserving queue/lyrics;
+- renders the playback progress as a thin repeating wave inspired by Caelestia;
+- places a pinned Oneko animation on the actual playback position.
 
-The restore rsync excludes `~/.config/caelestia/cli.json` from blind copying. One central `configure-caelestia-cli` merge owns both the Colloid-Dark theme key and the Spotify toggle while preserving unrelated Caelestia CLI settings. `configure-spotify` invokes that central owner when run standalone instead of parsing or rewriting `cli.json` itself.
+`Declutter now playing bar` is intentionally not stacked on top because the narrower sidebar cleanup already removes the unwanted pieces without deleting useful controls. Basify is also intentionally excluded because it is an artist/distributor trust-filtering extension, not part of the desired UI experience.
+
+## Automatic bootstrap
+
+`devos-spotify-experience` owns the experience setup. It:
+
+1. installs/refreshes Lucid assets;
+2. installs the Blueprint cleanup/wave extension;
+3. downloads and SHA-verifies pinned ivLyrics;
+4. configures Lucid + dark scheme + required Spicetify injection flags;
+5. adds `devos-clean-ui.js` and `ivLyrics` without deleting unrelated extension/custom-app entries.
+
+`configure-spotify` runs the helper with `--apply` when Spotify has already completed its first launch. The normal `devos-spotify` wrapper also runs the helper before `spicetify auto`, so a fresh system becomes configured automatically on the first managed launch after the initial sign-in.
+
+The old Blueprint Bloom bootstrap, Caelestia palette watcher, `spicetify watch -s`, remote-debugging port and custom pane/frame CSS are retired.
+
+## Desktop integration and Spotify Connect
+
+The desktop entry routes `%U` and `x-scheme-handler/spotify` through `devos-spotify`. The wrapper preserves the native Spotify client, so Spotify Connect behavior is not replaced by a third-party music backend.
+
+When a `spotify:` URI is opened while Spotify is already running, `devos-spotify` first uses MPRIS `OpenUri`. If MPRIS is unavailable, it falls back to `spotify-launcher`'s positional URI support.
+
+`devos-spotify` holds `~/.local/state/devillionner-os/spotify-wrapper.lock` with `flock` for the managed session, so repeated menu or `Super+M` launches do not create duplicate managed sessions.
+
+The desktop entry keeps upstream `StartupWMClass=spotify`. Blueprint accepts both `Spotify` and `spotify` classes plus the initial titles `Spotify` / `Spotify Free`; Hyprland's music-workspace rules and Caelestia's music toggle share that identity contract.
 
 ## Transparency
 
-Actual window transparency belongs to Hyprland, not the Spotify theme. Spotify uses the same Blueprint `windowOpacity = 0.95` policy as Dolphin, including fullscreen. Apps explicitly tagged `opaque` and games still opt out at 1.0.
-
-## Desktop integration and links
-
-The Blueprint shadows the stock `spotify-launcher.desktop`, but preserves `%U`, `TryExec` and `x-scheme-handler/spotify`, routing them through `devos-spotify`.
-
-The desktop entry keeps upstream `StartupWMClass=spotify` (lowercase). Runtime Spotify windows are not fully consistent across client/XWayland/Wayland modes, so Blueprint deliberately accepts both `Spotify` and `spotify` classes and then falls back to the initial titles `Spotify` / `Spotify Free`. Hyprland's `special:music` routing and Caelestia's music toggle share that identity contract.
-
-`configure-spotify` sets `x-scheme-handler/spotify=spotify-launcher.desktop` in `~/.config/mimeapps.list` while preserving unrelated MIME/browser defaults.
-
-When a `spotify:` URI is opened while Spotify is already running, `devos-spotify` first uses MPRIS `OpenUri`. If MPRIS is unavailable, it falls back to `spotify-launcher`'s native positional URI support.
-
-## Single managed launcher
-
-`devos-spotify` holds `~/.local/state/devillionner-os/spotify-wrapper.lock` with `flock` for the lifetime of the managed Spotify session. Repeated menu or `Super+M` launches therefore do not accumulate duplicate `spicetify watch -s` processes.
-
-A URI launch that races with startup waits for the first client to expose MPRIS; ordinary duplicate launches become no-ops.
+Window transparency remains a Hyprland policy rather than a theme hack. Spotify uses the same Blueprint `windowOpacity = 0.95` policy as Dolphin, including fullscreen; apps/games explicitly tagged opaque still opt out at `1.0`.
 
 ## First launch
 
-Spicetify requires Spotify to create `~/.config/spotify/prefs`. On a fresh system, the first `devos-spotify` launch opens vanilla Spotify. Sign in and leave it open for about a minute, then close and reopen. From the second launch onward `spicetify auto` handles backup/re-apply after Spotify updates and launches Bloom.
+Spicetify requires Spotify to create `~/.config/spotify/prefs`. On a fresh installation, the first managed launch opens vanilla Spotify so the user can sign in. Leave it open for roughly a minute. On the next managed launch, Lucid, ivLyrics and the curated extension are prepared automatically before Spicetify applies.
 
 ## Validation
 
-`check-spotify` verifies:
+`check-spotify` validates the installed wrapper/helper paths, Caelestia/Hyprland identity, URI routing, single-instance guard, retirement of legacy Bloom automation, Lucid assets/revision, ivLyrics version, managed extension identity and Spicetify selections.
 
-- the canonical system launcher and user-local shim;
-- Caelestia/Hyprland Spotify identity aliases;
-- real `spotify:` protocol routing;
-- the single-wrapper guard;
-- pinned Bloom `user.css` + `theme.js`;
-- exact Bloom upstream revision;
-- retirement of the old custom pane/frame CSS;
-- Bloom-compatible adaptive `color.ini`;
-- palette watcher;
-- Bloom theme, scheme, asset override and `theme.js` Spicetify settings.
-
-Validate with:
+`check-spotify-wrapper-source` validates the same architecture at repository level, including exact ivLyrics release hash and representative cleanup/wave/Oneko source contracts.
 
 ```bash
 bash scripts/check-spotify
+bash scripts/check-spotify-wrapper-source
 ```
 
-A green source/runtime check does not replace visual validation after a Spotify/Bloom update. Bloom is third-party UI code and Spotify updates frequently, so the physical-host visual test remains part of the acceptance gate.
+Source/CI validation does not prove that Spotify's current DOM still renders every third-party selector perfectly. A real full-window physical-host screenshot/playback test remains the final visual acceptance gate after Spotify, Lucid or ivLyrics updates.
