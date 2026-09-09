@@ -43,6 +43,24 @@ for index in "$HOME/.icons/default/index.theme" "$HOME/.local/share/icons/defaul
         || fail "$label cursor fallback differs"
 done
 
+# The login commands use variables.lua to overwrite the session cursor.
+if python3 - "$HOME/.config/hypr/variables.lua" "$THEME" "$SIZE" <<'PY'
+from pathlib import Path
+import re
+import sys
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8") if path.exists() else ""
+themes = re.findall(r'(?m)^\s*cursorTheme\s*=\s*"([^"]*)"', text)
+sizes = re.findall(r'(?m)^\s*cursorSize\s*=\s*(\d+)', text)
+if themes != [sys.argv[2]] or sizes != [sys.argv[3]]:
+    raise SystemExit("Hyprland login cursor variables differ")
+PY
+then
+    ok "Hyprland login cursor: $THEME ($SIZE)"
+else
+    fail "Hyprland login can override the managed cursor"
+fi
+
 if command -v gsettings >/dev/null 2>&1 \
     && gsettings list-schemas 2>/dev/null | grep -qx 'org.gnome.desktop.interface'; then
     GTK_THEME="$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null | tr -d "'" || true)"

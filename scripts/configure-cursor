@@ -40,6 +40,17 @@ theme = sys.argv[1]
 size = sys.argv[2]
 home = Path.home()
 
+# Hyprland startup reads these values and writes them back to GSettings.
+# Merge only cursor keys so a targeted apply preserves all other preferences.
+variables = home / ".config/hypr/variables.lua"
+if variables.exists():
+    text = variables.read_text(encoding="utf-8")
+    text, themes = re.subn(r'(?m)^(\s*cursorTheme\s*=\s*)"[^"]*"', lambda m: m[1] + f'"{theme}"', text)
+    text, sizes = re.subn(r"(?m)^(\s*cursorSize\s*=\s*)\d+", lambda m: m[1] + size, text)
+    if themes != 1 or sizes != 1:
+        raise SystemExit("Hyprland cursor variables are missing or ambiguous")
+    variables.write_text(text, encoding="utf-8")
+
 
 def set_ini_values(path: Path, section: str, values: dict[str, str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
