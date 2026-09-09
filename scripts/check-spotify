@@ -10,18 +10,29 @@ printf '========================================\n'
 printf '       Spotify integration check\n'
 printf '========================================\n'
 
-for cmd in spotify-launcher spicetify devos-spotify flock; do
+for cmd in spotify-launcher spicetify devos-spotify devos-spotify-experience flock; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
 
 SYSTEM_LAUNCHER="/usr/local/bin/devos-spotify"
 USER_LAUNCHER="$HOME/.local/bin/devos-spotify"
-if [[ -x "$SYSTEM_LAUNCHER" ]]; then ok "system Spotify wrapper installed"; else fail "system Spotify wrapper missing"; fi
+SYSTEM_EXPERIENCE="/usr/local/bin/devos-spotify-experience"
+USER_EXPERIENCE="$HOME/.local/bin/devos-spotify-experience"
+SYSTEM_UI="/usr/local/share/devos/spotify/devos-clean-ui.js"
+
+[[ -x "$SYSTEM_LAUNCHER" ]] && ok "system Spotify wrapper installed" || fail "system Spotify wrapper missing"
 if [[ -L "$USER_LAUNCHER" ]] && [[ "$(readlink -f "$USER_LAUNCHER" 2>/dev/null || true)" == "$SYSTEM_LAUNCHER" ]]; then
     ok "user-local Spotify shim points to system wrapper"
 else
     fail "user-local Spotify wrapper may shadow the system launcher"
 fi
+[[ -x "$SYSTEM_EXPERIENCE" ]] && ok "Spotify experience helper installed" || fail "Spotify experience helper missing"
+if [[ -L "$USER_EXPERIENCE" ]] && [[ "$(readlink -f "$USER_EXPERIENCE" 2>/dev/null || true)" == "$SYSTEM_EXPERIENCE" ]]; then
+    ok "user-local experience shim points to system helper"
+else
+    fail "user-local Spotify experience helper differs"
+fi
+[[ -s "$SYSTEM_UI" ]] && ok "curated Spotify UI extension installed" || fail "curated Spotify UI extension missing"
 
 DESKTOP="$HOME/.local/share/applications/spotify-launcher.desktop"
 [[ -f "$DESKTOP" ]] && ok ".local/share/applications/spotify-launcher.desktop" || fail "managed Spotify desktop entry missing"
@@ -72,13 +83,13 @@ fi
 
 if grep -Fq 'spotify-wrapper.lock' "$SYSTEM_LAUNCHER" 2>/dev/null \
     && grep -Fq 'exec 9>"$LOCK"' "$SYSTEM_LAUNCHER" 2>/dev/null \
-    && grep -Fq 'flock -n 9' "$SYSTEM_LAUNCHER" 2>/dev/null; then
-    ok "single managed Spotify wrapper enforced"
+    && grep -Fq 'flock -n 9' "$SYSTEM_LAUNCHER" 2>/dev/null \
+    && grep -Fq 'devos-spotify-experience' "$SYSTEM_LAUNCHER" 2>/dev/null; then
+    ok "single managed wrapper auto-prepares the Spotify experience"
 else
-    fail "Spotify single-instance guard incomplete"
+    fail "Spotify wrapper lifecycle/experience hook incomplete"
 fi
 
-# Theme ownership boundary: Blueprint must not keep historical theme automation.
 legacy=0
 for path in \
     "$HOME/.local/bin/devos-spotify-theme-bootstrap" \
@@ -89,28 +100,58 @@ for path in \
     "$HOME/.config/spicetify/Themes/devillionner-bloom"; do
     [[ -e "$path" || -L "$path" ]] && legacy=$((legacy + 1))
 done
-if ((legacy == 0)); then ok "Blueprint theme automation retired; Marketplace/user themes are untouched"; else fail "$legacy legacy Blueprint Spotify theme artifact(s) remain"; fi
+if ((legacy == 0)); then ok "legacy Blueprint Bloom automation retired"; else fail "$legacy legacy Blueprint Spotify artifact(s) remain"; fi
 
 if systemctl --user is-enabled devos-spotify-theme.path >/dev/null 2>&1; then
     fail "legacy Spotify palette watcher still enabled"
 else
-    ok "no Blueprint theme watcher enabled"
+    ok "no legacy Spotify palette watcher enabled"
 fi
 
 PREFS="$HOME/.config/spotify/prefs"
 CFG="$HOME/.config/spicetify/config-xpui.ini"
+THEME="$HOME/.config/spicetify/Themes/Lucid"
+USER_UI="$HOME/.config/spicetify/Extensions/devos-clean-ui.js"
+IVLYRICS="$HOME/.config/spicetify/CustomApps/ivLyrics"
+
 if [[ -f "$PREFS" ]]; then
     ok "Spotify prefs exist"
-    if [[ -f "$CFG" ]]; then
-        theme="$(sed -n 's/^current_theme[[:space:]]*=[[:space:]]*//p' "$CFG" | tail -n1)"
-        scheme="$(sed -n 's/^color_scheme[[:space:]]*=[[:space:]]*//p' "$CFG" | tail -n1)"
-        [[ -n "$theme" ]] && ok "user-selected Spicetify theme: $theme" || warn "no custom Spicetify theme selected yet"
-        [[ -n "$scheme" ]] && ok "user-selected color scheme: $scheme" || true
+
+    if [[ -s "$THEME/user.css" && -s "$THEME/color.ini" && -s "$THEME/theme.js" ]] \
+        && [[ "$(cat "$THEME/.devos-upstream-revision" 2>/dev/null || true)" == "5c5bead49d5dad971e0bb38d64e7dee88463cf83" ]]; then
+        ok "current Lucid theme assets installed from pinned manifest identity"
     else
-        warn "Spicetify config not generated yet"
+        fail "Lucid theme assets/revision incomplete"
+    fi
+
+    if [[ -s "$IVLYRICS/index.js" && -s "$IVLYRICS/manifest.json" ]] \
+        && [[ "$(tr -d '[:space:]' < "$IVLYRICS/version.txt" 2>/dev/null || true)" == "6.6.13" ]]; then
+        ok "ivLyrics 6.6.13 installed"
+    else
+        fail "ivLyrics installation/version incomplete"
+    fi
+
+    if [[ -s "$USER_UI" ]] && cmp -s "$SYSTEM_UI" "$USER_UI"; then
+        ok "curated cleanup/wave/Oneko extension matches Blueprint"
+    else
+        fail "curated Spotify UI extension differs"
+    fi
+
+    if [[ -f "$CFG" ]] \
+        && grep -Eq '^current_theme[[:space:]]*=[[:space:]]*Lucid[[:space:]]*$' "$CFG" \
+        && grep -Eq '^color_scheme[[:space:]]*=[[:space:]]*dark[[:space:]]*$' "$CFG" \
+        && grep -Eq '^extensions[[:space:]]*=.*devos-clean-ui\.js' "$CFG" \
+        && grep -Eq '^custom_apps[[:space:]]*=.*ivLyrics' "$CFG" \
+        && grep -Eq '^inject_css[[:space:]]*=[[:space:]]*1[[:space:]]*$' "$CFG" \
+        && grep -Eq '^replace_colors[[:space:]]*=[[:space:]]*1[[:space:]]*$' "$CFG" \
+        && grep -Eq '^overwrite_assets[[:space:]]*=[[:space:]]*1[[:space:]]*$' "$CFG" \
+        && grep -Eq '^inject_theme_js[[:space:]]*=[[:space:]]*1[[:space:]]*$' "$CFG"; then
+        ok "Lucid + ivLyrics + curated extension selected"
+    else
+        fail "Spicetify curated experience configuration incomplete"
     fi
 else
-    warn "first Spotify login is still required before Spicetify themes can apply"
+    warn "first Spotify login is still required; experience will bootstrap on next managed launch"
 fi
 
 printf '\n========================================\n'
