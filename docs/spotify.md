@@ -88,3 +88,8 @@ bash scripts/check-spotify-wrapper-source
 ```
 
 Source/CI validation does not prove that Spotify's current DOM still renders every third-party selector perfectly. A real full-window physical-host screenshot/playback test remains the final visual acceptance gate after Spotify, Lucid or ivLyrics updates.
+
+
+## Native Wayland launcher
+
+Blueprint manages `~/.config/spotify-launcher.conf` with `UseOzonePlatform` and `--ozone-platform=wayland`. The user-level config takes precedence over `/etc/spotify-launcher.conf`, so Blueprint keeps Spotify on the tested native Wayland GPU path without editing the distribution-owned `/etc` file.
