@@ -72,8 +72,10 @@ if grep -Fq 'org.mpris.MediaPlayer2.Player' "$LAUNCHER" \
     && grep -Fq 'spotify-wrapper.lock' "$LAUNCHER" \
     && grep -Fq 'flock -n 9' "$LAUNCHER" \
     && grep -Fq 'devos-spotify-experience' "$LAUNCHER" \
-    && grep -Fq 'spicetify -q auto' "$LAUNCHER"; then
-    ok "wrapper preserves URI routing, single-instance guard and automatic experience apply"
+    && grep -Fq 'spicetify -q auto' "$LAUNCHER" \
+    && grep -Fq 'if ! pgrep -x spotify >/dev/null 2>&1; then' "$LAUNCHER" \
+    && grep -Fq 'launch_vanilla' "$LAUNCHER"; then
+    ok "wrapper preserves URI routing, single-instance guard, automatic experience apply and post-Spicetify launch fallback"
 else
     fail "Spotify wrapper lifecycle contract differs"
 fi
