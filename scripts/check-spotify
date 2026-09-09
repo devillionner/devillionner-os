@@ -12,7 +12,7 @@ printf '========================================\n'
 printf '       Spotify integration check\n'
 printf '========================================\n'
 
-for cmd in spotify-launcher spicetify devos-spotify devos-spotify-experience flock; do
+for cmd in spotify-launcher spicetify devos-spotify devos-spotify-experience flock sha256sum; do
     command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
 done
 
@@ -25,6 +25,9 @@ SOURCE_LAUNCHER="$REPO/dotfiles/.local/bin/devos-spotify"
 SOURCE_EXPERIENCE="$REPO/dotfiles/.local/bin/devos-spotify-experience"
 SOURCE_UI="$REPO/dotfiles/.config/spicetify/Extensions/devos-clean-ui.js"
 LAUNCHER_CONFIG="$HOME/.config/spotify-launcher.conf"
+LUCID_USER_CSS_SHA256="ef437d56022bae8cbec03ce66368b986075d38e541b4fe33c954f7980075a9ba"
+LUCID_COLOR_INI_SHA256="895c5504ed47bc8d2dac7b30ec60b7b041afc8ecc71d376446fa6ac9faa57159"
+LUCID_THEME_JS_SHA256="f86649f9da821bac1b2a8d1632b66b0d2a6504da47eebdcb84c31ae09498c511"
 
 [[ -x "$SYSTEM_LAUNCHER" ]] && ok "system Spotify wrapper installed" || fail "system Spotify wrapper missing"
 if [[ -x "$SYSTEM_LAUNCHER" && -f "$SOURCE_LAUNCHER" ]] && cmp -s "$SOURCE_LAUNCHER" "$SYSTEM_LAUNCHER"; then
@@ -157,10 +160,13 @@ if [[ -f "$PREFS" ]]; then
     ok "Spotify prefs exist"
 
     if [[ -s "$THEME/user.css" && -s "$THEME/color.ini" && -s "$THEME/theme.js" ]] \
-        && [[ "$(cat "$THEME/.devos-upstream-revision" 2>/dev/null || true)" == "5c5bead49d5dad971e0bb38d64e7dee88463cf83" ]]; then
-        ok "current Lucid theme assets installed from pinned manifest identity"
+        && [[ "$(cat "$THEME/.devos-upstream-revision" 2>/dev/null || true)" == "5c5bead49d5dad971e0bb38d64e7dee88463cf83" ]] \
+        && [[ "$(sha256sum "$THEME/user.css" | awk '{print $1}')" == "$LUCID_USER_CSS_SHA256" ]] \
+        && [[ "$(sha256sum "$THEME/color.ini" | awk '{print $1}')" == "$LUCID_COLOR_INI_SHA256" ]] \
+        && [[ "$(sha256sum "$THEME/theme.js" | awk '{print $1}')" == "$LUCID_THEME_JS_SHA256" ]]; then
+        ok "Lucid theme assets match the pinned physical-host build"
     else
-        fail "Lucid theme assets/revision incomplete"
+        fail "Lucid theme assets/revision/checksums differ"
     fi
 
     if [[ -s "$IVLYRICS/index.js" && -s "$IVLYRICS/manifest.json" ]] \
