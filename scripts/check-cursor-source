@@ -42,4 +42,17 @@ grep -Fq '"$REPO/scripts/configure-cursor"' "$RESTORE" \
 grep -Fq '$REPO/scripts/check-cursor' "$AGG" \
     || fail "aggregate runtime check does not include cursor validation"
 
+python3 - "$REPO/dotfiles/.config/hypr/variables.lua" <<'PY'
+from pathlib import Path
+import re
+import sys
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+assert re.findall(r'(?m)^\s*cursorTheme\s*=\s*"([^"]*)"', text) == ["Bibata-Modern-Ice"]
+assert re.findall(r'(?m)^\s*cursorSize\s*=\s*(\d+)', text) == ["24"]
+PY
+
+grep -Fq 'variables.write_text' "$CONFIG" \
+    && grep -Fq 'Hyprland login cursor' "$CHECK" \
+    || fail "Hyprland login cursor policy is not managed and validated"
+
 printf 'Cursor source contract: PASS\n'
