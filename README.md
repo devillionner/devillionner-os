@@ -40,7 +40,7 @@ The installer has four first-class profiles:
 
 All four profiles use **Dolphin** as the single file manager with the **Colloid-Dark** icon theme. `Super+E` opens Dolphin; JPEG, PNG and WEBP open in Swappy.
 
-All four profiles also include **Spotify + Spicetify** with a pinned **Bloom** visual base. Bloom owns the Spotify UI/layout; Blueprint only supplies the wallpaper-derived Caelestia color scheme, managed launcher/protocol behavior and the same `0.95` compositor opacity as Dolphin. `Super+M` opens the managed Spotify launcher.
+All four profiles also include **Spotify + Spicetify** with a curated **Lucid** experience: Lucid owns the main visual language, **ivLyrics** provides the lyrics view, and a small Blueprint extension removes unwanted Spotify chrome while adding a Caelestia-style wave progress bar with Oneko. `Super+M`, `spotify:` links, Spotify Connect and the managed single-instance launcher remain intact.
 
 The common cursor is **Bibata Modern Ice** at 24 px, managed across XCursor, GTK and session environment with an XCursor fallback for Hyprland/XWayland consumers.
 
@@ -117,7 +117,7 @@ See:
 - [Caelestia configuration policy](docs/caelestia.md)
 - [Quickshell ABI recovery](docs/quickshell.md)
 - [Dolphin file manager](docs/dolphin.md)
-- [Adaptive Spotify](docs/spotify.md)
+- [Spotify experience](docs/spotify.md)
 - [TV Cast / Miracast](docs/tv-cast.md)
 - [Virtual machines](docs/virtualization.md)
 - [Recovery points](docs/recovery.md)
@@ -133,7 +133,7 @@ See:
 - Dolphin is the single default file manager; Thunar is not part of the active manifests.
 - SDDM is the common login/display manager baseline; login-screen styling is a separate UX task.
 - Caelestia `shell.json` and `cli.json` are merge-managed so Blueprint-owned defaults can be updated without deleting unrelated user settings.
-- Spotify uses the official Arch `spotify-launcher` plus Spicetify with pinned upstream **Bloom** UI code and a Blueprint-generated Caelestia-adaptive Bloom color scheme; Blueprint no longer patches Spotify pane geometry.
+- Spotify uses the Arch `spotify-launcher` plus Spicetify, current Lucid, pinned ivLyrics and one narrowly scoped Blueprint extension for cleanup + wave progress/Oneko. The old Bloom palette watcher and custom pane geometry are retired.
 - Normal desktop translucency remains `0.95` in fullscreen; explicitly opaque apps and games opt out at `1.0`.
 - Bibata Modern Ice at 24 px is the common cursor; Colloid-Dark remains the common icon theme.
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
