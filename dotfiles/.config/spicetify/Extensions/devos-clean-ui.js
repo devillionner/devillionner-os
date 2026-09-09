@@ -1,7 +1,7 @@
 (() => {
     const STYLE_ID = "devos-spotify-clean-ui";
     const LUCID_KEY = "lucid:settings";
-    const LUCID_MARKER = "devos:lucid-preset-v1";
+    const LUCID_MARKER = "devos:lucid-preset-v4";
     const RELOAD_GUARD = "devos:lucid-preset-reload-v1";
 
     const css = String.raw`
@@ -10,7 +10,7 @@
  * Cleanup selectors are curated from Spicetify Marketplace snippets
  * (spicetify/marketplace @ ec6f772891bad4bf08b645447c2ade6b06c4f991).
  * Lucid owns the main visual language; this layer only removes clutter and
- * adds the Caelestia-style wave progress + Oneko progress companion.
+ * adds Oneko as a progress companion without overriding Lucid's progress geometry.
  */
 
 /* Remove Popular shelves from Home. */
@@ -75,50 +75,25 @@ button:has(path[d='M16 2.45c0-.8-.65-1.45-1.45-1.45H1.45C.65 1 0 1.65 0 2.45v11.
     display: none !important;
 }
 
-/* Caelestia-style wave progress bar. */
-.player-controls .playback-progressbar {
-    position: relative !important;
-    overflow: visible !important;
-}
-.player-controls .playback-progressbar .x-progressBar-progressBarBg,
-.player-controls .playback-progressbar .x-progressBar-fillColor,
-.playback-bar .x-progressBar-progressBarBg,
-.playback-bar .x-progressBar-fillColor {
-    height: 10px !important;
-    border-radius: 0 !important;
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 10'%3E%3Cpath d='M0 5 C4.5 1 4.5 1 9 5 S13.5 9 18 5 S22.5 1 27 5 S31.5 9 36 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
-    -webkit-mask-repeat: repeat-x;
-    -webkit-mask-position: left center;
-    -webkit-mask-size: 36px 10px;
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 10'%3E%3Cpath d='M0 5 C4.5 1 4.5 1 9 5 S13.5 9 18 5 S22.5 1 27 5 S31.5 9 36 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
-    mask-repeat: repeat-x;
-    mask-position: left center;
-    mask-size: 36px 10px;
-}
-.player-controls .playback-progressbar .x-progressBar-progressBarBg,
-.playback-bar .x-progressBar-progressBarBg {
-    background: rgba(var(--spice-rgb-text), 0.18) !important;
-}
-.player-controls .playback-progressbar .x-progressBar-fillColor,
-.playback-bar .x-progressBar-fillColor {
-    background: var(--spice-button-active, var(--spice-accent)) !important;
-}
+/* Keep Spotify/Lucid's native progress geometry so elapsed fill remains exact.
+ * The pet is anchored to Spotify's own slider, so it cannot drift from playback.
+ */
 .player-controls .playback-progressbar .progress-bar__slider,
 .playback-bar .progress-bar__slider {
-    width: 10px !important;
-    height: 10px !important;
-    box-shadow: 0 0 0 2px rgba(var(--spice-rgb-main), 0.7), 0 0 12px rgba(var(--spice-rgb-button-active), 0.35) !important;
+    position: relative !important;
+    opacity: 1 !important;
+    width: 8px !important;
+    height: 8px !important;
 }
-
-/* Oneko follows the actual playback position instead of sitting at a fixed edge. */
-.player-controls .playback-progressbar::after {
+.player-controls .playback-progressbar .progress-bar__slider::after,
+.playback-bar .progress-bar__slider::after {
     content: '';
+    position: absolute;
     width: 32px;
     height: 32px;
-    bottom: calc(100% - 7px);
-    left: clamp(16px, var(--devos-spotify-progress, 0%), calc(100% - 16px));
+    left: 50%;
+    bottom: 5px;
     transform: translateX(-50%);
-    position: absolute;
     image-rendering: pixelated;
     background-image: url('https://raw.githubusercontent.com/adryd325/oneko.js/14bab15a755d0e35cd4ae19c931d96d306f99f42/oneko.gif');
     pointer-events: none;
@@ -137,23 +112,6 @@ button:has(path[d='M16 2.45c0-.8-.65-1.45-1.45-1.45H1.45C.65 1 0 1.65 0 2.45v11.
         style.id = STYLE_ID;
         style.textContent = css;
         document.documentElement.appendChild(style);
-    }
-
-    function updateProgress() {
-        try {
-            const fraction = Number(Spicetify?.Player?.getProgressPercent?.());
-            const pct = Number.isFinite(fraction) ? Math.max(0, Math.min(1, fraction)) * 100 : 0;
-            document.documentElement.style.setProperty("--devos-spotify-progress", `${pct}%`);
-        } catch {}
-    }
-
-    function startProgressTracking() {
-        updateProgress();
-        try {
-            Spicetify.Player.addEventListener("onprogress", updateProgress);
-            Spicetify.Player.addEventListener("songchange", updateProgress);
-            Spicetify.Player.addEventListener("onplaypause", updateProgress);
-        } catch {}
     }
 
     function applyLucidPreset() {
@@ -186,7 +144,7 @@ button:has(path[d='M16 2.45c0-.8-.65-1.45-1.45-1.45H1.45C.65 1 0 1.65 0 2.45v11.
                 isFloating: false,
                 nextSongCard: {
                     ...(state.player?.nextSongCard || {}),
-                    show: true,
+                    show: false,
                     isFloating: false,
                 },
             };
@@ -225,7 +183,6 @@ button:has(path[d='M16 2.45c0-.8-.65-1.45-1.45-1.45H1.45C.65 1 0 1.65 0 2.45v11.
 
     function boot() {
         installStyle();
-        startProgressTracking();
         applyLucidPreset();
     }
 
