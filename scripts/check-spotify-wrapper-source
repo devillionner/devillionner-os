@@ -82,14 +82,16 @@ else
 fi
 
 if grep -Fq 'lucid:settings' "$UI" \
-    && grep -Fq 'getProgressPercent' "$UI" \
-    && grep -Fq 'mask-image:' "$UI" \
+    && grep -Fq 'progress-bar__slider::after' "$UI" \
+    && grep -Fq 'show: false' "$UI" \
     && grep -Fq 'adryd325/oneko.js/14bab15a755d0e35cd4ae19c931d96d306f99f42/oneko.gif' "$UI" \
     && grep -Fq "button[aria-label='Podcasts']" "$UI" \
     && grep -Fq 'fullscreen-mode-button' "$UI" \
     && grep -Fq 'main-actionBar-exploreButton' "$UI" \
-    && grep -Fq 'main-nowPlayingView-section:not(.main-nowPlayingView-queue):not(.lyrics-npv-card)' "$UI"; then
-    ok "curated cleanup, Lucid preset, wave progress and Oneko are source-managed"
+    && grep -Fq 'main-nowPlayingView-section:not(.main-nowPlayingView-queue):not(.lyrics-npv-card)' "$UI" \
+    && ! grep -Fq 'mask-image:' "$UI" \
+    && ! grep -Fq 'getProgressPercent' "$UI"; then
+    ok "curated cleanup, Lucid preset, exact native progress and Oneko are source-managed"
 else
     fail "curated Spotify UI extension contract differs"
 fi
