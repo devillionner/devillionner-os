@@ -23,7 +23,7 @@ The root and home snapshots are created sequentially, so this is a recovery poin
 Inspect a recorded bundle before recovery:
 
 ```bash
-sudo python3 /usr/local/share/devos/recovery.py verify /path/to/manifest.json
+sudo python3 /path/to/Blueprint/scripts/lib/recovery.py verify /path/to/manifest.json
 sudo snapper -c root list
 ```
 
