@@ -25,7 +25,7 @@ This file records **what has actually been exercised**. A green source/CI check 
 | Quickshell runtime / ABI check | ✅ | ✅ | ⏳ | ⏳ | `check-quickshell` passed on the existing host. A deliberate real Qt-update rebuild exercise is still pending. |
 | Caelestia merge policy + package patches | ✅ | ✅ | ⏳ | ⏳ | `check-caelestia` passed after applying the managed settings and QML patches on the existing host. |
 | Dolphin | ✅ | ✅ | ⏳ | ⏳ | After clone-less targeted apply, `check-dolphin`: 30 OK, 0 FAIL; global previews are enabled and only legacy Thunar remains as a warning. |
-| Spotify integration | ✅ Bloom source | ⚠️ previous text-theme runtime / Bloom retest pending | ⏳ | ⏳ | Launcher, playback, `Super+M`, URI routing and wallpaper-driven recolor were exercised with the previous text-theme implementation. Blueprint now uses pinned Bloom UI code and has retired the custom pane/frame CSS; Bloom must be applied and visually/runtime-validated on the host before this row returns to ✅. |
+| Spotify integration | ⏳ new Lucid stack CI pending | ⚠️ clean Spotify + Spicetify base ready; curated stack not yet applied | ⏳ | ⏳ | The host has a clean Spotify + Spicetify base. The current branch replaces the old Bloom watcher with current Lucid, pinned ivLyrics 6.6.13, curated cleanup, wave progress and Oneko while preserving `Super+M`, URI routing and Spotify Connect. Source CI and real full-window runtime validation are still required before this row returns to ✅. |
 | Bibata Modern Ice cursor | ✅ | ✅ config/runtime | ⏳ | ⏳ | After clone-less targeted apply, `check-cursor`: 10 OK, 0 FAIL including GSettings. A logout/login visual check is still needed for compositor-side XCursor refresh. |
 | TV Cast / Miracast | ✅ current three-mode source | ✅ component contract; TV retest pending | ⏳ | ⏳ | The current installed host now passes the exact 1080p30/8 Mbps, 720p60/8 Mbps and Low Latency 720p30/5 Mbps runtime contract. Actual casting through all three modes against the physical Miracast TV still needs a retest. |
 | Full aggregate `devos-blueprint check` | ✅ contract | ⚠️ 5 FAIL remain | ⏳ | ⏳ | Clone-less aggregate now reaches the live host correctly. Remaining failures are deliberate/unresolved host drift: keyboard policy, profile-dependent package identity, SDDM package/display-manager state and the corresponding SDDM service check. |
@@ -40,7 +40,7 @@ Legend: ✅ exercised at that level · ⚠️ useful evidence/current migration 
 
 ## Next validation order
 
-1. Apply the new pinned Bloom Spotify component on the physical host and visually/runtime-validate launch, playback, `Super+M`, URI routing, single-instance behavior and Caelestia recolor.
+1. Finish repository CI for the new Lucid + ivLyrics Spotify stack, then apply it on the existing host and visually/runtime-validate launch, playback, `Super+M`, URI routing, single-instance behavior, Spotify Connect, lyrics, cleanup selectors, wave progress and Oneko.
 2. Decide the intended identity of the current physical host (likely candidate: Gaming), then run an explicit non-mutating `devos-blueprint check --profile <profile>` before recording profile state.
 3. Resolve the intended `EN ↔ UA` keyboard layout/switch policy on the existing host.
 4. Keep the current GDM host unchanged until SDDM has passed a clean-KVM install + reboot; only then consider an explicit live-host migration.
