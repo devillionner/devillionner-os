@@ -25,35 +25,39 @@ This file records **what has actually been exercised**. A green source/CI check 
 | Quickshell runtime / ABI check | ✅ | ✅ | ⏳ | ⏳ | `check-quickshell` passed on the existing host. A deliberate real Qt-update rebuild exercise is still pending. |
 | Caelestia merge policy + package patches | ✅ | ✅ | ⏳ | ⏳ | `check-caelestia` passed after applying the managed settings and QML patches on the existing host. |
 | Dolphin | ✅ | ✅ | ⏳ | ⏳ | After clone-less targeted apply, `check-dolphin`: 30 OK, 0 FAIL; global previews are enabled and only legacy Thunar remains as a warning. |
-| Spotify integration | ⏳ new Lucid stack CI pending | ⚠️ clean Spotify + Spicetify base ready; curated stack not yet applied | ⏳ | ⏳ | The host has a clean Spotify + Spicetify base. The current branch replaces the old Bloom watcher with current Lucid, pinned ivLyrics 6.6.13, curated cleanup, wave progress and Oneko while preserving `Super+M`, URI routing and Spotify Connect. Source CI and real full-window runtime validation are still required before this row returns to ✅. |
-| Bibata Modern Ice cursor | ✅ | ✅ config/runtime | ⏳ | ⏳ | After clone-less targeted apply, `check-cursor`: 10 OK, 0 FAIL including GSettings. A logout/login visual check is still needed for compositor-side XCursor refresh. |
+| Spotify integration | ✅ | ✅ configuration / live Wayland window | ⏳ | ⏳ | Lucid dynamic colors, ivLyrics 6.6.13, native progress and Oneko are merged. Existing-host check: 30 OK / 0 FAIL; system and user UI bytes match canonical source. No fresh-install claim. |
+| Bibata Modern Ice cursor | ✅ | ✅ config/runtime | ⏳ | ⏳ | PR #51 fixes the sweet-cursors login override in variables.lua. Canonical targeted apply and check: 11 OK / 0 FAIL / 1 pending-login warning. Actual logout/login visual validation remains pending. |
 | TV Cast / Miracast | ✅ current three-mode source | ✅ component contract; TV retest pending | ⏳ | ⏳ | The current installed host now passes the exact 1080p30/8 Mbps, 720p60/8 Mbps and Low Latency 720p30/5 Mbps runtime contract. Actual casting through all three modes against the physical Miracast TV still needs a retest. |
-| Full aggregate `devos-blueprint check` | ✅ contract | ⚠️ 5 FAIL remain | ⏳ | ⏳ | Clone-less aggregate now reaches the live host correctly. Remaining failures are deliberate/unresolved host drift: keyboard policy, profile-dependent package identity, SDDM package/display-manager state and the corresponding SDDM service check. |
+| Full aggregate `devos-blueprint check` | ✅ contract | ⚠️ 5 FAIL remain | ⏳ | ⏳ | Explicit Gaming audit: SDDM package, display-manager and service failures; darkly manifest package replaced locally by darkly-bin without a Provides declaration; missing Dolphin global preview state. Keyboard and saved Gaming identity now pass. |
 | Gaming profile install | ✅ source wiring | — | ⏳ | ⏳ | Fresh KVM must prove virtualization defaults off, reboot, and aggregate PASS. |
-| Work profile install | ✅ source wiring | partial migration only | ⏳ | ⏳ | Current host has no saved profile state; the fallback Work check should not be treated as proof that this physical system is intended to be Work. |
+| Work profile install | ✅ source wiring | — | ⏳ | ⏳ | Existing host is explicitly Gaming, not Work. Work clean install remains pending. |
 | Laboratory / Dev profile install | ✅ source wiring | — | ⏳ | ⏳ | Clean KVM must prove virtualization defaults on and the nested-KVM limitation is reported honestly if present. |
 | University / Uni profile install | ✅ source wiring | — | ⏳ | ⏳ | Distinct University identity is wired with virtualization off by default. University-specific apps are intentionally not guessed before the real study workflow is defined. |
-| Recovery checkpoint / rollback | ✅ source wiring | ✅ record / ⏳ rollback | ⏳ | ⏳ | `devos-blueprint check` now confirms a Blueprint pre-restore recovery-point record exists on the host. A real usable rollback is still unverified. |
+| Recovery checkpoint / rollback | ✅ root-only source wiring | ⚠️ record only / home uncovered | ⏳ | ⏳ | Host records snapper:223; existence remains unverified without privileged access. Root is /@ and home is separate /@home. Root-only snapshots do not protect home dotfiles; coordinated coverage and real rollback usability remain required. |
 | Virtualization + accelerated Linux guest | ✅ source wiring | ⏳ | ⏳ | ⏳ | Physical `/dev/kvm`, libvirt runtime and virtio/virgl vs `llvmpipe` remain pending. |
 
 Legend: ✅ exercised at that level · ⚠️ useful evidence/current migration drift remains · ⏳ pending · — not applicable/not attempted.
 
 ## Next validation order
 
-1. Finish repository CI for the new Lucid + ivLyrics Spotify stack, then apply it on the existing host and visually/runtime-validate launch, playback, `Super+M`, URI routing, single-instance behavior, Spotify Connect, lyrics, cleanup selectors, wave progress and Oneko.
-2. Decide the intended identity of the current physical host (likely candidate: Gaming), then run an explicit non-mutating `devos-blueprint check --profile <profile>` before recording profile state.
-3. Resolve the intended `EN ↔ UA` keyboard layout/switch policy on the existing host.
-4. Keep the current GDM host unchanged until SDDM has passed a clean-KVM install + reboot; only then consider an explicit live-host migration.
-5. Confirm Bibata visually after logout/login.
-6. Exercise all **three** current TV Cast modes against the physical Miracast TV, especially Low Latency.
-7. Fresh **Gaming** KVM → reboot → pinned `devos-blueprint check`.
-8. Fresh **Work** KVM → reboot → pinned `devos-blueprint check`.
-9. Fresh **Laboratory / Dev** KVM → reboot → pinned `devos-blueprint check`, including virtualization state.
-10. Fresh **University / Uni** KVM → reboot → pinned `devos-blueprint check` and verify the saved profile remains `university`.
-11. Exercise a real Qt update in a clean KVM and confirm automatic `quickshell-git` ABI rebuild.
-12. Validate physical-host KVM/virgl behavior.
-13. Only after all four VM profiles pass, use the reserved physical Blueprint test partition.
-14. Verify the pre-restore Snapper/Btrfs recovery point is actually usable before any production restore is considered.
+1. Finish existing-host configuration discrepancies and define coordinated root/home recovery before any production restore.
+2. Keep GDM on the current host until SDDM passes clean-KVM validation.
+3. Confirm Bibata visually after logout/login.
+4. TV Cast: owner reports the last physical cast worked normally; current three-mode contracts pass. No TV is available for a new end-to-end test, so defer it.
+5. After necessary source work is complete, fresh Gaming, Work, Laboratory/Dev and University/Uni KVM installs → reboot → pinned check.
+6. Exercise a real Qt update and Quickshell ABI rebuild in a clean KVM.
+7. Validate KVM/virgl graphics; then use the reserved physical partition only after all four VM profiles pass.
+8. Prove recovery usability before any production restore.
+
+## Existing-host audit — 2026-09-09
+
+- Physical host: `cachyos-asus-gaming`; owner selected and recorded `gaming`.
+- EN/UA: `us,ua`, Ukrainian Windows Enhanced, `copilot` mode with Copilot/Menu bindings; Hyprland reports no config errors.
+- Audit baseline: `bb9d16b0a9bd8532d99e628dcca29cf791b884f7`. No restore, reboot, package replacement or rollback was performed.
+- The first aggregate run blocked because checkrebuild reads non-TTY stdin. That scanner was terminated; its apparent PASS from the old error-swallowing code is invalid evidence. The corrected checker closes stdin, bounds the scan, and fails on scanner errors. A separate real corrected scan passed (5 OK / 0 FAIL); isolated open-stdin, failure-exit and ABI-drift cases also passed.
+- `darkly-bin 0.5.39-2` is installed but declares no `Provides: darkly`. This is a manifest/package-identity discrepancy, not proof that the Qt style files are absent. No package swap was attempted.
+- Dolphin global preview state file is absent; preview backends and the other checked Dolphin settings pass. No UI preference was changed during this audit.
+- Full-system `source-revision` remains intentionally absent: targeted component updates are not a full restore. Do not write the latest main SHA there merely to remove a warning. Future per-component provenance must be kept separate and must distinguish applied source from successful runtime validation.
 
 ## Rule
 
