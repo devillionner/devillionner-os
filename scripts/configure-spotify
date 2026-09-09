@@ -6,18 +6,26 @@ source "$REPO/scripts/lib/common.sh"
 
 command -v spotify-launcher >/dev/null 2>&1 || bp_die "spotify-launcher is missing"
 command -v spicetify >/dev/null 2>&1 || bp_die "spicetify is missing"
+command -v curl >/dev/null 2>&1 || bp_die "curl is missing"
+command -v python3 >/dev/null 2>&1 || bp_die "python3 is missing"
 
 bash "$REPO/scripts/configure-caelestia-cli"
 
-bp_info "Installing Spotify + Spicetify integration (theme remains user-managed)"
+bp_info "Installing managed Spotify experience"
 
 sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify" /usr/local/bin/devos-spotify
+sudo install -Dm755 "$REPO/dotfiles/.local/bin/devos-spotify-experience" /usr/local/bin/devos-spotify-experience
+sudo install -Dm644 \
+    "$REPO/dotfiles/.config/spicetify/Extensions/devos-clean-ui.js" \
+    /usr/local/share/devos/spotify/devos-clean-ui.js
+
 mkdir -p "$HOME/.local/bin"
 ln -sfn /usr/local/bin/devos-spotify "$HOME/.local/bin/devos-spotify"
+ln -sfn /usr/local/bin/devos-spotify-experience "$HOME/.local/bin/devos-spotify-experience"
 install -Dm644 "$REPO/dotfiles/.local/share/applications/spotify-launcher.desktop" "$HOME/.local/share/applications/spotify-launcher.desktop"
 
-# Retire every historical Blueprint-owned visual layer without touching themes
-# installed by the user/Marketplace (Lucid, Bloom, etc.).
+# Retire all historical Blueprint-owned Bloom/palette automation before the new
+# Lucid-based experience is installed.
 systemctl --user disable --now devos-spotify-theme.path >/dev/null 2>&1 || true
 systemctl --user disable --now devos-spotify-theme.service >/dev/null 2>&1 || true
 rm -f \
@@ -29,7 +37,7 @@ rm -f \
 rm -rf "$HOME/.config/spicetify/Themes/devillionner-bloom"
 systemctl --user daemon-reload
 
-python - "$HOME/.config/mimeapps.list" <<'PY'
+python3 - "$HOME/.config/mimeapps.list" <<'PY'
 from configparser import RawConfigParser
 from pathlib import Path
 import sys
@@ -54,12 +62,11 @@ spotify-launcher --no-exec >/dev/null 2>&1 || bp_warn "spotify-launcher could no
 SPOTIFY_ROOT="$HOME/.local/share/spotify-launcher/install/usr/share/spotify"
 PREFS="$HOME/.config/spotify/prefs"
 if [[ -f "$PREFS" && -d "$SPOTIFY_ROOT" ]]; then
-    # Only own the application paths. Never set current_theme/color_scheme or
-    # overwrite Marketplace/user theme files.
-    spicetify config spotify_path "$SPOTIFY_ROOT" prefs_path "$PREFS" >/dev/null || \
-        bp_warn "Spicetify paths could not be refreshed"
+    if ! /usr/local/bin/devos-spotify-experience --apply; then
+        bp_warn "Spotify experience setup failed; the launcher will retry on the next start"
+    fi
 else
-    bp_warn "Spotify needs one normal first launch/login before Spicetify can apply themes."
+    bp_warn "Spotify needs one normal first launch/login. After that, the managed launcher installs the experience automatically."
 fi
 
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
@@ -68,4 +75,4 @@ if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 
     hyprctl reload >/dev/null 2>&1 || true
 fi
 
-bp_ok "Spotify integration ready: user-managed Spicetify theme, Super+M, spotify: links, single-instance launcher and Hyprland window policy"
+bp_ok "Spotify integration ready: Lucid, ivLyrics, clean UI, wave progress, Oneko, Super+M, spotify: links and single-instance routing"
