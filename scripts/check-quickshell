@@ -33,8 +33,16 @@ fi
 
 if command -v checkrebuild >/dev/null 2>&1; then
     ok "rebuild-detector available"
-    REBUILD_OUTPUT="$(checkrebuild 2>/dev/null || true)"
-    if grep -Eq '(^|[[:space:]])quickshell-git([[:space:]]|$)' <<< "$REBUILD_OUTPUT"; then
+    # checkrebuild reads hook targets from non-TTY stdin. Remote checks must
+    # close that input explicitly, and failed scans must never count as clean.
+    if REBUILD_OUTPUT="$(timeout 120s checkrebuild </dev/null 2>&1)"; then
+        REBUILD_STATUS=0
+    else
+        REBUILD_STATUS=$?
+    fi
+    if ((REBUILD_STATUS != 0)); then
+        fail "rebuild-detector could not complete (exit $REBUILD_STATUS): $REBUILD_OUTPUT"
+    elif grep -Eq '(^|[[:space:]])quickshell-git([[:space:]]|$)' <<< "$REBUILD_OUTPUT"; then
         fail "rebuild-detector flags quickshell-git for ABI rebuild"
     else
         ok "quickshell-git not flagged for ABI rebuild"

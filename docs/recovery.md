@@ -37,3 +37,21 @@ sudo snapper -c root list
 For full boot/root rollback, use the normal CachyOS/Snapper recovery flow rather than deleting or replacing the live root while it is mounted.
 
 The Blueprint intentionally does not automate destructive rollback.
+
+## Coverage limits found on the existing host
+
+The 2026-09-09 read-only audit found root on `/@` and `/home` on the
+separate `/@home` subvolume. Only the Snapper `root` config is present.
+Btrfs snapshots do not recursively capture nested/separate subvolumes: the
+current root-only recovery helper therefore does **not** protect the user's
+home dotfiles on this layout. A root snapshot must not be described as a
+complete package-and-dotfile rollback point.
+
+The host records `snapper:223`; snapshot existence and contents still require
+privileged verification. A nonempty `last-checkpoint` file proves only that an
+identifier was recorded. No rollback was attempted.
+
+Before production restore, implement and validate coordinated recovery for all
+modified subvolumes (including home), verify the recorded snapshots still
+exist, and exercise recovery on the reserved test environment after the KVM
+gates. Do not use the production partition to develop or test rollback.
