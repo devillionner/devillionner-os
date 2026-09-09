@@ -67,7 +67,7 @@ if [[ ! -s "$THEME_DIR/user.css" \
 fi
 
 if [[ ! -f "$EXT_DIR/devos-clean-ui.js" ]] || ! cmp -s "$SYSTEM_EXTENSION" "$EXT_DIR/devos-clean-ui.js"; then
-    log "installing curated cleanup + wave progress extension"
+    log "installing curated cleanup + native progress extension"
     install -m644 "$SYSTEM_EXTENSION" "$EXT_DIR/devos-clean-ui.js"
     changed=1
 fi
@@ -132,8 +132,8 @@ fi
 
 if [[ "$APPLY" == true ]]; then
     pkill -x spotify >/dev/null 2>&1 || true
-    spicetify apply >/dev/null
-    log "Lucid + ivLyrics + clean UI applied"
+    spicetify -q -n apply >/dev/null
+    log "Lucid + ivLyrics + clean UI applied; managed launcher owns the next Spotify start"
 elif ((changed)); then
     log "experience prepared; next managed Spotify launch will apply it"
 fi
