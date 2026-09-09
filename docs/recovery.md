@@ -55,13 +55,3 @@ Before production restore, implement and validate coordinated recovery for all
 modified subvolumes (including home), verify the recorded snapshots still
 exist, and exercise recovery on the reserved test environment after the KVM
 gates. Do not use the production partition to develop or test rollback.
-
-## Coordinated root/home coverage
-
-The recovery helper inspects the mounted Btrfs topology before creating any snapshot. When /home is a separate subvolume on the same filesystem, it creates a read-only snapshot for both / and /home in one bundle. A manifest records each source subvolume UUID, snapshot UUID, filesystem UUID, read-only state and the coverage limits.
-
-The checkpoint is published to ~/.local/state/devillionner-os/last-checkpoint only after both snapshots and the manifest verify successfully. If any preflight or verification step fails, the previous checkpoint record is left untouched and restore stops before package or dotfile changes.
-
-The pair is sequential, so it is a recovery point rather than an application-consistent transaction. Separate filesystems, relocated XDG directories, nested mounts in Blueprint-owned paths and unsupported nested home layouts fail closed until separately validated. The helper never mounts, deletes or rolls back snapshots.
-
-Btrfs snapshots remain local recovery points rather than backups. Use an external backup for protection from filesystem or disk failure.
