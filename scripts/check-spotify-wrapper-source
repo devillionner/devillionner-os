@@ -140,7 +140,10 @@ else
 fi
 
 if grep -Fq 'lucid:settings' "$UI" \
-    && grep -Fq 'progress-bar__slider::after' "$UI" \
+    && grep -Fq 'progress-bar::after' "$UI" \
+    && grep -Fq -- '--progress-bar-transform' "$UI" \
+    && grep -Fq 'overflow: visible !important' "$UI" \
+    && ! grep -Fq 'progress-bar__slider::after' "$UI" \
     && grep -Fq 'show: false' "$UI" \
     && grep -Fq 'adryd325/oneko.js/14bab15a755d0e35cd4ae19c931d96d306f99f42/oneko.gif' "$UI" \
     && grep -Fq "button[aria-label='Podcasts']" "$UI" \
