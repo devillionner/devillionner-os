@@ -121,11 +121,12 @@ else
     fail "Spotify wrapper lifecycle/experience hook incomplete"
 fi
 
-if grep -Fq 'spicetify -q -n apply' "$SYSTEM_EXPERIENCE" 2>/dev/null \
+if grep -Fq 'spicetify -q -n auto' "$SYSTEM_EXPERIENCE" 2>/dev/null \
+    && ! grep -Fq 'spicetify -q -n apply' "$SYSTEM_EXPERIENCE" 2>/dev/null \
     && ! grep -Fq 'spicetify apply >/dev/null' "$SYSTEM_EXPERIENCE" 2>/dev/null; then
-    ok "Spotify experience apply keeps client restart ownership with managed launcher"
+    ok "Spotify experience apply uses backup-safe restart-free auto"
 else
-    fail "Spotify experience apply may restart the client independently"
+    fail "Spotify experience apply lifecycle differs"
 fi
 
 legacy=0
