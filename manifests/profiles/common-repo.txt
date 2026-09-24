@@ -15,6 +15,7 @@ fastfetch
 ffmpegthumbs
 file-roller
 fish
+fragments
 frameworkintegration
 fwupd
 git
@@ -50,6 +51,7 @@ playerctl
 polkit-gnome
 power-profiles-daemon
 python
+python-dbus
 qt6-imageformats
 rebuild-detector
 ripgrep
@@ -62,6 +64,7 @@ spotify-launcher
 starship
 sudo
 swappy
+transmission-cli
 trash-cli
 ttf-jetbrains-mono-nerd
 ttf-liberation

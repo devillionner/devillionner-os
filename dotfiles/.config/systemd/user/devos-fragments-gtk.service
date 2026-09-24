@@ -1,0 +1,6 @@
+[Unit]
+Description=Restore Fragments import after Caelestia GTK theme refresh
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/devos-fragments-gtk-sync

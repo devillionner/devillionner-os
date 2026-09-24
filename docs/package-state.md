@@ -15,6 +15,8 @@ Only packages explicitly listed in Blueprint manifests are considered Blueprint-
 
 Dependencies are deliberately not recorded as owned packages. Software installed manually by the user is therefore outside the normal Blueprint ownership boundary and is never removed merely because it is absent from a profile manifest.
 
+Fragments is part of the common Blueprint package set. `transmission-cli` and `python-dbus` are also explicit common packages because the managed Caelestia tray bridge calls `transmission-remote` and implements StatusNotifierItem/DBusMenu itself. qBittorrent is outside Blueprint ownership and is not installed by any active profile.
+
 There is one deliberately narrow system-role exception for the visible desktop layer. The reconciler removes `network-manager-applet` and `nm-connection-editor` because Caelestia is the canonical NetworkManager UI, and also removes the pure CachyOS desktop extras `cachyos-hello`, `cachyos-packageinstaller` and `cachyos-wallpapers`. These removals apply even when the packages came from the base image rather than an older Blueprint revision. The reconciler first verifies that none of them appears in the desired target set, uses normal dependency-aware removal, and aborts instead of forcing through a conflict. CachyOS kernels, repositories, mirrors, hooks, performance settings and recovery tooling are not part of this exception.
 
 ## Profile switching

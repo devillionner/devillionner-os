@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch Caelestia GTK theme for Fragments integration
+
+[Path]
+PathChanged=%h/.config/gtk-4.0/gtk.css
+Unit=devos-fragments-gtk.service
+
+[Install]
+WantedBy=default.target

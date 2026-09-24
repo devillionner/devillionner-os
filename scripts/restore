@@ -164,6 +164,9 @@ bp_info "Configuring hardware-specific behavior"
 bp_info "Configuring Dolphin file manager"
 "$REPO/scripts/configure-dolphin"
 
+bp_info "Configuring Fragments torrent integration"
+"$REPO/scripts/configure-fragments"
+
 if [[ -f "$REPO/scripts/patch-caelestia-fullscreen" ]]; then
     bp_info "Applying Caelestia compatibility/UI patches"
     if ! bash "$REPO/scripts/patch-caelestia-fullscreen"; then

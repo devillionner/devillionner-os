@@ -16,6 +16,7 @@ Components:
   caelestia   merge Blueprint-owned Caelestia settings + package patches
   cursor      configure Bibata Modern Ice cursor
   dolphin     configure Dolphin integration and preview policy
+  fragments   configure Fragments + Caelestia background/tray integration
   hardware    configure hardware-specific audio/helper policy
   spotify     configure managed Spotify integration
   tvcast      install/update the shared three-mode TV Cast component
@@ -50,6 +51,10 @@ case "$COMPONENT" in
     dolphin)
         bp_info "Applying Dolphin component only"
         bash "$REPO/scripts/configure-dolphin"
+        ;;
+    fragments)
+        bp_info "Applying Fragments component only"
+        bash "$REPO/scripts/configure-fragments"
         ;;
     hardware)
         bp_info "Applying hardware policy only"

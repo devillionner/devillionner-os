@@ -40,6 +40,8 @@ The installer has four first-class profiles:
 
 All four profiles use **Dolphin** as the single file manager with the **Colloid-Dark** icon theme. `Super+E` opens Dolphin; JPEG, PNG and WEBP open in Swappy.
 
+All four profiles use **Fragments** as the lightweight torrent client. `.torrent` and `magnet:` links route through a Caelestia-aware launcher; `Super+Q` hides Fragments to the background while Transmission keeps downloading, and the Caelestia tray exposes a dynamic torrent submenu with progress/speed plus pause/resume controls.
+
 All four profiles also include **Spotify + Spicetify** with a curated **Lucid** experience: Lucid owns the main visual language, **ivLyrics** provides the lyrics view, and a small Blueprint extension removes unwanted Spotify chrome while adding a Caelestia-style wave progress bar with Oneko. `Super+M`, `spotify:` links, Spotify Connect and the managed single-instance launcher remain intact.
 
 The common cursor is **Bibata Modern Ice** at 24 px, managed across XCursor, GTK and session environment with an XCursor fallback for Hyprland/XWayland consumers.
@@ -117,6 +119,7 @@ See:
 - [Caelestia configuration policy](docs/caelestia.md)
 - [Quickshell ABI recovery](docs/quickshell.md)
 - [Dolphin file manager](docs/dolphin.md)
+- [Fragments torrent client](docs/fragments.md)
 - [Spotify experience](docs/spotify.md)
 - [TV Cast / Miracast](docs/tv-cast.md)
 - [Virtual machines](docs/virtualization.md)
@@ -131,6 +134,7 @@ See:
 - Gaming, Work, Laboratory/Dev and University/Uni are distinct profile identities. University is not a Work alias.
 - Kitty is the single default terminal. Alacritty/Ptyxis are not part of the active profile manifests.
 - Dolphin is the single default file manager; Thunar is not part of the active manifests.
+- Fragments is the common lightweight torrent client; qBittorrent is not in active manifests. Its GTK styling follows Caelestia dynamically, `Super+Q` hides only Fragments, and its tray DBusMenu exposes live torrent state.
 - SDDM is the common login/display manager baseline; login-screen styling is a separate UX task.
 - Caelestia `shell.json` and `cli.json` are merge-managed so Blueprint-owned defaults can be updated without deleting unrelated user settings.
 - Spotify uses the Arch `spotify-launcher` plus Spicetify, current Lucid, pinned ivLyrics and one narrowly scoped Blueprint extension for cleanup + wave progress/Oneko. The old Bloom palette watcher and custom pane geometry are retired.

@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+set -u
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Remote/admin shells may lack the session-bus variables even while the user's
+# graphical session is alive. Reconstruct the standard user-bus address so
+# targeted Blueprint apply/check works from either a terminal or remote runner.
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "$XDG_RUNTIME_DIR/bus" ]]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+fi
+OK=0; WARN=0; FAIL=0
+ok() { printf '  [OK]   %s\n' "$*"; OK=$((OK + 1)); }
+warn() { printf '  [WARN] %s\n' "$*"; WARN=$((WARN + 1)); }
+fail() { printf '  [FAIL] %s\n' "$*"; FAIL=$((FAIL + 1)); }
+
+printf '========================================\n'
+printf '       Fragments integration check\n'
+printf '========================================\n'
+
+for pkg in fragments transmission-cli python-dbus; do
+    pacman -Qq "$pkg" >/dev/null 2>&1 && ok "$pkg installed" || fail "$pkg missing"
+done
+for cmd in fragments transmission-remote python3; do
+    command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
+done
+python3 - <<'PY' >/dev/null 2>&1 && ok "python-dbus import" || fail "python-dbus import failed"
+import dbus
+PY
+
+pairs=(
+    "dotfiles/.local/bin/fragments-caelestia:$HOME/.local/bin/fragments-caelestia"
+    "dotfiles/.local/bin/fragments-tray:$HOME/.local/bin/fragments-tray"
+    "dotfiles/.local/bin/devos-fragments-gtk-sync:$HOME/.local/bin/devos-fragments-gtk-sync"
+    "dotfiles/.config/gtk-4.0/fragments.css:$HOME/.config/gtk-4.0/fragments.css"
+    "dotfiles/.config/systemd/user/devos-fragments-gtk.service:$HOME/.config/systemd/user/devos-fragments-gtk.service"
+    "dotfiles/.config/systemd/user/devos-fragments-gtk.path:$HOME/.config/systemd/user/devos-fragments-gtk.path"
+    "dotfiles/.local/share/applications/de.haeckerfelix.Fragments.desktop:$HOME/.local/share/applications/de.haeckerfelix.Fragments.desktop"
+)
+for pair in "${pairs[@]}"; do
+    src="${pair%%:*}"; dst="${pair#*:}"
+    if [[ -f "$dst" ]] && cmp -s "$REPO/$src" "$dst"; then
+        ok "${dst#$HOME/} matches Blueprint"
+    else
+        fail "${dst#$HOME/} missing or differs"
+    fi
+done
+
+DESKTOP="$HOME/.local/share/applications/de.haeckerfelix.Fragments.desktop"
+if grep -Fqx 'Exec=fragments-caelestia %U' "$DESKTOP" 2>/dev/null \
+    && grep -Fqx 'TryExec=fragments-caelestia' "$DESKTOP" 2>/dev/null \
+    && grep -Fqx 'DBusActivatable=false' "$DESKTOP" 2>/dev/null; then
+    ok "desktop entry routes through managed background wrapper"
+else
+    fail "Fragments desktop routing differs"
+fi
+
+MIME="$HOME/.config/mimeapps.list"
+for mime in 'x-scheme-handler/magnet' 'application/x-bittorrent'; do
+    grep -Fqx "$mime=de.haeckerfelix.Fragments.desktop" "$MIME" 2>/dev/null \
+        && ok "$mime defaults to Fragments" \
+        || fail "$mime default differs"
+done
+
+HYPR_USER="$HOME/.config/caelestia/hypr-user.lua"
+if grep -Fq -- '-- BEGIN Fragments Caelestia integration' "$HYPR_USER" 2>/dev/null \
+    && grep -Fq 'opacity = "0.85 override 0.85 override"' "$HYPR_USER" 2>/dev/null \
+    && grep -Fq 'class = "^de\\.haeckerfelix\\.Fragments$"' "$HYPR_USER" 2>/dev/null; then
+    ok "Caelestia/Hyprland Fragments opacity rule"
+else
+    fail "Fragments opacity rule differs"
+fi
+if grep -Fq -- '-- BEGIN Fragments background close behavior' "$HYPR_USER" 2>/dev/null \
+    && grep -Fq 'w.class == "de.haeckerfelix.Fragments"' "$HYPR_USER" 2>/dev/null \
+    && grep -Fq 'workspace = "special:fragments"' "$HYPR_USER" 2>/dev/null \
+    && grep -Fq 'hl.dsp.window.close()' "$HYPR_USER" 2>/dev/null; then
+    ok "Super+Q hides only Fragments and closes other windows normally"
+else
+    fail "Fragments Super+Q background rule differs"
+fi
+
+GTK_CSS="$HOME/.config/gtk-4.0/gtk.css"
+if grep -Fqx '@import "fragments.css";' "$GTK_CSS" 2>/dev/null; then
+    ok "Fragments CSS imported into current Caelestia GTK theme"
+else
+    fail "Fragments CSS import missing from current GTK theme"
+fi
+systemctl --user is-enabled devos-fragments-gtk.path >/dev/null 2>&1 \
+    && ok "GTK theme refresh watcher enabled" \
+    || fail "GTK theme refresh watcher not enabled"
+systemctl --user is-active devos-fragments-gtk.path >/dev/null 2>&1 \
+    && ok "GTK theme refresh watcher active" \
+    || warn "GTK theme refresh watcher not active in this session"
+
+if grep -Fq 'Torrents (' "$HOME/.local/bin/fragments-tray" 2>/dev/null \
+    && grep -Fq 'transmission-remote' "$HOME/.local/bin/fragments-tray" 2>/dev/null \
+    && grep -Fq 'Pause all' "$HOME/.local/bin/fragments-tray" 2>/dev/null \
+    && grep -Fq 'Resume all' "$HOME/.local/bin/fragments-tray" 2>/dev/null; then
+    ok "Caelestia tray DBusMenu includes dynamic torrent submenu and controls"
+else
+    fail "Fragments tray menu contract differs"
+fi
+
+if pgrep -x fragments >/dev/null 2>&1; then
+    ok "Fragments process running"
+    DAEMON_PATTERN="transmission-daemon.*--config-dir $HOME/.config/fragments"
+    DAEMON_COUNT="$(pgrep -fc -- "$DAEMON_PATTERN" 2>/dev/null || true)"
+    if [[ "$DAEMON_COUNT" == "1" ]]; then
+        ok "exactly one Fragments-owned Transmission daemon running"
+    elif [[ "$DAEMON_COUNT" == "0" ]]; then
+        fail "Fragments is running without its Transmission daemon"
+    else
+        fail "$DAEMON_COUNT Fragments-owned Transmission daemons running; expected one"
+    fi
+    pgrep -f '^python3 .*/fragments-tray$' >/dev/null 2>&1 \
+        && ok "Fragments Caelestia tray helper running" \
+        || fail "Fragments tray helper missing while app is running"
+
+    if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v busctl >/dev/null 2>&1; then
+        if busctl --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
+            org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems 2>/dev/null \
+            | grep -Fq 'org.kde.StatusNotifierItem.Fragments/StatusNotifierItem'; then
+            ok "Fragments registered in Caelestia system tray"
+        else
+            fail "Fragments tray item is not registered"
+        fi
+    else
+        warn "D-Bus session unavailable; tray registration not checked"
+    fi
+else
+    warn "Fragments is not running; background daemon/tray runtime checks skipped"
+fi
+
+if pacman -Qq qbittorrent >/dev/null 2>&1; then
+    warn "qBittorrent is installed manually; Blueprint defaults still route torrents to Fragments"
+else
+    ok "qBittorrent absent from the Blueprint host"
+fi
+
+printf '\n========================================\n'
+printf 'OK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then printf 'RESULT: PASS\n'; exit 0; fi
+printf 'RESULT: FAIL\n'; exit 1

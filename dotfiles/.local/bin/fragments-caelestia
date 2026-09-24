@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+start_tray() {
+  if ! pgrep -f '^python3 .*/fragments-tray$' >/dev/null 2>&1; then
+    nohup "$HOME/.local/bin/fragments-tray" >/tmp/fragments-tray.log 2>&1 &
+  fi
+}
+
+stop_orphan_daemons() {
+  local pattern="transmission-daemon.*--config-dir $HOME/.config/fragments"
+  local pids=() pid
+  mapfile -t pids < <(pgrep -f -- "$pattern" 2>/dev/null || true)
+  ((${#pids[@]})) || return 0
+  kill -TERM "${pids[@]}" 2>/dev/null || true
+  for _ in {1..20}; do
+    local alive=false
+    for pid in "${pids[@]}"; do
+      if kill -0 "$pid" 2>/dev/null; then alive=true; break; fi
+    done
+    [[ "$alive" == false ]] && return 0
+    sleep 0.1
+  done
+}
+
+restore_window() {
+  hyprctl eval 'local ws=hl.get_active_workspace(); if ws then for _,w in ipairs(hl.get_windows() or {}) do if w.class=="de.haeckerfelix.Fragments" then local win="address:"..w.address; hl.dispatch(hl.dsp.window.move({window=win, workspace=ws.id, follow=false})); hl.dispatch(hl.dsp.focus({window=win})); break end end end' >/dev/null
+}
+
+if pgrep -x fragments >/dev/null 2>&1; then
+  start_tray
+  if (( $# > 0 )); then
+    /usr/bin/fragments "$@" >/dev/null 2>&1 &
+    sleep 0.2
+  fi
+  restore_window
+else
+  # A real Fragments window owns the local Transmission session. If the UI was
+  # terminated abnormally, retire its orphan daemon before starting a new one so
+  # only one RPC listener/session exists. Super+Q never reaches this path because
+  # it hides the still-running Fragments process instead of terminating it.
+  stop_orphan_daemons
+  /usr/bin/fragments "$@" >/dev/null 2>&1 &
+  sleep 0.4
+  start_tray
+fi

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Name=Fragments
+Comment=Manage BitTorrent downloads
+Icon=de.haeckerfelix.Fragments
+Exec=fragments-caelestia %U
+TryExec=fragments-caelestia
+Terminal=false
+Type=Application
+StartupNotify=true
+StartupWMClass=de.haeckerfelix.Fragments
+DBusActivatable=false
+MimeType=x-scheme-handler/magnet;application/x-bittorrent;
+Categories=GTK;Utility;FileTransfer;P2P;
+Keywords=bittorrent;torrent;magnet;download;p2p;
+X-Purism-FormFactor=Workstation;Mobile;

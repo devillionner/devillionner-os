@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO/scripts/lib/common.sh"
+
+# Remote/admin shells may lack the session-bus variables even while the user's
+# graphical session is alive. Reconstruct the standard user-bus address so
+# targeted Blueprint apply/check works from either a terminal or remote runner.
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "$XDG_RUNTIME_DIR/bus" ]]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+fi
+
+for cmd in fragments transmission-remote python3; do
+    command -v "$cmd" >/dev/null 2>&1 || bp_die "$cmd is missing; install the Blueprint common package set first"
+done
+python3 - <<'PY' >/dev/null 2>&1 || bp_die "python-dbus is missing"
+import dbus  # noqa: F401
+PY
+
+bp_info "Installing Fragments + Caelestia integration"
+install -Dm755 "$REPO/dotfiles/.local/bin/fragments-caelestia" "$HOME/.local/bin/fragments-caelestia"
+install -Dm755 "$REPO/dotfiles/.local/bin/fragments-tray" "$HOME/.local/bin/fragments-tray"
+install -Dm755 "$REPO/dotfiles/.local/bin/devos-fragments-gtk-sync" "$HOME/.local/bin/devos-fragments-gtk-sync"
+install -Dm644 "$REPO/dotfiles/.config/gtk-4.0/fragments.css" "$HOME/.config/gtk-4.0/fragments.css"
+install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.service" "$HOME/.config/systemd/user/devos-fragments-gtk.service"
+install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.path" "$HOME/.config/systemd/user/devos-fragments-gtk.path"
+install -Dm644 "$REPO/dotfiles/.local/share/applications/de.haeckerfelix.Fragments.desktop" "$HOME/.local/share/applications/de.haeckerfelix.Fragments.desktop"
+
+HYPR_USER="$HOME/.config/caelestia/hypr-user.lua"
+mkdir -p "$(dirname "$HYPR_USER")"
+[[ -e "$HYPR_USER" || -L "$HYPR_USER" ]] || printf '\n' > "$HYPR_USER"
+python3 - "$HYPR_USER" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8") if path.exists() else ""
+
+blocks = [
+    (
+        "-- BEGIN Fragments Caelestia integration",
+        "-- END Fragments Caelestia integration",
+        '''-- BEGIN Fragments Caelestia integration
+hl.window_rule({
+    name = "fragments-kitty-opacity",
+    match = {
+        class = "^de\\\\.haeckerfelix\\\\.Fragments$",
+    },
+    opacity = "0.85 override 0.85 override",
+})
+-- END Fragments Caelestia integration''',
+    ),
+    (
+        "-- BEGIN Fragments background close behavior",
+        "-- END Fragments background close behavior",
+        '''-- BEGIN Fragments background close behavior
+hl.unbind("SUPER + Q")
+hl.bind("SUPER + Q", function()
+    local w = hl.get_active_window()
+    if w and w.class == "de.haeckerfelix.Fragments" then
+        hl.dispatch(hl.dsp.window.move({ workspace = "special:fragments", follow = false }))
+    else
+        hl.dispatch(hl.dsp.window.close())
+    end
+end, { description = "Close window / hide Fragments" })
+-- END Fragments background close behavior''',
+    ),
+]
+
+for start, end, block in blocks:
+    if start in text or end in text:
+        if text.count(start) != 1 or text.count(end) != 1:
+            raise SystemExit(f"ambiguous managed block in {path}: {start}")
+        a = text.index(start)
+        b = text.index(end, a) + len(end)
+        text = text[:a] + block + text[b:]
+    else:
+        text = text.rstrip() + "\n\n" + block + "\n"
+
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(text, encoding="utf-8")
+PY
+
+python3 - "$HOME/.config/mimeapps.list" <<'PY'
+from configparser import RawConfigParser
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+cfg = RawConfigParser(interpolation=None, strict=False)
+cfg.optionxform = str
+if path.exists():
+    cfg.read(path, encoding="utf-8")
+if not cfg.has_section("Default Applications"):
+    cfg.add_section("Default Applications")
+for mime in ("x-scheme-handler/magnet", "application/x-bittorrent"):
+    cfg.set("Default Applications", mime, "de.haeckerfelix.Fragments.desktop")
+path.parent.mkdir(parents=True, exist_ok=True)
+with path.open("w", encoding="utf-8") as handle:
+    cfg.write(handle, space_around_delimiters=False)
+PY
+
+"$HOME/.local/bin/devos-fragments-gtk-sync"
+systemctl --user daemon-reload
+systemctl --user enable --now devos-fragments-gtk.path >/dev/null 2>&1 \
+    || bp_warn "Could not enable Fragments GTK theme watcher in this user session"
+
+command -v update-desktop-database >/dev/null 2>&1 \
+    && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+
+if pgrep -x fragments >/dev/null 2>&1; then
+    if ! pgrep -f '^python3 .*/fragments-tray$' >/dev/null 2>&1; then
+        nohup "$HOME/.local/bin/fragments-tray" >/tmp/fragments-tray.log 2>&1 &
+    fi
+fi
+
+if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 2>&1; then
+    hyprctl reload >/dev/null 2>&1 || bp_warn "Hyprland reload failed; Fragments bindings will apply next session"
+fi
+
+bp_ok "Fragments integration ready: Caelestia GTK styling, 0.85 opacity, Super+Q background hide, tray menu and torrent submenu"

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+GTK_DIR="$HOME/.config/gtk-4.0"
+GTK_CSS="$GTK_DIR/gtk.css"
+FRAGMENTS_CSS="$GTK_DIR/fragments.css"
+IMPORT='@import "fragments.css";'
+
+mkdir -p "$GTK_DIR"
+[[ -f "$FRAGMENTS_CSS" ]] || exit 0
+[[ -f "$GTK_CSS" ]] || : > "$GTK_CSS"
+
+grep -Fqx "$IMPORT" "$GTK_CSS" 2>/dev/null && exit 0
+printf '\n/* Blueprint: keep Fragments on the live Caelestia GTK palette. */\n%s\n' "$IMPORT" >> "$GTK_CSS"

@@ -89,6 +89,16 @@ required_paths=(
     scripts/configure-dolphin
     scripts/check-dolphin
     scripts/lib/set-caelestia-file-explorer.py
+    scripts/configure-fragments
+    scripts/check-fragments
+    scripts/check-fragments-source
+    dotfiles/.local/bin/fragments-caelestia
+    dotfiles/.local/bin/fragments-tray
+    dotfiles/.local/bin/devos-fragments-gtk-sync
+    dotfiles/.config/gtk-4.0/fragments.css
+    dotfiles/.config/systemd/user/devos-fragments-gtk.path
+    dotfiles/.config/systemd/user/devos-fragments-gtk.service
+    dotfiles/.local/share/applications/de.haeckerfelix.Fragments.desktop
     scripts/configure-spotify
     scripts/check-spotify
     scripts/check-spotify-wrapper-source
@@ -157,6 +167,14 @@ if grep -Fq '"$REPO/scripts/configure-dolphin"' "$RESTORE" \
     ok "Dolphin is wired into restore + aggregate validation"
 else
     fail "Dolphin restore/check wiring is incomplete"
+fi
+
+if grep -Fq '"$REPO/scripts/configure-fragments"' "$RESTORE" \
+    && grep -Fq '$REPO/scripts/check-fragments' "$RUNTIME_CHECK" \
+    && bash "$REPO/scripts/check-fragments-source" >/dev/null; then
+    ok "Fragments is wired into restore + aggregate/source validation"
+else
+    fail "Fragments restore/check/source wiring is incomplete"
 fi
 
 if grep -Fq '$REPO/scripts/check-quickshell' "$RUNTIME_CHECK" \

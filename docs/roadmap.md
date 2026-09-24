@@ -86,6 +86,7 @@ This is the working backlog after the profile + reusable-feature refactor. See `
 - [ ] Review remaining duplicated viewers/utilities after real use of a fresh system.
 - [x] Remove the redundant NetworkManager GTK applet/editor while retaining NetworkManager itself and FluxCast's libappindicator tray backend.
 - [x] Remove pure CachyOS desktop extras while keeping the CachyOS technical base (kernel/repos/mirrors/hooks/settings/recovery) intact.
+- [x] Standardize torrents on Fragments with Caelestia dynamic GTK styling, background `Super+Q` behavior and a live tray torrent submenu; keep qBittorrent out of active manifests.
 - [ ] Decide whether remaining GNOME-oriented helper packages can be reduced further without hurting login, portals, keyring or file dialogs.
 - [ ] Review whether the current media/video apps should be consolidated.
 
@@ -102,6 +103,7 @@ This is the working backlog after the profile + reusable-feature refactor. See `
 - [x] Caelestia shell policy documented.
 - [x] Quickshell ABI recovery documented.
 - [x] Curated Lucid + ivLyrics Spotify integration documented.
+- [x] Fragments + Caelestia background/tray integration documented.
 - [x] Repository CI / source-integrity validation documented.
 - [x] Validate repository-local documentation links and referenced `docs/*.md` paths in CI.
 - [x] Track validation level separately for CI/source, existing host, fresh KVM and physical test partition.

@@ -34,7 +34,7 @@ A local checkout remains useful for Blueprint development/debugging, but is not 
 devos-blueprint check
 ```
 
-This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, declared service manifests and Blueprint source identity. It then runs the dedicated display-manager, service-manifest, Quickshell, Caelestia, Dolphin, Spotify, cursor and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
+This is the canonical **full runtime validation** command after restore and after reboot. It validates the selected profile, mandatory shared TV Cast feature, optional virtualization state, core binaries, packages, keyboard mode, hardware/audio helper selection, declared service manifests and Blueprint source identity. It then runs the dedicated display-manager, service-manifest, Quickshell, Caelestia, Dolphin, Fragments, Spotify, cursor and TV Cast validators and folds their exit status into one final `RESULT: PASS` / `RESULT: FAIL`.
 
 Restore uses this same aggregate `scripts/check` internally, then records the source commit so the installed helper can fetch the same revision later.
 
@@ -46,6 +46,7 @@ bash scripts/check-services
 bash scripts/check-quickshell
 bash scripts/check-caelestia
 bash scripts/check-dolphin
+bash scripts/check-fragments
 bash scripts/check-spotify
 bash scripts/check-cursor
 bash scripts/check-tv-cast
@@ -54,6 +55,8 @@ bash scripts/check-tv-cast
 `check-display-manager` validates the SDDM package/service, enabled state and `display-manager.service` alias. `check-services` validates all system units selected by the common/profile/feature manifests plus the common user units, requiring each declared unit to exist and be enabled.
 
 The dedicated Quickshell check validates that `quickshell-git` is installed, `qs --version` succeeds and `rebuild-detector` does not report the package as linked against stale libraries.
+
+The Fragments check validates the package/runtime dependencies, Caelestia GTK import watcher, 0.85 opacity + `Super+Q` background contract, MIME routing, tray StatusNotifierItem and the dynamic torrent DBusMenu.
 
 The TV Cast check validates Miracast dependencies, installed helper files, shell/Python syntax, FluxCast low-latency tuning, the exact three-mode contract, `fast_bilinear`, gettext catalogs, UFW rules and the single persistent `Super+P` bind.
 

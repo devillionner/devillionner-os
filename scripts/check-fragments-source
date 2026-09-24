@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+MAN="$REPO/manifests/profiles/common-repo.txt"
+CONFIG="$REPO/scripts/configure-fragments"
+CHECK="$REPO/scripts/check-fragments"
+WRAPPER="$REPO/dotfiles/.local/bin/fragments-caelestia"
+TRAY="$REPO/dotfiles/.local/bin/fragments-tray"
+GTK_SYNC="$REPO/dotfiles/.local/bin/devos-fragments-gtk-sync"
+CSS="$REPO/dotfiles/.config/gtk-4.0/fragments.css"
+DESKTOP="$REPO/dotfiles/.local/share/applications/de.haeckerfelix.Fragments.desktop"
+PATH_UNIT="$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.path"
+SERVICE_UNIT="$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.service"
+
+for file in "$CONFIG" "$CHECK" "$WRAPPER" "$TRAY" "$GTK_SYNC" "$CSS" "$DESKTOP" "$PATH_UNIT" "$SERVICE_UNIT"; do
+    [[ -f "$file" ]] || { echo "missing: ${file#$REPO/}" >&2; exit 1; }
+done
+
+for pkg in fragments transmission-cli python-dbus; do
+    grep -Fqx "$pkg" "$MAN" || { echo "common manifest missing: $pkg" >&2; exit 1; }
+done
+
+bash -n "$CONFIG"
+bash -n "$CHECK"
+bash -n "$WRAPPER"
+bash -n "$GTK_SYNC"
+python3 - "$TRAY" <<'PY'
+from pathlib import Path
+import sys
+compile(Path(sys.argv[1]).read_text(encoding="utf-8"), sys.argv[1], "exec")
+PY
+
+grep -Fqx 'Exec=fragments-caelestia %U' "$DESKTOP"
+grep -Fqx 'TryExec=fragments-caelestia' "$DESKTOP"
+grep -Fqx 'DBusActivatable=false' "$DESKTOP"
+! grep -Eq '^Exec=/home/' "$DESKTOP"
+
+grep -Fq 'special:fragments' "$CONFIG"
+grep -Fq '0.85 override 0.85 override' "$CONFIG"
+grep -Fq 'x-scheme-handler/magnet' "$CONFIG"
+grep -Fq 'application/x-bittorrent' "$CONFIG"
+grep -Fq 'devos-fragments-gtk.path' "$CONFIG"
+
+grep -Fq 'Torrents (' "$TRAY"
+grep -Fq 'children-display' "$TRAY"
+grep -Fq 'Pause all' "$TRAY"
+grep -Fq 'Resume all' "$TRAY"
+grep -Fq 'transmission-remote' "$TRAY"
+grep -Fq 'org.kde.StatusNotifierItem.Fragments' "$TRAY"
+grep -Fq 'def stop_fragments_daemons' "$TRAY"
+grep -Fq 'stop_orphan_daemons' "$WRAPPER"
+
+grep -Fq '@accent_color' "$CSS"
+grep -Fq '@window_fg_color' "$CSS"
+grep -Fq '@card_bg_color' "$CSS"
+grep -Fq '@import "fragments.css";' "$GTK_SYNC"
+
+grep -Fq 'PathChanged=%h/.config/gtk-4.0/gtk.css' "$PATH_UNIT"
+grep -Fq 'ExecStart=%h/.local/bin/devos-fragments-gtk-sync' "$SERVICE_UNIT"
+
+# Standalone apply must remain a targeted configuration operation; package
+# installation/removal belongs to profile reconciliation.
+! grep -Eq 'pacman[[:space:]]+-[SR]|paru[[:space:]]+-S' "$CONFIG"
+
+printf 'Fragments source contract: PASS\n'

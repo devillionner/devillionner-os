@@ -51,6 +51,9 @@ jobs:
       - name: Validate Dolphin global preview contract
         run: bash scripts/check-dolphin-global-view-source
 
+      - name: Validate Fragments integration contract
+        run: bash scripts/check-fragments-source
+
       - name: Validate Spotify wrapper path contract
         run: bash scripts/check-spotify-wrapper-source
 
