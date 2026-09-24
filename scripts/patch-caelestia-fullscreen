@@ -158,9 +158,9 @@ import sys
 nexus_state, network_list, add_network, network_connection, nmcli = map(Path, sys.argv[1:])
 texts = {p: p.read_text(encoding="utf-8") for p in (nexus_state, network_list, add_network, network_connection, nmcli)}
 
-def replace_known(path, old, new, label):
+def replace_known(path, old, new, label, markers=()):
     text = texts[path]
-    if new in text:
+    if new in text or (markers and all(marker in text for marker in markers)):
         print(f"{path.name}: {label} already patched")
         return
     if old not in text:
@@ -548,7 +548,12 @@ replace_known(nmcli,
             return true;
         return root.savedConnections.some(connName => connName === ssid);
     }
-''', "exact saved-profile matching")
+''', "exact saved-profile matching", (
+    'root.savedConnectionSecurity[ssid] || ""',
+    'root.active && root.active.ssid === ssid',
+    'root.savedConnectionSsids.some(savedSsid => savedSsid === ssid)',
+    'root.savedConnections.some(connName => connName === ssid)',
+))
 
 replace_known(nmcli,
 '''        const connectionName = root.savedConnections.find(conn => conn && conn.toLowerCase().trim() === ssid.toLowerCase().trim()) || ssid;
@@ -576,7 +581,11 @@ replace_known(add_network,
     property bool attempted: false
     property string targetSsid: ""
     property string failureReason: ""
-''', "connection state")
+''', "connection state", (
+    'property bool attempted: false',
+    'property string targetSsid: ""',
+    'property string failureReason: ""',
+))
 
 replace_known(add_network,
 '''    function submit(): void {
@@ -655,7 +664,13 @@ replace_known(add_network,
         else
             Nmcli.addHiddenNetwork(ssid, root.secured ? passwordField.text : "", root.secured ? "wpa" : "none", hiddenToggle.checked, handleResult);
     }
-''', "exact-SSID connect flow")
+''', "exact-SSID connect flow", (
+    'const ssid = root.targetSsid || ssidField.text;',
+    'root.failureReason = "";',
+    'NetworkConnection.connectWithPassword(target, passwordField.text, handleResult);',
+    'Network not found — rescan and try again',
+    'Authentication failed — check the password',
+))
 
 replace_known(add_network,
 '''    title: Tr.tr("Add network")
