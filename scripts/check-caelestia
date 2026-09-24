@@ -97,12 +97,19 @@ else
     fail "manual Cachy-Update launcher is missing or user-hidden"
 fi
 
+if pacman -Qq cachyos-kernel-manager >/dev/null 2>&1 \
+    && [[ -f /usr/share/applications/org.cachyos.KernelManager.desktop ]] \
+    && [[ ! -e "$HOME/.local/share/applications/org.cachyos.KernelManager.desktop" ]]; then
+    ok "manual CachyOS Kernel Manager launcher available"
+else
+    fail "manual CachyOS Kernel Manager launcher is missing or user-hidden"
+fi
+
 HIDDEN_LAUNCHERS=0
 for desktop in \
     arch-update-tray.desktop \
     cachyos-hello.desktop \
-    cachyos-pi.desktop \
-    org.cachyos.KernelManager.desktop
+    cachyos-pi.desktop
 do
     grep -Fq 'Hidden=true' "$HOME/.local/share/applications/$desktop" 2>/dev/null \
         || HIDDEN_LAUNCHERS=$((HIDDEN_LAUNCHERS + 1))

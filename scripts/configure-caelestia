@@ -16,12 +16,14 @@ bp_info "Applying Caelestia-first desktop branding policy"
 mkdir -p "$HOME/.config/autostart" "$HOME/.local/share/applications"
 
 # Caelestia is the visible shell identity. Keep CachyOS as the technical base,
-# but suppress its welcome/update tray and branded launcher shortcuts.
+# but suppress its welcome/background tray and branding-only launcher shortcuts.
 rm -f "$HOME/.config/autostart/cachyos-hello.desktop"
 
-# Keep the interactive updater available on demand in the launcher. Only its
-# background tray/timer are suppressed.
-rm -f "$HOME/.local/share/applications/arch-update.desktop"
+# Keep useful manual technical tools available on demand in the launcher.
+# Only Cachy-Update's background tray/timer are suppressed.
+rm -f \
+    "$HOME/.local/share/applications/arch-update.desktop" \
+    "$HOME/.local/share/applications/org.cachyos.KernelManager.desktop"
 
 cat > "$HOME/.config/autostart/arch-update-tray.desktop" <<'EOF'
 [Desktop Entry]
@@ -34,8 +36,7 @@ EOF
 for desktop in \
     arch-update-tray.desktop \
     cachyos-hello.desktop \
-    cachyos-pi.desktop \
-    org.cachyos.KernelManager.desktop
+    cachyos-pi.desktop
 do
     cat > "$HOME/.local/share/applications/$desktop" <<'EOF'
 [Desktop Entry]
