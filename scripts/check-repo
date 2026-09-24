@@ -98,6 +98,8 @@ required_paths=(
     dotfiles/.config/gtk-4.0/fragments.css
     dotfiles/.config/systemd/user/devos-fragments-gtk.path
     dotfiles/.config/systemd/user/devos-fragments-gtk.service
+    dotfiles/.config/systemd/user/devos-fragments-daemon.service
+    dotfiles/.config/systemd/user/devos-fragments-tray.service
     dotfiles/.local/share/applications/de.haeckerfelix.Fragments.desktop
     scripts/configure-spotify
     scripts/check-spotify

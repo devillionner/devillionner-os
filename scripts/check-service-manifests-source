@@ -67,6 +67,20 @@ require_entry "$MAN/services-user-common.txt" wireplumber.service "WirePlumber u
 require_entry "$MAN/common-repo.txt" xdg-user-dirs "xdg-user-dirs package"
 require_entry "$MAN/services-user-common.txt" xdg-user-dirs.service "xdg-user-dirs user service"
 
+require_entry "$MAN/common-repo.txt" transmission-cli "Fragments Transmission backend package"
+require_entry "$MAN/common-repo.txt" python-dbus "Fragments tray D-Bus package"
+require_entry "$MAN/services-user-common.txt" devos-fragments-daemon.service "Fragments Transmission user service"
+require_entry "$MAN/services-user-common.txt" devos-fragments-tray.service "Fragments tray user service"
+require_entry "$MAN/services-user-common.txt" devos-fragments-gtk.path "Fragments GTK watcher path"
+for unit in \
+    "$REPO/dotfiles/.config/systemd/user/devos-fragments-daemon.service" \
+    "$REPO/dotfiles/.config/systemd/user/devos-fragments-tray.service" \
+    "$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.path" \
+    "$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.service"
+do
+    [[ -f "$unit" ]] || fail "missing repository-owned Fragments user unit: ${unit#$REPO/}"
+done
+
 # Spotify's former palette watcher is intentionally retired. The current
 # Lucid/ivLyrics experience is prepared synchronously by devos-spotify and must
 # not reintroduce a persistent user service.

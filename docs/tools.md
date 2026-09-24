@@ -56,7 +56,7 @@ bash scripts/check-tv-cast
 
 The dedicated Quickshell check validates that `quickshell-git` is installed, `qs --version` succeeds and `rebuild-detector` does not report the package as linked against stale libraries.
 
-The Fragments check validates the package/runtime dependencies, Caelestia GTK import watcher, 0.85 opacity + `Super+Q` background contract, MIME routing, tray StatusNotifierItem and the dynamic torrent DBusMenu.
+The Fragments check validates the package/runtime dependencies, Caelestia GTK import watcher, 0.85 opacity, localhost Transmission user service, normal UI close/no-special-workspace contract, MIME routing, tray StatusNotifierItem and the dynamic torrent DBusMenu.
 
 The TV Cast check validates Miracast dependencies, installed helper files, shell/Python syntax, FluxCast low-latency tuning, the exact three-mode contract, `fast_bilinear`, gettext catalogs, UFW rules and the single persistent `Super+P` bind.
 

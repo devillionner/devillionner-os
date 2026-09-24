@@ -2,7 +2,7 @@
 
 Fragments is the Blueprint torrent client for **Gaming, Work, Laboratory/Dev and University/Uni**.
 
-The goal is intentionally small: open `.torrent` / `magnet:` links, see basic transfer state, pause/resume downloads, and keep transfers running without a permanent full-size application window. The Blueprint does not install qBittorrent.
+The UI is intentionally lightweight: open `.torrent` / `magnet:` links, see basic transfer state, pause/resume downloads and inspect progress. The long-running BitTorrent backend is separate from the Fragments window, so the UI does not need to stay open or occupy a special workspace. The Blueprint does not install qBittorrent.
 
 ## Caelestia integration
 
@@ -13,20 +13,31 @@ Fragments is GTK4/libadwaita, so Blueprint keeps it on Caelestia's live GTK pale
 - `devos-fragments-gtk.path` watches Caelestia's generated `gtk.css`; after a wallpaper/theme refresh it restores the single `@import "fragments.css";` line that Caelestia's GTK generator replaces.
 - The watcher is idempotent and does not copy or freeze palette values. New Caelestia colours flow through the GTK variables automatically.
 
-## Background behavior
+## Background architecture
 
-`Super+Q` keeps its normal meaning everywhere except Fragments:
+Blueprint runs Transmission independently as a user service:
 
-- on a normal window, `Super+Q` closes the active window;
-- on Fragments, `Super+Q` moves the window to hidden `special:fragments` instead of terminating it;
-- the Fragments process and its `transmission-daemon` continue downloading;
-- launching Fragments again restores and focuses the existing window instead of spawning a second UI instance.
+```text
+devos-fragments-daemon.service
+└─ transmission-daemon --config-dir ~/.config/fragments
+```
 
-The managed launcher is `~/.local/bin/fragments-caelestia`. The desktop entry disables D-Bus activation and routes app-menu, `.torrent` and `magnet:` launches through that wrapper.
+RPC is restricted to `127.0.0.1:9091`. Fragments is configured with a persistent non-local connection named **This computer** pointing to `http://127.0.0.1:9091/transmission/rpc`.
+
+That separation gives the desired desktop behavior:
+
+- `Super+Q` closes the Fragments UI normally;
+- there is **no `special:fragments` workspace**;
+- the Transmission service keeps downloading after the Fragments window closes;
+- Fragments appears on screen only when it is explicitly opened;
+- launching Fragments reconnects to the already-running localhost backend instead of spawning another daemon;
+- active downloads survive a UI restart and continue automatically after login.
+
+The managed launcher is `~/.local/bin/fragments-caelestia`. It ensures the backend/tray services are running and then launches the normal Fragments window on the current workspace.
 
 ## Caelestia tray menu
 
-While Fragments is running, `~/.local/bin/fragments-tray` registers a StatusNotifierItem with Caelestia/Quickshell.
+`devos-fragments-tray.service` keeps `~/.local/bin/fragments-tray` registered as a StatusNotifierItem independently of the Fragments UI.
 
 The normal Caelestia tray popout exposes:
 
@@ -34,7 +45,7 @@ The normal Caelestia tray popout exposes:
 - **Torrents (N)** → dynamic submenu;
 - **Pause all**;
 - **Resume all**;
-- **Quit Fragments**.
+- **Stop torrent service**.
 
 The torrent submenu is refreshed from `transmission-remote` whenever it is opened. Each row shows the useful lightweight state directly in the tray, for example:
 
@@ -44,14 +55,16 @@ The torrent submenu is refreshed from `transmission-remote` whenever it is opene
 ✓ Completed item · 100%
 ```
 
-Selecting a torrent restores the Fragments window. The tray helper also re-registers itself if Caelestia/Quickshell restarts while Fragments stays alive.
+Selecting a torrent opens Fragments. The tray helper re-registers itself if Caelestia/Quickshell restarts while the backend remains alive.
+
+Stopping the torrent service is explicit because it stops background transfers and removes the tray item. Starting Fragments again starts both managed services automatically.
 
 ## Packages and defaults
 
 The common profile explicitly owns:
 
 - `fragments`;
-- `transmission-cli`, because the Blueprint tray integration directly uses `transmission-remote`;
+- `transmission-cli`, which provides `transmission-daemon` and `transmission-remote`;
 - `python-dbus`, because the tray bridge implements StatusNotifierItem/DBusMenu on the session bus.
 
 Blueprint sets both handlers to `de.haeckerfelix.Fragments.desktop`:
@@ -63,7 +76,9 @@ qBittorrent is not part of the active Blueprint manifests. A manually installed 
 
 ## Existing-host migration evidence
 
-On the ASUS UX3405CA host on **2026-09-24**, the old qBittorrent UI was removed and the existing torrent session was imported into Fragments/Transmission without deleting downloaded data. Background hiding, continued transfer activity, tray registration, menu controls and the live torrent submenu were exercised on the real Caelestia session.
+On the ASUS UX3405CA host on **2026-09-24**, the old qBittorrent session was imported into Fragments/Transmission without deleting downloaded data. The first Blueprint Fragments integration kept the UI alive in `special:fragments`; it was then simplified to the current model with an independent Transmission user service and a normal on-demand Fragments window.
+
+The current host exercise verifies that downloads continue while Fragments itself is closed, no `special:fragments` workspace remains, the tray stays available, and reopening Fragments reconnects to the existing daemon without creating a second one.
 
 The imported torrent contents themselves are user data and are **not** committed to the Blueprint or recreated on a fresh install.
 

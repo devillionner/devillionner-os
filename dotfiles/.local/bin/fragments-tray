@@ -3,7 +3,6 @@ import os
 import re
 import signal
 import subprocess
-import time
 
 import dbus
 import dbus.service
@@ -139,7 +138,7 @@ class FragmentsMenu(dbus.service.Object):
                 "type": dbus.String("separator", variant_level=1),
                 "enabled": dbus.Boolean(True, variant_level=1),
             },
-            6: {"label": dbus.String("Quit Fragments", variant_level=1)},
+            6: {"label": dbus.String("Stop torrent service", variant_level=1)},
         }
 
         torrent = self.torrent_for_item(item_id)
@@ -203,7 +202,12 @@ class FragmentsMenu(dbus.service.Object):
         elif item_id == 4:
             run_quiet("transmission-remote", "127.0.0.1:9091", "-t", "all", "-s")
         elif item_id == 6:
-            run_quiet("pkill", "-TERM", "-x", "fragments")
+            run_quiet(
+                "sh",
+                "-lc",
+                "pkill -TERM -x fragments 2>/dev/null || true; "
+                "systemctl --user stop devos-fragments-daemon.service devos-fragments-tray.service",
+            )
 
     @dbus.service.method(MENU_IFACE, in_signature="isvu", out_signature="")
     def Event(self, item_id, event_id, data, timestamp):
@@ -278,7 +282,6 @@ class FragmentsTray(dbus.service.Object):
         self.bus_name = dbus.service.BusName(BUS_NAME, bus=bus, allow_replacement=True, replace_existing=True)
         super().__init__(self.bus_name, SNI_PATH)
         self.menu = FragmentsMenu(self.bus_name)
-        self.started = time.monotonic()
 
     def props(self):
         return {
@@ -349,29 +352,6 @@ class FragmentsTray(dbus.service.Object):
     def NewToolTip(self):
         pass
 
-def fragments_running():
-    return subprocess.run(
-        ["pgrep", "-x", "fragments"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).returncode == 0
-
-def stop_fragments_daemons():
-    config_dir = os.path.expanduser("~/.config/fragments")
-    pattern = rf"transmission-daemon.*--config-dir {re.escape(config_dir)}"
-    result = subprocess.run(
-        ["pgrep", "-f", pattern],
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-    for raw in result.stdout.split():
-        try:
-            os.kill(int(raw), signal.SIGTERM)
-        except (ProcessLookupError, ValueError):
-            pass
-
 def main():
     DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
@@ -399,14 +379,6 @@ def main():
 
     register()
 
-    def check_running():
-        if fragments_running() or (time.monotonic() - item.started) < 5:
-            return True
-        stop_fragments_daemons()
-        loop.quit()
-        return False
-
-    GLib.timeout_add_seconds(1, check_running)
     signal.signal(signal.SIGTERM, lambda *_: loop.quit())
     signal.signal(signal.SIGINT, lambda *_: loop.quit())
     loop.run()

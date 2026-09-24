@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 MAN="$REPO/manifests/profiles/common-repo.txt"
+USER_SERVICES="$REPO/manifests/profiles/services-user-common.txt"
 CONFIG="$REPO/scripts/configure-fragments"
 CHECK="$REPO/scripts/check-fragments"
 WRAPPER="$REPO/dotfiles/.local/bin/fragments-caelestia"
@@ -10,15 +11,21 @@ TRAY="$REPO/dotfiles/.local/bin/fragments-tray"
 GTK_SYNC="$REPO/dotfiles/.local/bin/devos-fragments-gtk-sync"
 CSS="$REPO/dotfiles/.config/gtk-4.0/fragments.css"
 DESKTOP="$REPO/dotfiles/.local/share/applications/de.haeckerfelix.Fragments.desktop"
-PATH_UNIT="$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.path"
-SERVICE_UNIT="$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.service"
+GTK_PATH_UNIT="$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.path"
+GTK_SERVICE_UNIT="$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.service"
+DAEMON_UNIT="$REPO/dotfiles/.config/systemd/user/devos-fragments-daemon.service"
+TRAY_UNIT="$REPO/dotfiles/.config/systemd/user/devos-fragments-tray.service"
 
-for file in "$CONFIG" "$CHECK" "$WRAPPER" "$TRAY" "$GTK_SYNC" "$CSS" "$DESKTOP" "$PATH_UNIT" "$SERVICE_UNIT"; do
+for file in     "$CONFIG" "$CHECK" "$WRAPPER" "$TRAY" "$GTK_SYNC" "$CSS" "$DESKTOP"     "$GTK_PATH_UNIT" "$GTK_SERVICE_UNIT" "$DAEMON_UNIT" "$TRAY_UNIT"
+do
     [[ -f "$file" ]] || { echo "missing: ${file#$REPO/}" >&2; exit 1; }
 done
 
 for pkg in fragments transmission-cli python-dbus; do
     grep -Fqx "$pkg" "$MAN" || { echo "common manifest missing: $pkg" >&2; exit 1; }
+done
+for unit in devos-fragments-daemon.service devos-fragments-tray.service devos-fragments-gtk.path; do
+    grep -Fqx "$unit" "$USER_SERVICES" || { echo "user-service manifest missing: $unit" >&2; exit 1; }
 done
 
 bash -n "$CONFIG"
@@ -36,28 +43,49 @@ grep -Fqx 'TryExec=fragments-caelestia' "$DESKTOP"
 grep -Fqx 'DBusActivatable=false' "$DESKTOP"
 ! grep -Eq '^Exec=/home/' "$DESKTOP"
 
-grep -Fq 'special:fragments' "$CONFIG"
 grep -Fq '0.85 override 0.85 override' "$CONFIG"
 grep -Fq 'x-scheme-handler/magnet' "$CONFIG"
 grep -Fq 'application/x-bittorrent' "$CONFIG"
 grep -Fq 'devos-fragments-gtk.path' "$CONFIG"
+grep -Fq 'devos-fragments-daemon.service' "$CONFIG"
+grep -Fq 'devos-fragments-tray.service' "$CONFIG"
+grep -Fq 'client-last-connection' "$CONFIG"
+grep -Fq 'http://127.0.0.1:9091/transmission/rpc' "$CONFIG"
+grep -Fq '"rpc-bind-address": "127.0.0.1"' "$CONFIG"
+grep -Fq 'legacy_start = "-- BEGIN Fragments background close behavior"' "$CONFIG"
+
+# The new model keeps only the backend in the background. Fragments itself must
+# not use a special workspace or custom close binding anymore.
+! grep -Fq 'workspace = "special:fragments"' "$CONFIG"
+! grep -Fq 'restore_window' "$WRAPPER"
+! grep -Fq 'stop_orphan_daemons' "$WRAPPER"
+grep -Fq 'systemctl --user start devos-fragments-daemon.service devos-fragments-tray.service' "$WRAPPER"
+grep -Fq 'exec /usr/bin/fragments "$@"' "$WRAPPER"
 
 grep -Fq 'Torrents (' "$TRAY"
 grep -Fq 'children-display' "$TRAY"
 grep -Fq 'Pause all' "$TRAY"
 grep -Fq 'Resume all' "$TRAY"
+grep -Fq 'Stop torrent service' "$TRAY"
 grep -Fq 'transmission-remote' "$TRAY"
 grep -Fq 'org.kde.StatusNotifierItem.Fragments' "$TRAY"
-grep -Fq 'def stop_fragments_daemons' "$TRAY"
-grep -Fq 'stop_orphan_daemons' "$WRAPPER"
+! grep -Fq 'def fragments_running' "$TRAY"
+! grep -Fq 'def stop_fragments_daemons' "$TRAY"
 
 grep -Fq '@accent_color' "$CSS"
 grep -Fq '@window_fg_color' "$CSS"
 grep -Fq '@card_bg_color' "$CSS"
 grep -Fq '@import "fragments.css";' "$GTK_SYNC"
 
-grep -Fq 'PathChanged=%h/.config/gtk-4.0/gtk.css' "$PATH_UNIT"
-grep -Fq 'ExecStart=%h/.local/bin/devos-fragments-gtk-sync' "$SERVICE_UNIT"
+grep -Fq 'PathChanged=%h/.config/gtk-4.0/gtk.css' "$GTK_PATH_UNIT"
+grep -Fq 'ExecStart=%h/.local/bin/devos-fragments-gtk-sync' "$GTK_SERVICE_UNIT"
+
+grep -Fq 'ExecStart=/usr/bin/transmission-daemon -f' "$DAEMON_UNIT"
+grep -Fq -- '--rpc-bind-address 127.0.0.1' "$DAEMON_UNIT"
+grep -Fq 'WantedBy=default.target' "$DAEMON_UNIT"
+grep -Fq 'Requires=devos-fragments-daemon.service' "$TRAY_UNIT"
+grep -Fq 'PartOf=devos-fragments-daemon.service' "$TRAY_UNIT"
+grep -Fq 'ExecStart=%h/.local/bin/fragments-tray' "$TRAY_UNIT"
 
 # Standalone apply must remain a targeted configuration operation; package
 # installation/removal belongs to profile reconciliation.

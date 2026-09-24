@@ -1,0 +1,14 @@
+[Unit]
+Description=Caelestia tray bridge for Fragments
+Requires=devos-fragments-daemon.service
+After=devos-fragments-daemon.service
+PartOf=devos-fragments-daemon.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/fragments-tray
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

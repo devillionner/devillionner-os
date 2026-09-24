@@ -12,7 +12,7 @@ if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "$XDG_RUNTIME_DIR/bus" ]]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 fi
 
-for cmd in fragments transmission-remote python3; do
+for cmd in fragments transmission-daemon transmission-remote python3 gsettings; do
     command -v "$cmd" >/dev/null 2>&1 || bp_die "$cmd is missing; install the Blueprint common package set first"
 done
 python3 - <<'PY' >/dev/null 2>&1 || bp_die "python-dbus is missing"
@@ -20,13 +20,58 @@ import dbus  # noqa: F401
 PY
 
 bp_info "Installing Fragments + Caelestia integration"
+
 install -Dm755 "$REPO/dotfiles/.local/bin/fragments-caelestia" "$HOME/.local/bin/fragments-caelestia"
 install -Dm755 "$REPO/dotfiles/.local/bin/fragments-tray" "$HOME/.local/bin/fragments-tray"
 install -Dm755 "$REPO/dotfiles/.local/bin/devos-fragments-gtk-sync" "$HOME/.local/bin/devos-fragments-gtk-sync"
 install -Dm644 "$REPO/dotfiles/.config/gtk-4.0/fragments.css" "$HOME/.config/gtk-4.0/fragments.css"
 install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.service" "$HOME/.config/systemd/user/devos-fragments-gtk.service"
 install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-fragments-gtk.path" "$HOME/.config/systemd/user/devos-fragments-gtk.path"
+install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-fragments-daemon.service" "$HOME/.config/systemd/user/devos-fragments-daemon.service"
+install -Dm644 "$REPO/dotfiles/.config/systemd/user/devos-fragments-tray.service" "$HOME/.config/systemd/user/devos-fragments-tray.service"
 install -Dm644 "$REPO/dotfiles/.local/share/applications/de.haeckerfelix.Fragments.desktop" "$HOME/.local/share/applications/de.haeckerfelix.Fragments.desktop"
+
+# Fragments normally owns a local Transmission child process. Blueprint instead
+# keeps Transmission as a user service and makes Fragments use it through a
+# localhost "remote" connection. The UI can then close normally without stopping
+# active transfers or occupying a special workspace.
+FRAGMENTS_CONNECTION_UUID="cae1e57a-6d6b-4fae-9a51-7a9d9ce15a01"
+mkdir -p "$HOME/.config/fragments"
+python3 - "$HOME/.config/fragments/settings.json" "$HOME/.config/fragments/connections.conf" "$FRAGMENTS_CONNECTION_UUID" <<'PY'
+from configparser import RawConfigParser
+import json
+from pathlib import Path
+import sys
+
+settings_path = Path(sys.argv[1])
+connections_path = Path(sys.argv[2])
+uuid = sys.argv[3]
+
+settings = {}
+if settings_path.exists():
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+settings.update({
+    "rpc-enabled": True,
+    "rpc-bind-address": "127.0.0.1",
+    "rpc-port": 9091,
+    "rpc-authentication-required": False,
+    "rpc-whitelist": "127.0.0.1,::1",
+    "rpc-whitelist-enabled": True,
+})
+settings_path.write_text(json.dumps(settings, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
+
+cfg = RawConfigParser(interpolation=None, strict=False)
+cfg.optionxform = str
+if connections_path.exists():
+    cfg.read(connections_path, encoding="utf-8")
+if not cfg.has_section(uuid):
+    cfg.add_section(uuid)
+cfg.set(uuid, "title", "This computer")
+cfg.set(uuid, "address", "http://127.0.0.1:9091/transmission/rpc")
+with connections_path.open("w", encoding="utf-8") as handle:
+    cfg.write(handle, space_around_delimiters=False)
+PY
+gsettings set de.haeckerfelix.Fragments client-last-connection "$FRAGMENTS_CONNECTION_UUID"
 
 HYPR_USER="$HOME/.config/caelestia/hypr-user.lua"
 mkdir -p "$(dirname "$HYPR_USER")"
@@ -38,46 +83,38 @@ import sys
 path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8") if path.exists() else ""
 
-blocks = [
-    (
-        "-- BEGIN Fragments Caelestia integration",
-        "-- END Fragments Caelestia integration",
-        '''-- BEGIN Fragments Caelestia integration
+start = "-- BEGIN Fragments Caelestia integration"
+end = "-- END Fragments Caelestia integration"
+block = '''-- BEGIN Fragments Caelestia integration
 hl.window_rule({
     name = "fragments-kitty-opacity",
     match = {
-        class = "^de\\\\.haeckerfelix\\\\.Fragments$",
+        class = "^de\\.haeckerfelix\\.Fragments$",
     },
     opacity = "0.85 override 0.85 override",
 })
--- END Fragments Caelestia integration''',
-    ),
-    (
-        "-- BEGIN Fragments background close behavior",
-        "-- END Fragments background close behavior",
-        '''-- BEGIN Fragments background close behavior
-hl.unbind("SUPER + Q")
-hl.bind("SUPER + Q", function()
-    local w = hl.get_active_window()
-    if w and w.class == "de.haeckerfelix.Fragments" then
-        hl.dispatch(hl.dsp.window.move({ workspace = "special:fragments", follow = false }))
-    else
-        hl.dispatch(hl.dsp.window.close())
-    end
-end, { description = "Close window / hide Fragments" })
--- END Fragments background close behavior''',
-    ),
-]
+-- END Fragments Caelestia integration'''
 
-for start, end, block in blocks:
-    if start in text or end in text:
-        if text.count(start) != 1 or text.count(end) != 1:
-            raise SystemExit(f"ambiguous managed block in {path}: {start}")
-        a = text.index(start)
-        b = text.index(end, a) + len(end)
-        text = text[:a] + block + text[b:]
-    else:
-        text = text.rstrip() + "\n\n" + block + "\n"
+if start in text or end in text:
+    if text.count(start) != 1 or text.count(end) != 1:
+        raise SystemExit(f"ambiguous managed block in {path}: {start}")
+    a = text.index(start)
+    b = text.index(end, a) + len(end)
+    text = text[:a] + block + text[b:]
+else:
+    text = text.rstrip() + "\n\n" + block + "\n"
+
+# Migration from the first Fragments integration: it used special:fragments as
+# a pseudo-minimize target. That creates an unnecessary special-workspace icon,
+# so remove the managed override and let the normal Super+Q close binding win.
+legacy_start = "-- BEGIN Fragments background close behavior"
+legacy_end = "-- END Fragments background close behavior"
+if legacy_start in text or legacy_end in text:
+    if text.count(legacy_start) != 1 or text.count(legacy_end) != 1:
+        raise SystemExit(f"ambiguous legacy managed block in {path}: {legacy_start}")
+    a = text.index(legacy_start)
+    b = text.index(legacy_end, a) + len(legacy_end)
+    text = (text[:a].rstrip() + "\n\n" + text[b:].lstrip()).rstrip() + "\n"
 
 path.parent.mkdir(parents=True, exist_ok=True)
 path.write_text(text, encoding="utf-8")
@@ -103,21 +140,45 @@ with path.open("w", encoding="utf-8") as handle:
 PY
 
 "$HOME/.local/bin/devos-fragments-gtk-sync"
+
+# Retire the old UI-owned daemon before enabling the background service. User
+# torrent state lives in ~/.config/fragments and is preserved.
+systemctl --user stop devos-fragments-tray.service devos-fragments-daemon.service >/dev/null 2>&1 || true
+pkill -TERM -x fragments >/dev/null 2>&1 || true
+sleep 0.3
+python3 - "$HOME/.config/fragments" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+
+config_dir = sys.argv[1]
+out = subprocess.run(
+    ["ps", "-eo", "pid=,comm=,args="],
+    text=True,
+    stdout=subprocess.PIPE,
+    check=True,
+).stdout
+for line in out.splitlines():
+    parts = line.strip().split(None, 2)
+    if len(parts) != 3:
+        continue
+    pid, comm, args = parts
+    if comm.startswith("transmission-da") and f"--config-dir {config_dir}" in args:
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+PY
+sleep 0.5
+
 systemctl --user daemon-reload
-systemctl --user enable --now devos-fragments-gtk.path >/dev/null 2>&1 \
-    || bp_warn "Could not enable Fragments GTK theme watcher in this user session"
+systemctl --user enable --now     devos-fragments-daemon.service     devos-fragments-tray.service     devos-fragments-gtk.path >/dev/null 2>&1     || bp_warn "Could not enable one or more Fragments user services in this session"
 
-command -v update-desktop-database >/dev/null 2>&1 \
-    && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
-
-if pgrep -x fragments >/dev/null 2>&1; then
-    if ! pgrep -f '^python3 .*/fragments-tray$' >/dev/null 2>&1; then
-        nohup "$HOME/.local/bin/fragments-tray" >/tmp/fragments-tray.log 2>&1 &
-    fi
-fi
+command -v update-desktop-database >/dev/null 2>&1     && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 
 if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 2>&1; then
-    hyprctl reload >/dev/null 2>&1 || bp_warn "Hyprland reload failed; Fragments bindings will apply next session"
+    hyprctl reload >/dev/null 2>&1 || bp_warn "Hyprland reload failed; Fragments opacity will apply next session"
 fi
 
-bp_ok "Fragments integration ready: Caelestia GTK styling, 0.85 opacity, Super+Q background hide, tray menu and torrent submenu"
+bp_ok "Fragments ready: background Transmission service + tray, normal UI close, no special workspace"

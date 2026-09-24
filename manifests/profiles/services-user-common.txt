@@ -1,4 +1,6 @@
+devos-fragments-daemon.service
 devos-fragments-gtk.path
+devos-fragments-tray.service
 gnome-keyring-daemon.socket
 pipewire-pulse.socket
 pipewire.socket

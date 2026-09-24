@@ -1,0 +1,11 @@
+[Unit]
+Description=Transmission backend for Fragments
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/transmission-daemon -f --no-auth --config-dir %h/.config/fragments --port 9091 --rpc-bind-address 127.0.0.1 --allowed 127.0.0.1,::1
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
