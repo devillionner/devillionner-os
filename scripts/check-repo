@@ -145,6 +145,7 @@ BRANDING_APPLY="$REPO/scripts/configure-caelestia"
 BRANDING_RECONCILE="$REPO/scripts/reconcile-packages"
 if grep -Fq '"logo": "caelestia"' "$BRANDING_CONFIG" \
     && grep -Fq 'arch-update.timer' "$BRANDING_APPLY" \
+    && grep -Fq 'rm -f "$HOME/.local/share/applications/arch-update.desktop"' "$BRANDING_APPLY" \
     && grep -Fq 'org.cachyos.KernelManager.desktop' "$BRANDING_APPLY"; then
     ok "Caelestia-first branding source contract"
 else

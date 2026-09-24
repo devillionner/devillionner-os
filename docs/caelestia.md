@@ -87,7 +87,8 @@ The same configurator suppresses the branded background/launcher layer without r
 
 - the global Cachy-Update tray autostart is overridden per-user and its user timer is masked;
 - any already-running Cachy-Update tray instance is stopped;
-- launcher entries for Cachy-Update, CachyOS Hello, CachyOS Package Installer and CachyOS Kernel Manager are hidden;
+- the normal **Cachy-Update** launcher remains visible for deliberate manual updates;
+- branding/background-only launcher entries for the Cachy-Update tray, CachyOS Hello, CachyOS Package Installer and CachyOS Kernel Manager are hidden;
 - the kernel manager package itself may remain available as a recovery/technical tool even though it is not part of the normal launcher UX;
 - full package reconciliation removes the pure desktop extras `cachyos-hello`, `cachyos-packageinstaller` and `cachyos-wallpapers`.
 

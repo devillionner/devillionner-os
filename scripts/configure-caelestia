@@ -18,6 +18,11 @@ mkdir -p "$HOME/.config/autostart" "$HOME/.local/share/applications"
 # Caelestia is the visible shell identity. Keep CachyOS as the technical base,
 # but suppress its welcome/update tray and branded launcher shortcuts.
 rm -f "$HOME/.config/autostart/cachyos-hello.desktop"
+
+# Keep the interactive updater available on demand in the launcher. Only its
+# background tray/timer are suppressed.
+rm -f "$HOME/.local/share/applications/arch-update.desktop"
+
 cat > "$HOME/.config/autostart/arch-update-tray.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
@@ -27,7 +32,6 @@ NoDisplay=true
 EOF
 
 for desktop in \
-    arch-update.desktop \
     arch-update-tray.desktop \
     cachyos-hello.desktop \
     cachyos-pi.desktop \

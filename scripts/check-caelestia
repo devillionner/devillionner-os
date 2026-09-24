@@ -90,9 +90,15 @@ else
     fail "Cachy-Update autostart override missing"
 fi
 
+if [[ -f /usr/share/applications/arch-update.desktop ]] \
+    && [[ ! -e "$HOME/.local/share/applications/arch-update.desktop" ]]; then
+    ok "manual Cachy-Update launcher available"
+else
+    fail "manual Cachy-Update launcher is missing or user-hidden"
+fi
+
 HIDDEN_LAUNCHERS=0
 for desktop in \
-    arch-update.desktop \
     arch-update-tray.desktop \
     cachyos-hello.desktop \
     cachyos-pi.desktop \
@@ -102,8 +108,8 @@ do
         || HIDDEN_LAUNCHERS=$((HIDDEN_LAUNCHERS + 1))
 done
 ((HIDDEN_LAUNCHERS == 0)) \
-    && ok "CachyOS-branded launcher entries hidden" \
-    || fail "$HIDDEN_LAUNCHERS CachyOS-branded launcher override(s) missing"
+    && ok "background/branding-only CachyOS launcher entries hidden" \
+    || fail "$HIDDEN_LAUNCHERS background/branding launcher override(s) missing"
 
 if command -v caelestia >/dev/null 2>&1; then
     ok "caelestia CLI available"
