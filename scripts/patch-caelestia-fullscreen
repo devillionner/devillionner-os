@@ -348,7 +348,7 @@ replace_known(network_connection,
 ''', "credential-first connection flow")
 
 replace_known(nmcli,
-'''    function parseNetworkOutput(output: string): list<var> {
+r'''    function parseNetworkOutput(output: string): list<var> {
         if (!output || output.length === 0) {
             return [];
         }
@@ -372,7 +372,7 @@ replace_known(nmcli,
         return allNetworks;
     }
 ''',
-'''    function parseNmcliTerseLine(line: string): list<string> {
+r'''    function parseNmcliTerseLine(line: string): list<string> {
         const fields = [];
         let current = "";
         let escaped = false;
@@ -422,7 +422,7 @@ replace_known(nmcli,
 ''', "nmcli escaped-field parser")
 
 replace_known(nmcli,
-'''    function parseConnectionList(output: string, callback: var): void {
+r'''    function parseConnectionList(output: string, callback: var): void {
         const lines = output.trim().split("\n").filter(line => line.length > 0);
         const wifiConnections = [];
         const connections = [];
@@ -430,7 +430,7 @@ replace_known(nmcli,
         for (const line of lines) {
             const parts = line.split(":");
 ''',
-'''    function parseConnectionList(output: string, callback: var): void {
+r'''    function parseConnectionList(output: string, callback: var): void {
         const lines = output.split("\n").filter(line => line.length > 0);
         const wifiConnections = [];
         const connections = [];
@@ -440,7 +440,7 @@ replace_known(nmcli,
 ''', "saved connection escaped-field parser")
 
 replace_known(nmcli,
-'''    function processSsidOutput(output: string): void {
+r'''    function processSsidOutput(output: string): void {
         const ssidPrefix = "802-11-wireless.ssid:";
         const keyMgmtPrefix = `${root.securityKeyMgmt}:`;
 
@@ -470,7 +470,7 @@ replace_known(nmcli,
         root.savedConnectionSecurity = security;
     }
 ''',
-'''    function processSsidOutput(output: string): void {
+r'''    function processSsidOutput(output: string): void {
         let ssid = "";
         let keyMgmt = "";
 
