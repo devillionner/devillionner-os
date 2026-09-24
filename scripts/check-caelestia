@@ -78,27 +78,7 @@ case "$UPDATE_TIMER_STATE" in
     *) fail "Cachy-Update background timer is $UPDATE_TIMER_STATE" ;;
 esac
 
-if pgrep -f '^/usr/lib/arch-update/arch-update-tray    ok "caelestia CLI available"
-else
-    warn "caelestia CLI not found in PATH"
-fi
-
-printf '\n'
-if bash "$REPO/scripts/check-caelestia-patches"; then
-    ok "installed Caelestia package patches match Blueprint"
-else
-    fail "installed Caelestia package patches differ or upstream changed"
-fi
-
-printf '\n========================================\n'
-printf 'Caelestia summary: OK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
-if ((FAIL == 0)); then
-    printf 'RESULT: PASS\n'
-    exit 0
-fi
-printf 'RESULT: FAIL\n'
-exit 1
- >/dev/null 2>&1; then
+if pgrep -f "^/usr/lib/arch-update/arch-update-tray$" >/dev/null 2>&1; then
     fail "Cachy-Update tray process is running"
 else
     ok "Cachy-Update tray process absent"

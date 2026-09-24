@@ -47,7 +47,7 @@ if systemctl --user cat arch-update.timer >/dev/null 2>&1; then
     systemctl --user mask --now arch-update.timer >/dev/null 2>&1 || true
     systemctl --user stop arch-update.service arch-update-notification.service >/dev/null 2>&1 || true
 fi
-pkill -f '^/usr/lib/arch-update/arch-update-tray >/dev/null 2>&1 || true
+pkill -f "^/usr/lib/arch-update/arch-update-tray$" >/dev/null 2>&1 || true
 systemctl --user daemon-reload >/dev/null 2>&1 || true
 command -v update-desktop-database >/dev/null 2>&1 \
     && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 \
