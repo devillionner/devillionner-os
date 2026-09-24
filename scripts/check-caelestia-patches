@@ -93,6 +93,41 @@ if [[ -n "$SHELL_QML" && -f "$SHELL_QML" ]]; then
     [[ "$env_ok" == true ]] || true
 fi
 
+NEXUS_STATE="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/nexus\/NexusState\.qml$/ {print $2; exit}')"
+NETWORK_LIST="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/nexus\/common\/NetworkList\.qml$/ {print $2; exit}')"
+ADD_NETWORK="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/modules\/nexus\/pages\/network\/AddNetworkPage\.qml$/ {print $2; exit}')"
+NETWORK_CONNECTION="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/utils\/NetworkConnection\.qml$/ {print $2; exit}')"
+NMCLI="$(pacman -Ql caelestia-shell 2>/dev/null | awk '/\/services\/Nmcli\.qml$/ {print $2; exit}')"
+
+wifi_ok=true
+for file in "$NEXUS_STATE" "$NETWORK_LIST" "$ADD_NETWORK" "$NETWORK_CONNECTION" "$NMCLI"; do
+    [[ -n "$file" && -f "$file" ]] || { fail "Caelestia Wi-Fi patch target missing"; wifi_ok=false; }
+done
+
+if [[ "$wifi_ok" == true ]]; then
+    if python3 - "$NEXUS_STATE" "$NETWORK_LIST" "$ADD_NETWORK" "$NETWORK_CONNECTION" "$NMCLI" <<'PY' >/dev/null 2>&1
+from pathlib import Path
+import sys
+nexus, listing, add, connection, nmcli = [Path(p).read_text(encoding="utf-8") for p in sys.argv[1:]]
+assert 'property string pendingNetworkSsid' in nexus
+assert 'NetworkConnection.handleConnect(modelData, null, target =>' in listing
+assert 'network.isSecure && !Nmcli.hasSavedProfile(network.ssid)' in connection
+assert 'function parseNmcliTerseLine(line: string): list<string>' in nmcli
+assert 'ssid: net[3] ?? ""' in nmcli
+assert 'root.savedConnectionSsids.some(savedSsid => savedSsid === ssid)' in nmcli
+assert 'root.savedConnections.find(conn => conn === ssid) || ssid' in nmcli
+assert 'const ssid = root.targetSsid || ssidField.text;' in add
+assert 'NetworkConnection.connectWithPassword(target, passwordField.text, handleResult);' in add
+assert 'Network not found — rescan and try again' in add
+assert 'Connection failed — try again' in add
+PY
+    then
+        ok "Caelestia Wi-Fi password/exact-SSID patch active"
+    else
+        fail "Caelestia Wi-Fi password/exact-SSID patch missing or upstream structure changed"
+    fi
+fi
+
 printf '\nOK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
 if ((FAIL == 0)); then
     printf 'RESULT: PASS\n'

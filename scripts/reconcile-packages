@@ -87,6 +87,30 @@ PREVIOUS_ALL="$TMP/previous-all"
 
 cat "$DESIRED_REPO" "$DESIRED_AUR" | sort -u > "$DESIRED_ALL"
 
+# Caelestia is the canonical NetworkManager UI. Remove the redundant GTK
+# applet/editor even when inherited from the base image, but keep NetworkManager.
+FORBIDDEN_NETWORK_UI=(network-manager-applet nm-connection-editor)
+INSTALLED_FORBIDDEN_NETWORK_UI=()
+for pkg in "${FORBIDDEN_NETWORK_UI[@]}"; do
+    grep -qxF "$pkg" "$DESIRED_ALL" && bp_die "Forbidden network UI package is also desired: $pkg"
+    pacman -Qq "$pkg" >/dev/null 2>&1 && INSTALLED_FORBIDDEN_NETWORK_UI+=("$pkg")
+done
+if ((${#INSTALLED_FORBIDDEN_NETWORK_UI[@]})); then
+    bp_info "Removing redundant NetworkManager GUI frontend: ${INSTALLED_FORBIDDEN_NETWORK_UI[*]}"
+    sudo pacman -Rns --noconfirm "${INSTALLED_FORBIDDEN_NETWORK_UI[@]}" \
+        || bp_die "Could not remove redundant NetworkManager GUI frontend"
+else
+    bp_ok "legacy NetworkManager GUI frontend absent"
+fi
+
+systemctl --user disable --now nm-applet.service >/dev/null 2>&1 || true
+pkill -x nm-applet >/dev/null 2>&1 || true
+rm -f \
+    "$HOME/.config/systemd/user/nm-applet.service" \
+    "$HOME/.config/systemd/user/graphical-session.target.wants/nm-applet.service" \
+    "$HOME/.config/autostart/nm-applet.desktop"
+systemctl --user daemon-reload >/dev/null 2>&1 || true
+
 # Prefer the exact ownership snapshot from the previous successful reconciliation.
 # Older Blueprint installs predate this state, so bootstrap their ownership from
 # the stored profile/features plus an explicit list of retired Blueprint packages.

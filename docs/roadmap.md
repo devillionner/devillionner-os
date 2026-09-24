@@ -41,6 +41,7 @@ This is the working backlog after the profile + reusable-feature refactor. See `
 - [ ] Confirm Bibata Modern Ice visually across the compositor/XWayland after the next logout/login.
 - [ ] Add an OCR region hotkey: select area → OCR → clipboard (ukr/eng/rus).
 - [x] Add explicit validation for every current Caelestia UI/runtime package patch after upstream updates.
+- [x] Make Caelestia the single Wi-Fi UI: native password prompt, exact escaped/whitespace SSID handling, BSSID-aware connect flow, and no legacy nm-applet frontend.
 
 ## P1 — system / performance
 
@@ -81,7 +82,8 @@ This is the working backlog after the profile + reusable-feature refactor. See `
 
 - [x] Active manifests no longer install Alacritty/Ptyxis; Kitty is the single default terminal.
 - [ ] Review remaining duplicated viewers/utilities after real use of a fresh system.
-- [ ] Decide whether GNOME-oriented helper packages can be reduced further without hurting login, portals, keyring or file dialogs.
+- [x] Remove the redundant NetworkManager GTK applet/editor while retaining NetworkManager itself and FluxCast's libappindicator tray backend.
+- [ ] Decide whether remaining GNOME-oriented helper packages can be reduced further without hurting login, portals, keyring or file dialogs.
 - [ ] Review whether the current media/video apps should be consolidated.
 
 ## Documentation

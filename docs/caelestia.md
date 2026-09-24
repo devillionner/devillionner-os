@@ -57,13 +57,25 @@ The packaged Caelestia shell currently needs a small Blueprint compatibility/UI 
 
 - allow the sidebar shortcut while a fullscreen client is active;
 - keep fullscreen input masked except while the sidebar is open;
-- convert the four required Quickshell environment pragmas from `DefaultEnv` to `Env`.
+- convert the four required Quickshell environment pragmas from `DefaultEnv` to `Env`;
+- route secured unsaved Wi-Fi networks from Nexus directly to a password form before disconnecting the current network;
+- preserve SSIDs exactly, including escaped backslashes, case and leading/trailing spaces from `nmcli` terse output;
+- connect scanned networks with their exact SSID + BSSID instead of reconstructing a trimmed hidden-network profile;
+- show password-specific errors only for authentication failures, while missing/disappeared SSIDs get a network-not-found message.
 
 `scripts/check-caelestia-patches` validates the installed package files after restore/update. It fails when a patch is missing or when the upstream QML structure moved enough that the known result can no longer be found.
 
 Repository CI separately runs `scripts/check-caelestia-patch-source`, which keeps patch application and runtime validation coupled to the same QML targets and exact expected results. This catches a stale checker/patch pair before it reaches a clean install.
 
 `scripts/check-caelestia` includes the package-patch check, so a restore cannot report a clean Caelestia validation while those runtime patches are absent.
+
+## Network UI ownership
+
+Caelestia is the single NetworkManager UI in Blueprint. The backend remains the normal `NetworkManager` service and `nmcli`; the legacy GTK tray frontend is intentionally removed during package reconciliation.
+
+The reconciler explicitly removes `network-manager-applet` and `nm-connection-editor`, stops and deletes stale per-user `nm-applet` service/autostart state, and leaves NetworkManager itself untouched. `libappindicator` stays explicit in the shared TV Cast manifest because FluxCast uses it as its Hyprland/KDE tray backend. The aggregate runtime check fails if either legacy frontend returns, if an nm-applet process/autostart survives, or if the FluxCast tray dependency disappears.
+
+This package removal belongs to a full restore/reconciliation. Targeted `devos-blueprint apply caelestia` remains non-destructive and does not uninstall packages.
 
 ## Safe apply and validation
 

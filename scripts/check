@@ -156,6 +156,35 @@ for pkg in "${AUR_PKGS[@]}"; do
 done
 ((AUR_MISSING == 0)) && ok "AUR/foreign packages ${#AUR_PKGS[@]}/${#AUR_PKGS[@]}" || fail "$AUR_MISSING AUR package(s) missing"
 
+NETWORK_UI_DRIFT=0
+for pkg in network-manager-applet nm-connection-editor; do
+    if pacman -Qq "$pkg" >/dev/null 2>&1; then
+        printf "         redundant network UI package: %s\n" "$pkg"
+        NETWORK_UI_DRIFT=$((NETWORK_UI_DRIFT + 1))
+    fi
+done
+((NETWORK_UI_DRIFT == 0)) && ok "Caelestia is the sole NetworkManager UI package" || fail "$NETWORK_UI_DRIFT redundant NetworkManager GUI package(s)"
+
+pacman -Qq libappindicator >/dev/null 2>&1 \
+    && ok "libappindicator retained for FluxCast tray backend" \
+    || fail "libappindicator missing for FluxCast tray backend"
+
+if pgrep -x nm-applet >/dev/null 2>&1; then
+    fail "nm-applet process should not run"
+else
+    ok "nm-applet process absent"
+fi
+
+NM_APPLET_AUTOSTART=0
+for path in \
+    "$HOME/.config/systemd/user/nm-applet.service" \
+    "$HOME/.config/systemd/user/graphical-session.target.wants/nm-applet.service" \
+    "$HOME/.config/autostart/nm-applet.desktop"
+do
+    [[ -e "$path" || -L "$path" ]] && NM_APPLET_AUTOSTART=$((NM_APPLET_AUTOSTART + 1))
+done
+((NM_APPLET_AUTOSTART == 0)) && ok "nm-applet user autostart absent" || fail "$NM_APPLET_AUTOSTART nm-applet autostart artifact(s)"
+
 section "DESKTOP SESSION"
 if pgrep -af '(^|/)(qs|quickshell)([[:space:]].*)?-c[[:space:]]+caelestia|caelestia[[:space:]]+shell' >/dev/null 2>&1; then
     ok "Caelestia shell running"

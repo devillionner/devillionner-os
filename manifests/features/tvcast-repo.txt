@@ -4,3 +4,4 @@ gettext
 libnotify
 tmux
 wf-recorder
+libappindicator

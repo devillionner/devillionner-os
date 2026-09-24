@@ -134,4 +134,475 @@ else:
     print("shell.qml: environment pragmas already patched")
 PY
 
+ok "Caelestia fullscreen/runtime patches applied"
+
+NEXUS_STATE="$(pacman -Ql caelestia-shell | awk '/\/modules\/nexus\/NexusState\.qml$/ {print $2; exit}')"
+NETWORK_LIST="$(pacman -Ql caelestia-shell | awk '/\/modules\/nexus\/common\/NetworkList\.qml$/ {print $2; exit}')"
+ADD_NETWORK="$(pacman -Ql caelestia-shell | awk '/\/modules\/nexus\/pages\/network\/AddNetworkPage\.qml$/ {print $2; exit}')"
+NETWORK_CONNECTION="$(pacman -Ql caelestia-shell | awk '/\/utils\/NetworkConnection\.qml$/ {print $2; exit}')"
+NMCLI="$(pacman -Ql caelestia-shell | awk '/\/services\/Nmcli\.qml$/ {print $2; exit}')"
+
+for file in "$NEXUS_STATE" "$NETWORK_LIST" "$ADD_NETWORK" "$NETWORK_CONNECTION" "$NMCLI"; do
+    if [[ -z "$file" || ! -f "$file" ]]; then
+        warn "Could not locate all Caelestia Wi-Fi QML files; skipping Wi-Fi patch"
+        exit 0
+    fi
+done
+
+info "Patching Caelestia Wi-Fi password flow and exact SSID handling"
+
+sudo python - "$NEXUS_STATE" "$NETWORK_LIST" "$ADD_NETWORK" "$NETWORK_CONNECTION" "$NMCLI" <<'PY'
+from pathlib import Path
+import sys
+
+nexus_state, network_list, add_network, network_connection, nmcli = map(Path, sys.argv[1:])
+texts = {p: p.read_text(encoding="utf-8") for p in (nexus_state, network_list, add_network, network_connection, nmcli)}
+
+def replace_known(path, old, new, label):
+    text = texts[path]
+    if new in text:
+        print(f"{path.name}: {label} already patched")
+        return
+    if old not in text:
+        raise SystemExit(f"{path.name}: expected upstream block for {label} not found; refusing Wi-Fi patch")
+    if text.count(old) != 1:
+        raise SystemExit(f"{path.name}: expected exactly one upstream block for {label}")
+    texts[path] = text.replace(old, new, 1)
+    print(f"{path.name}: {label} patched")
+
+replace_known(nexus_state,
+'''    property string selectedNetworkSsid
+    property string selectedEthernetInterface
+''',
+'''    property string selectedNetworkSsid
+    property string pendingNetworkSsid
+    property string selectedEthernetInterface
+''', "pending network state")
+
+replace_known(network_list,
+'''            if (!modelData.active) {
+                NetworkConnection.handleConnect(modelData);
+                currentSelected = true;
+                root.networkSelected(modelData);
+''',
+'''            if (!modelData.active) {
+                NetworkConnection.handleConnect(modelData, null, target => {
+                    network.currentSelected = false;
+                    root.nState.pendingNetworkSsid = target.ssid;
+                    root.nState.openSubPage(2);
+                });
+                currentSelected = true;
+                root.networkSelected(modelData);
+''', "Nexus password prompt routing")
+
+replace_known(network_connection,
+'''        if (Nmcli.active && Nmcli.active.ssid !== network.ssid) {
+            Nmcli.disconnectFromNetwork();
+            Qt.callLater(() => {
+                root.connectToNetwork(network, session, onPasswordNeeded);
+            });
+        } else {
+            root.connectToNetwork(network, session, onPasswordNeeded);
+        }
+''',
+'''        // Ask for credentials before disconnecting the current network.
+        if (network.isSecure && !Nmcli.hasSavedProfile(network.ssid)) {
+            if (session && session.network) {
+                session.network.showPasswordDialog = true;
+                session.network.pendingNetwork = network;
+            } else if (onPasswordNeeded) {
+                onPasswordNeeded(network);
+            }
+            return;
+        }
+
+        if (Nmcli.active && Nmcli.active.ssid !== network.ssid) {
+            Nmcli.disconnectFromNetwork();
+            Qt.callLater(() => {
+                root.connectToNetwork(network, session, onPasswordNeeded);
+            });
+        } else {
+            root.connectToNetwork(network, session, onPasswordNeeded);
+        }
+''', "credential-first connection flow")
+
+replace_known(nmcli,
+'''    function parseNetworkOutput(output: string): list<var> {
+        if (!output || output.length === 0) {
+            return [];
+        }
+
+        const PLACEHOLDER = "STRINGWHICHHOPEFULLYWONTBEUSED";
+        const rep = new RegExp("\\\\:", "g");
+        const rep2 = new RegExp(PLACEHOLDER, "g");
+
+        const allNetworks = output.trim().split("\n").filter(line => line && line.length > 0).map(n => {
+            const net = n.replace(rep, PLACEHOLDER).split(":");
+            return {
+                active: net[0] === "yes",
+                strength: parseInt(net[1] || "0", 10) || 0,
+                frequency: parseInt(net[2] || "0", 10) || 0,
+                ssid: (net[3]?.replace(rep2, ":") ?? "").trim(),
+                bssid: (net[4]?.replace(rep2, ":") ?? "").trim(),
+                security: (net[5] ?? "").trim()
+            };
+        }).filter(n => n.ssid && n.ssid.length > 0);
+
+        return allNetworks;
+    }
+''',
+'''    function parseNmcliTerseLine(line: string): list<string> {
+        const fields = [];
+        let current = "";
+        let escaped = false;
+
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (escaped) {
+                current += ch;
+                escaped = false;
+            } else if (ch === "\\") {
+                escaped = true;
+            } else if (ch === ":") {
+                fields.push(current);
+                current = "";
+            } else {
+                current += ch;
+            }
+        }
+
+        if (escaped)
+            current += "\\";
+
+        fields.push(current);
+        return fields;
+    }
+
+    function parseNetworkOutput(output: string): list<var> {
+        if (!output || output.length === 0) {
+            return [];
+        }
+
+        const allNetworks = output.split("\n").filter(line => line && line.length > 0).map(line => {
+            const net = parseNmcliTerseLine(line);
+            return {
+                active: net[0] === "yes",
+                strength: parseInt(net[1] || "0", 10) || 0,
+                frequency: parseInt(net[2] || "0", 10) || 0,
+                // SSIDs are byte-significant: preserve backslashes, case and whitespace.
+                ssid: net[3] ?? "",
+                bssid: (net[4] ?? "").trim(),
+                security: (net[5] ?? "").trim()
+            };
+        }).filter(n => n.ssid && n.ssid.length > 0);
+
+        return allNetworks;
+    }
+''', "nmcli escaped-field parser")
+
+replace_known(nmcli,
+'''    function parseConnectionList(output: string, callback: var): void {
+        const lines = output.trim().split("\n").filter(line => line.length > 0);
+        const wifiConnections = [];
+        const connections = [];
+
+        for (const line of lines) {
+            const parts = line.split(":");
+''',
+'''    function parseConnectionList(output: string, callback: var): void {
+        const lines = output.split("\n").filter(line => line.length > 0);
+        const wifiConnections = [];
+        const connections = [];
+
+        for (const line of lines) {
+            const parts = parseNmcliTerseLine(line);
+''', "saved connection escaped-field parser")
+
+replace_known(nmcli,
+'''    function processSsidOutput(output: string): void {
+        const ssidPrefix = "802-11-wireless.ssid:";
+        const keyMgmtPrefix = `${root.securityKeyMgmt}:`;
+
+        let ssid = "";
+        let keyMgmt = "";
+        for (const line of output.trim().split("\n")) {
+            if (line.startsWith(ssidPrefix))
+                ssid = line.substring(ssidPrefix.length).trim();
+            else if (line.startsWith(keyMgmtPrefix))
+                keyMgmt = line.substring(keyMgmtPrefix.length).trim();
+        }
+
+        if (!ssid || ssid.length === 0)
+            return;
+
+        const ssidLower = ssid.toLowerCase();
+
+        const exists = root.savedConnectionSsids.some(s => s && s.toLowerCase() === ssidLower);
+        if (!exists) {
+            const newList = root.savedConnectionSsids.slice();
+            newList.push(ssid);
+            root.savedConnectionSsids = newList;
+        }
+
+        const security = Object.assign({}, root.savedConnectionSecurity);
+        security[ssidLower] = keyMgmt;
+        root.savedConnectionSecurity = security;
+    }
+''',
+'''    function processSsidOutput(output: string): void {
+        let ssid = "";
+        let keyMgmt = "";
+
+        for (const line of output.split("\n")) {
+            if (!line)
+                continue;
+            const parts = parseNmcliTerseLine(line);
+            if (parts[0] === root.wirelessSsidField)
+                ssid = parts[1] ?? "";
+            else if (parts[0] === root.securityKeyMgmt)
+                keyMgmt = (parts[1] ?? "").trim();
+        }
+
+        if (!ssid || ssid.length === 0)
+            return;
+
+        const exists = root.savedConnectionSsids.some(savedSsid => savedSsid === ssid);
+        if (!exists) {
+            const newList = root.savedConnectionSsids.slice();
+            newList.push(ssid);
+            root.savedConnectionSsids = newList;
+        }
+
+        const security = Object.assign({}, root.savedConnectionSecurity);
+        security[ssid] = keyMgmt;
+        root.savedConnectionSecurity = security;
+    }
+''', "exact saved SSID handling")
+
+replace_known(nmcli,
+'''    function savedSecurityFor(ssid: string): string {
+        if (!ssid || ssid.length === 0)
+            return "";
+        return root.savedConnectionSecurity[ssid.toLowerCase().trim()] || "";
+    }
+
+    function hasSavedProfile(ssid: string): bool {
+        if (!ssid || ssid.length === 0) {
+            return false;
+        }
+        const ssidLower = ssid.toLowerCase().trim();
+
+        if (root.active && root.active.ssid) {
+            const activeSsidLower = root.active.ssid.toLowerCase().trim();
+            if (activeSsidLower === ssidLower) {
+                return true;
+            }
+        }
+
+        const hasSsid = root.savedConnectionSsids.some(savedSsid => savedSsid && savedSsid.toLowerCase().trim() === ssidLower);
+
+        if (hasSsid) {
+            return true;
+        }
+
+        const hasConnectionName = root.savedConnections.some(connName => connName && connName.toLowerCase().trim() === ssidLower);
+
+        return hasConnectionName;
+    }
+''',
+'''    function savedSecurityFor(ssid: string): string {
+        if (!ssid || ssid.length === 0)
+            return "";
+        return root.savedConnectionSecurity[ssid] || "";
+    }
+
+    function hasSavedProfile(ssid: string): bool {
+        if (!ssid || ssid.length === 0)
+            return false;
+
+        if (root.active && root.active.ssid === ssid)
+            return true;
+        if (root.savedConnectionSsids.some(savedSsid => savedSsid === ssid))
+            return true;
+        return root.savedConnections.some(connName => connName === ssid);
+    }
+''', "exact saved-profile matching")
+
+replace_known(nmcli,
+'''        const connectionName = root.savedConnections.find(conn => conn && conn.toLowerCase().trim() === ssid.toLowerCase().trim()) || ssid;
+''',
+'''        const connectionName = root.savedConnections.find(conn => conn === ssid) || ssid;
+''', "exact forget-network matching")
+
+replace_known(add_network,
+'''import qs.services
+import qs.modules.nexus.common
+''',
+'''import qs.services
+import qs.utils
+import qs.modules.nexus.common
+''', "NetworkConnection import")
+
+replace_known(add_network,
+'''    property bool connecting: false
+    property bool failed: false
+    property bool success: false
+''',
+'''    property bool connecting: false
+    property bool failed: false
+    property bool success: false
+    property bool attempted: false
+    property string targetSsid: ""
+    property string failureReason: ""
+''', "connection state")
+
+replace_known(add_network,
+'''    function submit(): void {
+        const ssid = ssidField.text.trim();
+        if (ssid.length === 0) {
+            ssidField.isError = true;
+            ssidField.forceActiveFocus();
+            return;
+        }
+        if (root.secured && passwordField.text.length < 8) {
+            passwordField.isError = true;
+            passwordField.forceActiveFocus();
+            return;
+        }
+
+        root.failed = false;
+        root.connecting = true;
+
+        Nmcli.addHiddenNetwork(ssid, root.secured ? passwordField.text : "", root.secured ? "wpa" : "none", hiddenToggle.checked, result => {
+            root.connecting = false;
+            if (result && result.success) {
+                root.success = true;
+                root.nState.closeSubPage();
+            } else {
+                root.failed = true;
+                if (root.secured)
+                    passwordField.isError = true;
+                // Clean up the half-created profile so a retry starts fresh.
+                Nmcli.forgetNetwork(ssid);
+            }
+        });
+    }
+''',
+'''    function submit(): void {
+        const ssid = root.targetSsid || ssidField.text;
+        if (ssid.length === 0) {
+            ssidField.isError = true;
+            ssidField.forceActiveFocus();
+            return;
+        }
+        if (root.secured && passwordField.text.length < 8) {
+            passwordField.isError = true;
+            passwordField.forceActiveFocus();
+            return;
+        }
+
+        root.failed = false;
+        root.failureReason = "";
+        root.connecting = true;
+        root.attempted = true;
+
+        const handleResult = result => {
+            root.connecting = false;
+            if (result && result.success) {
+                root.success = true;
+                root.nState.pendingNetworkSsid = "";
+                root.nState.closeSubPage();
+            } else {
+                root.failed = true;
+                const detail = (((result && result.error) || "") + " " + ((result && result.output) || "")).toLowerCase();
+                if ((result && result.needsPassword) || detail.includes("secret") || detail.includes("password"))
+                    root.failureReason = Tr.tr("Authentication failed — check the password");
+                else if (detail.includes("ssid-not-found") || detail.includes("not found") || detail.includes("no network with ssid"))
+                    root.failureReason = Tr.tr("Network not found — rescan and try again");
+                else
+                    root.failureReason = Tr.tr("Connection failed — try again");
+                if (root.secured)
+                    passwordField.isError = true;
+                Nmcli.forgetNetwork(ssid);
+            }
+        };
+
+        const target = root.targetSsid ? Nmcli.findNetwork(root.targetSsid) : null;
+        if (target)
+            NetworkConnection.connectWithPassword(target, passwordField.text, handleResult);
+        else
+            Nmcli.addHiddenNetwork(ssid, root.secured ? passwordField.text : "", root.secured ? "wpa" : "none", hiddenToggle.checked, handleResult);
+    }
+''', "exact-SSID connect flow")
+
+replace_known(add_network,
+'''    title: Tr.tr("Add network")
+    isSubPage: true
+
+    ColumnLayout {
+''',
+'''    title: root.targetSsid ? Tr.tr("Connect to %1").arg(root.targetSsid) : Tr.tr("Add network")
+    isSubPage: true
+
+    Component.onCompleted: {
+        root.targetSsid = root.nState.pendingNetworkSsid;
+        if (root.targetSsid) {
+            ssidField.text = root.targetSsid;
+            hiddenToggle.checked = false;
+            passwordField.forceActiveFocus();
+        }
+    }
+
+    ColumnLayout {
+''', "connect-page setup")
+
+replace_known(add_network,
+'''            function onSubPageClosed(): void {
+                if (root.success)
+                    return;
+
+                const ssid = ssidField.text.trim();
+                if (ssid)
+                    Nmcli.forgetNetwork(ssid);
+            }
+''',
+'''            function onSubPageClosed(): void {
+                root.nState.pendingNetworkSsid = "";
+                if (root.success || !root.attempted)
+                    return;
+
+                const ssid = root.targetSsid || ssidField.text;
+                if (ssid)
+                    Nmcli.forgetNetwork(ssid);
+            }
+''', "safe close cleanup")
+
+replace_known(add_network,
+'''            text: Tr.tr("Enter the details below to manually connect to a network.")
+''',
+'''            text: root.targetSsid ? Tr.tr("Enter the password for %1.").arg(root.targetSsid) : Tr.tr("Enter the details below to manually connect to a network.")
+''', "connect-page guidance")
+
+replace_known(add_network,
+'''            placeholderText: Tr.tr("Network name (SSID)")
+            // TRANSLATORS: sample network name, translate the e.g. but the name is a placeholder
+''',
+'''            placeholderText: Tr.tr("Network name (SSID)")
+            enabled: !root.targetSsid
+            // TRANSLATORS: sample network name, translate the e.g. but the name is a placeholder
+''', "locked scanned SSID")
+
+replace_known(add_network,
+'''                errorText: root.failed ? Tr.tr("Connection failed — check the password") : Tr.tr("Password must be at least 8 characters")
+''',
+'''                errorText: root.failed ? (root.failureReason || Tr.tr("Connection failed — try again")) : Tr.tr("Password must be at least 8 characters")
+''', "accurate connection error")
+
+for path, text in texts.items():
+    original = path.read_text(encoding="utf-8")
+    if text != original:
+        path.write_text(text, encoding="utf-8")
+PY
+
+ok "Caelestia Wi-Fi/Nexus patches applied"
 ok "Caelestia patches applied"

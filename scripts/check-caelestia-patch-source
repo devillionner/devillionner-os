@@ -5,6 +5,9 @@ REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 PATCH="$REPO/scripts/patch-caelestia-fullscreen"
 CHECK="$REPO/scripts/check-caelestia-patches"
 SHELL_CHECK="$REPO/scripts/check-caelestia"
+RUNTIME_CHECK="$REPO/scripts/check"
+RECONCILE="$REPO/scripts/reconcile-packages"
+TVCAST_MANIFEST="$REPO/manifests/features/tvcast-repo.txt"
 MANIFEST="$REPO/manifests/profiles/common-aur.txt"
 
 fail() {
@@ -16,7 +19,7 @@ ok() {
     printf '  [OK]   %s\n' "$*"
 }
 
-for file in "$PATCH" "$CHECK" "$SHELL_CHECK" "$MANIFEST"; do
+for file in "$PATCH" "$CHECK" "$SHELL_CHECK" "$RUNTIME_CHECK" "$RECONCILE" "$TVCAST_MANIFEST" "$MANIFEST"; do
     [[ -f "$file" ]] || fail "missing required file: ${file#$REPO/}"
 done
 ok "Caelestia patch source files present"
@@ -40,6 +43,38 @@ MASK='mask: hasFullscreen && !screenState.sidebar ? emptyRegion : regions'
 grep -Fq "$MASK" "$PATCH" || fail "patch script missing fullscreen input-mask result"
 grep -Fq "$MASK" "$CHECK" || fail "runtime checker missing fullscreen input-mask assertion"
 ok "fullscreen input-mask patch is source-validated"
+
+for token in \
+    'NexusState\\.qml' \
+    'NetworkList\\.qml' \
+    'AddNetworkPage\\.qml' \
+    'NetworkConnection\\.qml' \
+    'Nmcli\\.qml'; do
+    grep -Fq "$token" "$PATCH" || fail "patch script missing Wi-Fi QML locator: $token"
+    grep -Fq "$token" "$CHECK" || fail "runtime checker missing Wi-Fi QML locator: $token"
+done
+for token in \
+    'property string pendingNetworkSsid' \
+    'NetworkConnection.handleConnect(modelData, null, target =>' \
+    'function parseNmcliTerseLine(line: string): list<string>' \
+    'ssid: net[3] ?? ""' \
+    'const ssid = root.targetSsid || ssidField.text;' \
+    'NetworkConnection.connectWithPassword(target, passwordField.text, handleResult);' \
+    'Network not found — rescan and try again'; do
+    grep -Fq "$token" "$PATCH" || fail "patch script missing Wi-Fi result: $token"
+    grep -Fq "$token" "$CHECK" || fail "runtime checker missing Wi-Fi result: $token"
+done
+ok "Wi-Fi password/exact-SSID patch is source-validated"
+
+for pkg in network-manager-applet nm-connection-editor; do
+    grep -Fq "$pkg" "$RECONCILE" || fail "reconciler missing forbidden network UI package: $pkg"
+    grep -Fq "$pkg" "$RUNTIME_CHECK" || fail "runtime check missing forbidden network UI package: $pkg"
+done
+grep -Fq 'pacman -Rns --noconfirm' "$RECONCILE" || fail "forbidden package removal is not dependency-clean"
+grep -Fqx 'libappindicator' "$TVCAST_MANIFEST" || fail "TV Cast must retain libappindicator"
+grep -Fq 'nm-applet.service' "$RECONCILE" || fail "nm-applet user service cleanup missing"
+grep -Fq 'pgrep -x nm-applet' "$RUNTIME_CHECK" || fail "runtime nm-applet process check missing"
+ok "Caelestia-only network UI package/session policy is source-validated"
 
 for name in \
     QS_NO_RELOAD_POPUP \

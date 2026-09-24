@@ -44,7 +44,7 @@ All four profiles also include **Spotify + Spicetify** with a curated **Lucid** 
 
 The common cursor is **Bibata Modern Ice** at 24 px, managed across XCursor, GTK and session environment with an XCursor fallback for Hyprland/XWayland consumers.
 
-Caelestia's `shell.json` and `cli.json` are merge-managed rather than blindly replaced. Blueprint owns the common app/idle policy, Colloid-Dark CLI theme setting and Spotify toggle while preserving unrelated local Caelestia settings. The idle policy locks at 30 min, turns the display off at 35 min and suspends/hibernates at 60 min.
+Caelestia's `shell.json` and `cli.json` are merge-managed rather than blindly replaced. Blueprint owns the common app/idle policy, Colloid-Dark CLI theme setting and Spotify toggle while preserving unrelated local Caelestia settings. The idle policy locks at 30 min, turns the display off at 35 min and suspends/hibernates at 60 min. Caelestia is also the single Wi-Fi UI: Blueprint patches its Nexus password flow and exact SSID/BSSID handling, while the redundant `network-manager-applet` / `nm-connection-editor` frontend is removed.
 
 Quickshell is ABI-checked after package reconciliation and restore. If `qs --version` fails or `rebuild-detector` flags `quickshell-git` after a Qt library update, Blueprint performs an intentional same-version-capable rebuild and validates the result before reporting success.
 
@@ -138,7 +138,8 @@ See:
 - Bibata Modern Ice at 24 px is the common cursor; Colloid-Dark remains the common icon theme.
 - System optimization is deliberately conservative: no experimental kernel flags or random sysctl tweaks.
 - Quickshell runtime + shared-library ABI state are validated; stale Qt-linked builds are rebuilt without `--needed` and checked again afterward.
-- Caelestia fullscreen and `Env` compatibility patches are applied during restore and validated afterward.
+- Caelestia fullscreen, `Env`, Wi-Fi password-prompt and exact SSID/BSSID compatibility patches are applied during restore and validated afterward.
+- NetworkManager remains the Wi-Fi backend, but Caelestia is the sole network UI; the GTK nm-applet/editor is removed and FluxCast keeps `libappindicator` explicitly for tray support.
 - TV Cast uses FluxCast/WFD + wf-recorder + Fuzzel and is shared by all four profiles; its supported mode set is fixed at exactly 1080p30, 720p60 and Low Latency 720p30/5 Mbps.
 - KVM/QEMU + libvirt + virt-manager is the standard general VM stack; VirtualBox is not the Blueprint default.
 - Color/ICC tuning is not guessed on unknown displays; the Zenbook color-profile decision remains a measured/researched task.

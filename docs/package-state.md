@@ -13,7 +13,9 @@ Only packages explicitly listed in Blueprint manifests are considered Blueprint-
 └── schema
 ```
 
-Dependencies are deliberately not recorded as owned packages. Software installed manually by the user is therefore outside the Blueprint ownership boundary and is never removed merely because it is absent from a profile manifest.
+Dependencies are deliberately not recorded as owned packages. Software installed manually by the user is therefore outside the normal Blueprint ownership boundary and is never removed merely because it is absent from a profile manifest.
+
+There is one deliberately narrow system-role exception: the reconciler removes `network-manager-applet` and `nm-connection-editor` because Caelestia is the canonical NetworkManager UI. This applies even if those two packages came from the base image rather than an older Blueprint revision. The reconciler first verifies that neither package appears in the desired target set, uses normal dependency-aware removal, and aborts instead of forcing through a conflict.
 
 ## Profile switching
 
@@ -29,12 +31,13 @@ curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/b
 It will:
 
 1. calculate the desired `common + gaming + tvcast` package set;
-2. compare it with the previous Blueprint-managed package set;
-3. remove only obsolete Blueprint-managed packages that are no longer part of the target;
-4. retain packages that another installed package still requires;
-5. install/update the new target packages;
-6. record the new ownership set only after package reconciliation succeeds;
-7. continue with dotfiles, profile configuration and validation.
+2. remove the two explicit Caelestia/network-UI conflicts if present and clear stale nm-applet user autostart state;
+3. compare the result with the previous Blueprint-managed package set;
+4. remove only obsolete Blueprint-managed packages that are no longer part of the target;
+5. retain packages that another installed package still requires;
+6. install/update the new target packages;
+7. record the new ownership set only after package reconciliation succeeds;
+8. continue with dotfiles, profile configuration and validation.
 
 The same mechanism applies independently to Gaming, Work, Laboratory/Dev and University/Uni. University has its own ownership identity even while its current profile-specific manifests are intentionally minimal. Reusable features such as `tvcast` and `virtualization` are included in the desired state when enabled.
 
@@ -50,4 +53,4 @@ This replaces package-specific migration code such as the Caelestia 2.3 → 2.4 
 
 ## Safety
 
-The reconciler never performs a blanket cleanup of foreign or explicitly installed packages. Removal is restricted to the previous Blueprint ownership set. It also avoids forced removal for ordinary obsolete-package cleanup; packages with active reverse dependencies are retained with a warning.
+The reconciler never performs a blanket cleanup of foreign or explicitly installed packages. Ordinary removal is restricted to the previous Blueprint ownership set; the two documented NetworkManager GUI frontends are the only current base-image role-conflict exception. Their removal uses normal dependency checks and aborts on failure. Ordinary obsolete-package cleanup still avoids forced removal; packages with active reverse dependencies are retained with a warning.
