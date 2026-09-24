@@ -78,7 +78,7 @@ for mime in 'x-scheme-handler/magnet' 'application/x-bittorrent'; do
 done
 
 HYPR_USER="$HOME/.config/caelestia/hypr-user.lua"
-if grep -Fq -- '-- BEGIN Fragments Caelestia integration' "$HYPR_USER" 2>/dev/null     && grep -Fq 'opacity = "0.85 override 0.85 override"' "$HYPR_USER" 2>/dev/null     && grep -Fq 'class = "^de\.haeckerfelix\.Fragments$"' "$HYPR_USER" 2>/dev/null; then
+if grep -Fq -- '-- BEGIN Fragments Caelestia integration' "$HYPR_USER" 2>/dev/null     && grep -Fq 'opacity = "0.85 override 0.85 override"' "$HYPR_USER" 2>/dev/null     && grep -Fq 'class = [[^de\.haeckerfelix\.Fragments$]],' "$HYPR_USER" 2>/dev/null; then
     ok "Caelestia/Hyprland Fragments opacity rule"
 else
     fail "Fragments opacity rule differs"

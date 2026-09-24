@@ -85,11 +85,11 @@ text = path.read_text(encoding="utf-8") if path.exists() else ""
 
 start = "-- BEGIN Fragments Caelestia integration"
 end = "-- END Fragments Caelestia integration"
-block = '''-- BEGIN Fragments Caelestia integration
+block = r'''-- BEGIN Fragments Caelestia integration
 hl.window_rule({
     name = "fragments-kitty-opacity",
     match = {
-        class = "^de\\.haeckerfelix\\.Fragments$",
+        class = [[^de\.haeckerfelix\.Fragments$]],
     },
     opacity = "0.85 override 0.85 override",
 })
