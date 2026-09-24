@@ -77,9 +77,25 @@ The reconciler explicitly removes `network-manager-applet` and `nm-connection-ed
 
 This package removal belongs to a full restore/reconciliation. Targeted `devos-blueprint apply caelestia` remains non-destructive and does not uninstall packages.
 
+## Caelestia-first branding
+
+Blueprint deliberately treats **CachyOS as the technical Arch-compatible base** and **Caelestia as the visible desktop identity**.
+
+The managed Caelestia shell config sets `general.logo = "caelestia"`. Caelestia's own `SysInfo` logic therefore uses the Caelestia mark in the top-bar launcher, dashboard identity and lock screen instead of inheriting `LOGO=cachyos` from `/etc/os-release`. The real OS identity is not falsified: `/etc/os-release`, CachyOS repositories, kernels, mirrors, hooks, scheduler/performance settings and Snapper integration remain untouched.
+
+The same configurator suppresses the branded background/launcher layer without removing useful technical tooling:
+
+- the global Cachy-Update tray autostart is overridden per-user and its user timer is masked;
+- any already-running Cachy-Update tray instance is stopped;
+- launcher entries for Cachy-Update, CachyOS Hello, CachyOS Package Installer and CachyOS Kernel Manager are hidden;
+- the kernel manager package itself may remain available as a recovery/technical tool even though it is not part of the normal launcher UX;
+- full package reconciliation removes the pure desktop extras `cachyos-hello`, `cachyos-packageinstaller` and `cachyos-wallpapers`.
+
+The reboot-sensitive boot splash and login-manager styling are intentionally separate. The existing physical host still uses GDM while Blueprint's clean-install baseline is SDDM, so boot/login branding is not changed on production until that path passes the clean-KVM + reboot gates.
+
 ## Safe apply and validation
 
-After pulling Blueprint changes, apply the managed Caelestia JSON settings with:
+After pulling Blueprint changes, apply the managed Caelestia JSON settings and user-level branding policy with:
 
 ```bash
 bash scripts/configure-caelestia

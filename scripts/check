@@ -156,14 +156,16 @@ for pkg in "${AUR_PKGS[@]}"; do
 done
 ((AUR_MISSING == 0)) && ok "AUR/foreign packages ${#AUR_PKGS[@]}/${#AUR_PKGS[@]}" || fail "$AUR_MISSING AUR package(s) missing"
 
-NETWORK_UI_DRIFT=0
-for pkg in network-manager-applet nm-connection-editor; do
+DESKTOP_UI_DRIFT=0
+for pkg in network-manager-applet nm-connection-editor cachyos-hello cachyos-packageinstaller cachyos-wallpapers; do
     if pacman -Qq "$pkg" >/dev/null 2>&1; then
-        printf "         redundant network UI package: %s\n" "$pkg"
-        NETWORK_UI_DRIFT=$((NETWORK_UI_DRIFT + 1))
+        printf "         redundant desktop/UI package: %s\n" "$pkg"
+        DESKTOP_UI_DRIFT=$((DESKTOP_UI_DRIFT + 1))
     fi
 done
-((NETWORK_UI_DRIFT == 0)) && ok "Caelestia is the sole NetworkManager UI package" || fail "$NETWORK_UI_DRIFT redundant NetworkManager GUI package(s)"
+((DESKTOP_UI_DRIFT == 0)) \
+    && ok "Caelestia-first desktop package policy" \
+    || fail "$DESKTOP_UI_DRIFT redundant desktop/UI package(s)"
 
 pacman -Qq libappindicator >/dev/null 2>&1 \
     && ok "libappindicator retained for FluxCast tray backend" \
@@ -184,6 +186,107 @@ do
     [[ -e "$path" || -L "$path" ]] && NM_APPLET_AUTOSTART=$((NM_APPLET_AUTOSTART + 1))
 done
 ((NM_APPLET_AUTOSTART == 0)) && ok "nm-applet user autostart absent" || fail "$NM_APPLET_AUTOSTART nm-applet autostart artifact(s)"
+
+UPDATE_TIMER_STATE="$(systemctl --user is-enabled arch-update.timer 2>/dev/null || true)"
+case "$UPDATE_TIMER_STATE" in
+    masked|not-found|"") ok "Cachy-Update timer suppressed" ;;
+    *) fail "Cachy-Update timer is $UPDATE_TIMER_STATE" ;;
+esac
+pgrep -f '^/usr/lib/arch-update/arch-update-trayif pgrep -af '(^|/)(qs|quickshell)([[:space:]].*)?-c[[:space:]]+caelestia|caelestia[[:space:]]+shell' >/dev/null 2>&1; then
+    ok "Caelestia shell running"
+else
+    warn "Caelestia shell not running in this session"
+fi
+
+section "AUDIO"
+WP="$(wpctl status 2>/dev/null || true)"
+if [[ "$IS_VM" == true ]]; then
+    warn "physical speaker check skipped in VM"
+else
+    grep -q "Speaker" <<< "$WP" && ok "PipeWire speaker sink" || warn "speaker sink not found by generic check"
+fi
+grep -q "WirePlumber" <<< "$WP" && ok "WirePlumber" || fail "WirePlumber not visible"
+if [[ "$HARDWARE" == "asus-zenbook-ux3405ca" ]]; then
+    EE_OUT="$HOME/.local/share/easyeffects/output"
+    PRESET_MISSING=0
+    for preset in "Laptop.json" "Dolby Atmos.json" "Sony AutoEq Harman.json"; do
+        [[ -f "$EE_OUT/$preset" ]] || {
+            printf "         missing preset: %s\n" "$preset"
+            PRESET_MISSING=$((PRESET_MISSING + 1))
+        }
+    done
+    ((PRESET_MISSING == 0)) && ok "Zenbook EasyEffects presets present" || warn "$PRESET_MISSING Zenbook EasyEffects preset(s) missing"
+else
+    ok "EasyEffects presets are user-managed on generic hardware"
+fi
+
+if feature_enabled virtualization; then
+    section "VIRTUALIZATION"
+    for cmd in virsh virt-manager qemu-system-x86_64; do
+        command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd missing"
+    done
+    systemctl is-enabled libvirtd.socket >/dev/null 2>&1 && ok "libvirtd.socket enabled" || fail "libvirtd.socket not enabled"
+    [[ -x "$HOME/.local/bin/devos-vm" ]] && ok "devos-vm launcher" || fail "devos-vm launcher missing"
+    if [[ -e /dev/kvm ]]; then
+        ok "/dev/kvm hardware acceleration"
+    elif [[ "$IS_VM" == true ]]; then
+        warn "nested /dev/kvm not exposed by outer VM"
+    else
+        fail "/dev/kvm missing on physical virtualization host"
+    fi
+    if virsh -c qemu:///system net-info default >/dev/null 2>&1; then
+        ok "libvirt default network accessible"
+    else
+        warn "libvirt network will be rechecked after relogin (libvirt group membership may be new)"
+    fi
+fi
+
+section "COMPONENT RUNTIME CHECKS"
+run_component_check "Display Manager" bash "$REPO/scripts/check-display-manager"
+run_component_check "Service Manifests" bash "$REPO/scripts/check-services" --profile "$PROFILE"
+run_component_check "Quickshell" bash "$REPO/scripts/check-quickshell"
+run_component_check "Caelestia" bash "$REPO/scripts/check-caelestia"
+run_component_check "Cursor" bash "$REPO/scripts/check-cursor"
+run_component_check "Dolphin" bash "$REPO/scripts/check-dolphin"
+run_component_check "Spotify" bash "$REPO/scripts/check-spotify"
+if feature_enabled tvcast; then
+    run_component_check "TV Cast" bash "$REPO/scripts/check-tv-cast"
+fi
+
+section "BLUEPRINT SOURCE"
+RECORDED_REVISION="$(cat "$(bp_config_dir)/source-revision" 2>/dev/null || true)"
+ACTIVE_REVISION="${DEVOS_SOURCE_REVISION:-}"
+SOURCE_IS_GIT=false
+if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    SOURCE_IS_GIT=true
+    ACTIVE_REVISION="$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)"
+    ok "local Git checkout source"
+    [[ -n "$(git -C "$REPO" status --porcelain)" ]] && warn "working tree has uncommitted changes" || ok "working tree clean"
+elif [[ "${DEVOS_SOURCE_MODE:-}" == "ephemeral" && "$ACTIVE_REVISION" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    ok "temporary remote source bundle (${ACTIVE_REVISION:0:12})"
+    ok "no persistent Git checkout required"
+else
+    fail "Blueprint source identity is unknown"
+fi
+
+if [[ "$RECORDED_REVISION" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    ok "installed Blueprint revision recorded (${RECORDED_REVISION:0:12})"
+    if [[ "$ACTIVE_REVISION" =~ ^[0-9a-fA-F]{40}$ && "${ACTIVE_REVISION,,}" != "${RECORDED_REVISION,,}" ]]; then
+        warn "validation source differs from installed revision (${ACTIVE_REVISION:0:12} != ${RECORDED_REVISION:0:12})"
+    fi
+else
+    warn "installed Blueprint revision is not recorded yet"
+fi
+
+printf "\n========================================\n"
+printf "OK: %d   WARN: %d   FAIL: %d\n" "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then
+    printf "RESULT: PASS\n"
+    exit 0
+fi
+printf "RESULT: FAIL\n"
+exit 1
+ >/dev/null 2>&1     && fail "Cachy-Update tray process running"     || ok "Cachy-Update tray process absent"
 
 section "DESKTOP SESSION"
 if pgrep -af '(^|/)(qs|quickshell)([[:space:]].*)?-c[[:space:]]+caelestia|caelestia[[:space:]]+shell' >/dev/null 2>&1; then

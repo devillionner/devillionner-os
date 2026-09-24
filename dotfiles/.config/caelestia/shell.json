@@ -43,7 +43,8 @@
                 "kitty"
             ]
         },
-        "showOverFullscreen": true
+        "showOverFullscreen": true,
+        "logo": "caelestia"
     },
     "services": {
         "brightnessIncrement": 0.05,

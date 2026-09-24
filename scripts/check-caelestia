@@ -34,6 +34,7 @@ assert data["dashboard"]["showDashboard"] is True
 assert data["dashboard"]["showOnHover"] is True
 
 general = data["general"]
+assert general["logo"] == "caelestia"
 assert general["showOverFullscreen"] is True
 assert general["apps"]["explorer"] == ["dolphin"]
 assert general["apps"]["playback"] == ["clapper"]
@@ -59,6 +60,70 @@ then
 else
     fail "shell.json is invalid or managed values differ"
 fi
+
+BRANDING_DRIFT=0
+for pkg in cachyos-hello cachyos-packageinstaller cachyos-wallpapers; do
+    if pacman -Qq "$pkg" >/dev/null 2>&1; then
+        printf '         redundant branded package: %s\n' "$pkg"
+        BRANDING_DRIFT=$((BRANDING_DRIFT + 1))
+    fi
+done
+((BRANDING_DRIFT == 0)) \
+    && ok "pure CachyOS desktop branding packages absent" \
+    || fail "$BRANDING_DRIFT pure CachyOS desktop branding package(s) installed"
+
+UPDATE_TIMER_STATE="$(systemctl --user is-enabled arch-update.timer 2>/dev/null || true)"
+case "$UPDATE_TIMER_STATE" in
+    masked|not-found|"") ok "Cachy-Update background timer suppressed" ;;
+    *) fail "Cachy-Update background timer is $UPDATE_TIMER_STATE" ;;
+esac
+
+if pgrep -f '^/usr/lib/arch-update/arch-update-tray    ok "caelestia CLI available"
+else
+    warn "caelestia CLI not found in PATH"
+fi
+
+printf '\n'
+if bash "$REPO/scripts/check-caelestia-patches"; then
+    ok "installed Caelestia package patches match Blueprint"
+else
+    fail "installed Caelestia package patches differ or upstream changed"
+fi
+
+printf '\n========================================\n'
+printf 'Caelestia summary: OK: %d   WARN: %d   FAIL: %d\n' "$OK" "$WARN" "$FAIL"
+if ((FAIL == 0)); then
+    printf 'RESULT: PASS\n'
+    exit 0
+fi
+printf 'RESULT: FAIL\n'
+exit 1
+ >/dev/null 2>&1; then
+    fail "Cachy-Update tray process is running"
+else
+    ok "Cachy-Update tray process absent"
+fi
+
+if grep -Fq 'Hidden=true' "$HOME/.config/autostart/arch-update-tray.desktop" 2>/dev/null; then
+    ok "system Cachy-Update autostart is user-overridden"
+else
+    fail "Cachy-Update autostart override missing"
+fi
+
+HIDDEN_LAUNCHERS=0
+for desktop in \
+    arch-update.desktop \
+    arch-update-tray.desktop \
+    cachyos-hello.desktop \
+    cachyos-pi.desktop \
+    org.cachyos.KernelManager.desktop
+do
+    grep -Fq 'Hidden=true' "$HOME/.local/share/applications/$desktop" 2>/dev/null \
+        || HIDDEN_LAUNCHERS=$((HIDDEN_LAUNCHERS + 1))
+done
+((HIDDEN_LAUNCHERS == 0)) \
+    && ok "CachyOS-branded launcher entries hidden" \
+    || fail "$HIDDEN_LAUNCHERS CachyOS-branded launcher override(s) missing"
 
 if command -v caelestia >/dev/null 2>&1; then
     ok "caelestia CLI available"

@@ -12,5 +12,47 @@ DST="$HOME/.config/caelestia/shell.json"
 bp_info "Merging Blueprint-owned Caelestia shell settings"
 python3 "$REPO/scripts/lib/merge-caelestia-shell.py" "$SRC" "$DST"
 
+bp_info "Applying Caelestia-first desktop branding policy"
+mkdir -p "$HOME/.config/autostart" "$HOME/.local/share/applications"
+
+# Caelestia is the visible shell identity. Keep CachyOS as the technical base,
+# but suppress its welcome/update tray and branded launcher shortcuts.
+rm -f "$HOME/.config/autostart/cachyos-hello.desktop"
+cat > "$HOME/.config/autostart/arch-update-tray.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Cachy-Update Systray Applet
+Hidden=true
+NoDisplay=true
+EOF
+
+for desktop in \
+    arch-update.desktop \
+    arch-update-tray.desktop \
+    cachyos-hello.desktop \
+    cachyos-pi.desktop \
+    org.cachyos.KernelManager.desktop
+do
+    cat > "$HOME/.local/share/applications/$desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Hidden by Blueprint
+Exec=/usr/bin/true
+Hidden=true
+NoDisplay=true
+EOF
+done
+
+if systemctl --user cat arch-update.timer >/dev/null 2>&1; then
+    systemctl --user mask --now arch-update.timer >/dev/null 2>&1 || true
+    systemctl --user stop arch-update.service arch-update-notification.service >/dev/null 2>&1 || true
+fi
+pkill -f '^/usr/lib/arch-update/arch-update-tray >/dev/null 2>&1 || true
+systemctl --user daemon-reload >/dev/null 2>&1 || true
+command -v update-desktop-database >/dev/null 2>&1 \
+    && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 \
+    || true
+
+bp_ok "Caelestia-first branding applied; CachyOS remains the technical base"
 bp_ok "Caelestia shell config merged safely"
 bp_info "Idle policy: lock 30 min, display off 35 min, suspend/hibernate 60 min"

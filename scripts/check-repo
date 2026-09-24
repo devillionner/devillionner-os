@@ -130,6 +130,21 @@ else
     fail "Caelestia shell restore/check wiring is incomplete"
 fi
 
+BRANDING_CONFIG="$REPO/dotfiles/.config/caelestia/shell.json"
+BRANDING_APPLY="$REPO/scripts/configure-caelestia"
+BRANDING_RECONCILE="$REPO/scripts/reconcile-packages"
+if grep -Fq '"logo": "caelestia"' "$BRANDING_CONFIG" \
+    && grep -Fq 'arch-update.timer' "$BRANDING_APPLY" \
+    && grep -Fq 'org.cachyos.KernelManager.desktop' "$BRANDING_APPLY"; then
+    ok "Caelestia-first branding source contract"
+else
+    fail "Caelestia-first branding source contract incomplete"
+fi
+for pkg in cachyos-hello cachyos-packageinstaller cachyos-wallpapers; do
+    grep -Fq "$pkg" "$BRANDING_RECONCILE" \
+        || fail "reconciler missing branded package cleanup: $pkg"
+done
+
 if grep -Fq '"$REPO/scripts/configure-spotify"' "$RESTORE" \
     && grep -Fq '$REPO/scripts/check-spotify' "$RUNTIME_CHECK"; then
     ok "Spotify is wired into restore + aggregate validation"

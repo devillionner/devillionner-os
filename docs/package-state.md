@@ -15,7 +15,7 @@ Only packages explicitly listed in Blueprint manifests are considered Blueprint-
 
 Dependencies are deliberately not recorded as owned packages. Software installed manually by the user is therefore outside the normal Blueprint ownership boundary and is never removed merely because it is absent from a profile manifest.
 
-There is one deliberately narrow system-role exception: the reconciler removes `network-manager-applet` and `nm-connection-editor` because Caelestia is the canonical NetworkManager UI. This applies even if those two packages came from the base image rather than an older Blueprint revision. The reconciler first verifies that neither package appears in the desired target set, uses normal dependency-aware removal, and aborts instead of forcing through a conflict.
+There is one deliberately narrow system-role exception for the visible desktop layer. The reconciler removes `network-manager-applet` and `nm-connection-editor` because Caelestia is the canonical NetworkManager UI, and also removes the pure CachyOS desktop extras `cachyos-hello`, `cachyos-packageinstaller` and `cachyos-wallpapers`. These removals apply even when the packages came from the base image rather than an older Blueprint revision. The reconciler first verifies that none of them appears in the desired target set, uses normal dependency-aware removal, and aborts instead of forcing through a conflict. CachyOS kernels, repositories, mirrors, hooks, performance settings and recovery tooling are not part of this exception.
 
 ## Profile switching
 
@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/devillionner/devillionner-os/main/b
 It will:
 
 1. calculate the desired `common + gaming + tvcast` package set;
-2. remove the two explicit Caelestia/network-UI conflicts if present and clear stale nm-applet user autostart state;
+2. remove the explicit Caelestia/network-UI conflicts and pure CachyOS desktop extras if present, while preserving the technical CachyOS base;
 3. compare the result with the previous Blueprint-managed package set;
 4. remove only obsolete Blueprint-managed packages that are no longer part of the target;
 5. retain packages that another installed package still requires;
@@ -53,4 +53,4 @@ This replaces package-specific migration code such as the Caelestia 2.3 → 2.4 
 
 ## Safety
 
-The reconciler never performs a blanket cleanup of foreign or explicitly installed packages. Ordinary removal is restricted to the previous Blueprint ownership set; the two documented NetworkManager GUI frontends are the only current base-image role-conflict exception. Their removal uses normal dependency checks and aborts on failure. Ordinary obsolete-package cleanup still avoids forced removal; packages with active reverse dependencies are retained with a warning.
+The reconciler never performs a blanket cleanup of foreign or explicitly installed packages. Ordinary removal is restricted to the previous Blueprint ownership set; the documented Caelestia-first desktop conflicts are the only current base-image role exceptions. Their removal uses normal dependency checks and aborts on failure. Ordinary obsolete-package cleanup still avoids forced removal; packages with active reverse dependencies are retained with a warning.
