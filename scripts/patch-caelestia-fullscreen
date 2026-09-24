@@ -194,7 +194,7 @@ migrate_live(
 
 migrate_live(
     nmcli,
-    '''                // SSIDs may legally contain backslashes and leading/trailing spaces.
+    r'''                // SSIDs may legally contain backslashes and leading/trailing spaces.
                 // Preserve them exactly; nmcli escapes both ':' and '\\' in terse output.
 ''',
     '''                // SSIDs are byte-significant: preserve backslashes, case and whitespace.
