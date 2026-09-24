@@ -477,6 +477,7 @@ r'''    function processSsidOutput(output: string): void {
         for (const line of output.split("\n")) {
             if (!line)
                 continue;
+
             const parts = parseNmcliTerseLine(line);
             if (parts[0] === root.wirelessSsidField)
                 ssid = parts[1] ?? "";
