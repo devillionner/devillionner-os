@@ -170,6 +170,127 @@ def replace_known(path, old, new, label):
     texts[path] = text.replace(old, new, 1)
     print(f"{path.name}: {label} patched")
 
+def migrate_live(path, old, new, label):
+    text = texts[path]
+    if old not in text:
+        return
+    if text.count(old) != 1:
+        raise SystemExit(f"{path.name}: ambiguous live-host state for {label}")
+    texts[path] = text.replace(old, new, 1)
+    print(f"{path.name}: {label} migrated")
+
+# Normalize the Wi-Fi variant proven interactively on the physical host before
+# this patch became Blueprint-managed. This keeps targeted apply idempotent.
+migrate_live(
+    network_connection,
+    '''        // For a secured network without a saved profile, ask for the password
+        // before disconnecting the current network. This keeps connectivity alive
+        // while the user enters credentials and avoids a pointless failed attempt.
+''',
+    '''        // Ask for credentials before disconnecting the current network.
+''',
+    "live credential-first comment",
+)
+
+migrate_live(
+    nmcli,
+    '''                // SSIDs may legally contain backslashes and leading/trailing spaces.
+                // Preserve them exactly; nmcli escapes both ':' and '\\' in terse output.
+''',
+    '''                // SSIDs are byte-significant: preserve backslashes, case and whitespace.
+''',
+    "live exact-SSID parser comment",
+)
+
+migrate_live(
+    nmcli,
+    '''        // SSIDs are case-sensitive byte strings and spaces are significant.
+        if (root.active && root.active.ssid === ssid)
+''',
+    '''        if (root.active && root.active.ssid === ssid)
+''',
+    "live exact-SSID match comment",
+)
+
+if 'property bool attempted: false' in texts[add_network]:
+    migrate_live(
+        add_network,
+        '''    property bool attempted: false
+    property string targetSsid: ""
+''',
+        '''    property bool attempted: false
+    property string targetSsid: ""
+    property string failureReason: ""
+''',
+        "live failure-reason state",
+    )
+    migrate_live(
+        add_network,
+        '''        // Never trim an SSID selected from scan results: leading/trailing spaces
+        // are valid and are part of the network name.
+        const ssid = root.targetSsid || ssidField.text;
+''',
+        '''        const ssid = root.targetSsid || ssidField.text;
+''',
+        "live exact-SSID submit comment",
+    )
+    migrate_live(
+        add_network,
+        '''        root.failed = false;
+        root.connecting = true;
+        root.attempted = true;
+''',
+        '''        root.failed = false;
+        root.failureReason = "";
+        root.connecting = true;
+        root.attempted = true;
+''',
+        "live failure-reason reset",
+    )
+    migrate_live(
+        add_network,
+        '''            } else {
+                root.failed = true;
+                if (root.secured)
+                    passwordField.isError = true;
+                Nmcli.forgetNetwork(ssid);
+            }
+''',
+        '''            } else {
+                root.failed = true;
+                const detail = (((result && result.error) || "") + " " + ((result && result.output) || "")).toLowerCase();
+                if ((result && result.needsPassword) || detail.includes("secret") || detail.includes("password"))
+                    root.failureReason = Tr.tr("Authentication failed — check the password");
+                else if (detail.includes("ssid-not-found") || detail.includes("not found") || detail.includes("no network with ssid"))
+                    root.failureReason = Tr.tr("Network not found — rescan and try again");
+                else
+                    root.failureReason = Tr.tr("Connection failed — try again");
+                if (root.secured)
+                    passwordField.isError = true;
+                Nmcli.forgetNetwork(ssid);
+            }
+''',
+        "live connection error classification",
+    )
+    migrate_live(
+        add_network,
+        '''        const target = root.targetSsid ? Nmcli.findNetwork(root.targetSsid) : null;
+        if (target) {
+            // Use the scanned access point (including its exact SSID and BSSID).
+            NetworkConnection.connectWithPassword(target, passwordField.text, handleResult);
+        } else {
+            Nmcli.addHiddenNetwork(ssid, root.secured ? passwordField.text : "", root.secured ? "wpa" : "none", hiddenToggle.checked, handleResult);
+        }
+''',
+        '''        const target = root.targetSsid ? Nmcli.findNetwork(root.targetSsid) : null;
+        if (target)
+            NetworkConnection.connectWithPassword(target, passwordField.text, handleResult);
+        else
+            Nmcli.addHiddenNetwork(ssid, root.secured ? passwordField.text : "", root.secured ? "wpa" : "none", hiddenToggle.checked, handleResult);
+''',
+        "live scanned-BSSID connect style",
+    )
+
 replace_known(nexus_state,
 '''    property string selectedNetworkSsid
     property string selectedEthernetInterface

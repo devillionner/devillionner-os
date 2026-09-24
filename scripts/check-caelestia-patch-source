@@ -45,11 +45,11 @@ grep -Fq "$MASK" "$CHECK" || fail "runtime checker missing fullscreen input-mask
 ok "fullscreen input-mask patch is source-validated"
 
 for token in \
-    'NexusState\\.qml' \
-    'NetworkList\\.qml' \
-    'AddNetworkPage\\.qml' \
-    'NetworkConnection\\.qml' \
-    'Nmcli\\.qml'; do
+    'NexusState\.qml' \
+    'NetworkList\.qml' \
+    'AddNetworkPage\.qml' \
+    'NetworkConnection\.qml' \
+    'Nmcli\.qml'; do
     grep -Fq "$token" "$PATCH" || fail "patch script missing Wi-Fi QML locator: $token"
     grep -Fq "$token" "$CHECK" || fail "runtime checker missing Wi-Fi QML locator: $token"
 done
